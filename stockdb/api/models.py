@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
@@ -104,9 +104,9 @@ class YahooTickerIdentifier(BaseModel):
     exch_id: str
 
 
-class ExchangeTickers(BaseModel):
-    exchange: str
-    tickers: list[str]
+class ExchangeTickerInfo(BaseModel):
+    ticker: str | None = None
+    company: str | None = None
 
 
 class ExchangeTickersInfo(BaseModel):
@@ -116,12 +116,14 @@ class ExchangeTickersInfo(BaseModel):
 
 
 class TickerHistoryOutput(BaseModel):
-    date: date
+    date: datetime | None = None
+    ticker: str | None = None
+    company: str | None = None
     open: float | None = None
     high: float | None = None
     low: float | None = None
     close: float | None = None
-    volume: float | None = None
+    volume: int | None = None
     # REVIEW - maybe required in future
     # dividends: float | None = None
     # stock_splits: float | None = Field(None, alias="Stock Splits")
@@ -174,6 +176,8 @@ class TickerHistoryQuery(BaseModel):
 
     @model_validator(mode="after")
     def check_start_end_date(self):
+        if (self.start_date is not None) and (self.end_date is None):
+            raise ValueError("end_date is required when start_date is set")
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self

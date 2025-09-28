@@ -19,9 +19,8 @@ async def yahoo_finance_aware_ticker(
     ticker: Annotated[str, Path(description="Desired company's `Ticker` symbol")],
 ) -> YahooTickerIdentifier:
     """Dependency to get Yahoo Finance aware ticker symbol"""
-    ticker = ticker.upper()  # making sure that ticker symbol are always Upper case
     return YahooTickerIdentifier(
-        symbol=ticker,
+        symbol=ticker.upper(),  # making sure that ticker symbol are always Upper case
         exchange=exchange.name.upper(),
         exch_id=getattr(StockExchangeYahooIdentifier, exchange.name),
     )

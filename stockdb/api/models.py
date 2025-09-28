@@ -177,7 +177,7 @@ class TickerHistoryQuery(BaseModel):
     @model_validator(mode="after")
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
-            raise ValueError("start_date and end_date cannot be both None")
+            raise ValueError("end_date is required when start_date is set")
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self

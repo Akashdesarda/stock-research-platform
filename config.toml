@@ -1,0 +1,3 @@
+[stockdb]
+data_base_path = 'C:\Users\desar\projects\stock-research-platform\stockdb\temp_data'
+download_batch_size = 40

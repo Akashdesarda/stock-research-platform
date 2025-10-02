@@ -1,13 +1,13 @@
-FROM python:3.13-slim
+FROM python:3.13-slim-bookworm
 
-RUN apt update -y && apt upgrade -y && \
+RUN apt update -y && \
     apt --no-install-recommends -y install gcc g++ && \
-    apt purge -y && rm -rf /var/lib/apt/lists/*
+    apt clean -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /stockdb
 
 # Setting up uv environment
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:python3.13-bookworm-slim /uv /uvx /bin/
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \

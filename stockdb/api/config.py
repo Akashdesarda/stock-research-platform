@@ -5,14 +5,14 @@ from pydantic import BaseModel
 from pydantic.types import DirectoryPath
 from pydantic_settings import (
     BaseSettings,
-    SettingsConfigDict,
     PydanticBaseSettingsSource,
+    SettingsConfigDict,
     TomlConfigSettingsSource,
 )
 
 # Define the default config path
 default_config_path = Path(__file__).parent.parent.parent / "config.toml"
-config_path = Path(os.getenv("config_path", default_config_path.resolve().as_posix()))
+config_path = Path(os.getenv("CONFIG_FILE", default_config_path.resolve().as_posix()))
 
 
 # StockDB model for the 'stockdb' section

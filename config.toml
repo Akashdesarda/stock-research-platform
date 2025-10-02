@@ -1,0 +1,3 @@
+[stockdb]
+data_base_path = '/stockdb/data' # WARNING - Currently this will only work in docker
+download_batch_size = 40

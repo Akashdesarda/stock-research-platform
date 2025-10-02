@@ -1,10 +1,10 @@
 FROM python:3.13-slim
 
-RUN apt update -y && apt upgrade && \
+RUN apt update -y && apt upgrade -y && \
     apt --no-install-recommends -y install gcc g++ && \
     apt purge -y && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /stockdb
 
 # Setting up uv environment
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -16,11 +16,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # Copy the project into the image
-COPY stockdb .
+COPY . .
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
 EXPOSE 8000
-CMD ["uv", "run", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run","uvicorn", "main:app", "--no-access-log", "--host", "0.0.0.0", "--port", "8000"]

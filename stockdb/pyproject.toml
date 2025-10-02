@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "alive-progress>=3.3.0",
     "fastapi>=0.116.1",
+    "orjson>=3.11.3",
     "polars[deltalake,pyarrow]>=1.33.0",
     "pydantic-settings>=2.10.1",
     "rich>=14.1.0",

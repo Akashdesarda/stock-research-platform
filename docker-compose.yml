@@ -1,0 +1,14 @@
+name: stock-research-platform
+services:
+  stockdb-api:
+    build:
+      context: ./stockdb
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - type: bind
+        source: C:\Users\AkashDesarda\AppData\Roaming\stock-research-platform
+        target: /stockdb/data
+    environment:
+      CONFIG_FILE: /stockdb/data/config.toml

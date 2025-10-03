@@ -12,3 +12,4 @@ services:
         target: /stockdb/data
     environment:
       CONFIG_FILE: /stockdb/data/config.toml
+      DOCKER_CONTAINER: "true" # Explicit Docker environment flag

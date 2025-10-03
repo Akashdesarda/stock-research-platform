@@ -1,9 +1,9 @@
 from pathlib import Path
 
+import polars as pl
 from api.config import Settings
 from api.data import StockDataDB
 from deltalake.table import DeltaTable
-import polars as pl
 
 settings = Settings()
 
@@ -27,5 +27,5 @@ def test_table_schema():
     st_db = StockDataDB(settings.stockdb.data_base_path / "nse/ticker_history")
     s = st_db.table_data.collect_schema()
     assert s["date"] == pl.Datetime
-    assert s["key"] == pl.String
-    assert s["close"] == pl.Float64
+    assert s["company"] == pl.String
+    assert s["close"] == pl.Float32

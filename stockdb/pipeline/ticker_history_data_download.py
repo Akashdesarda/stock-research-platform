@@ -3,12 +3,11 @@ import logging
 from datetime import date, timedelta
 
 import polars as pl
-from rich.prompt import Prompt
-from rich.progress import track
-
 from api.config import Settings
 from api.data import StockDataDB, YFStockData
 from api.models import Interval, Period, StockExchange, StockExchangeYahooIdentifier
+from rich.progress import track
+from rich.prompt import Prompt
 
 logger = logging.getLogger("stockdb")
 settings = Settings()
@@ -26,23 +25,7 @@ def calculate_batches(n: int, batch_size: int) -> int:
 
 
 def prepare_ticker_history_table(symbol: str, df: pl.DataFrame) -> pl.LazyFrame:
-    if df.is_empty():
-        logger.warning(
-            f"got empty dataframe, may not able to download {symbol} data from yahoo"
-        )
-        # passing empty lazyframe, which won't be considered while using pl.concat() in downstream
-        return pl.LazyFrame(
-            schema={
-                "date": pl.Datetime("ns"),
-                "open": pl.Float32,
-                "high": pl.Float32,
-                "low": pl.Float32,
-                "close": pl.Float32,
-                "volume": pl.Int64,
-                "ticker": pl.String,
-            }
-        )
-    else:
+    if not df.is_empty():
         return (
             df.lazy()  # converting to lazyframe
             .with_columns(
@@ -55,6 +38,21 @@ def prepare_ticker_history_table(symbol: str, df: pl.DataFrame) -> pl.LazyFrame:
             .drop_nulls()
             # .select("date", "key", "ticker", "open", "high", "low", "close", "volume")
         )
+    logger.warning(
+        f"got empty dataframe, may not able to download {symbol} data from yahoo"
+    )
+    # passing empty lazyframe, which won't be considered while using pl.concat() in downstream
+    return pl.LazyFrame(
+        schema={
+            "date": pl.Datetime("ns"),
+            "open": pl.Float32,
+            "high": pl.Float32,
+            "low": pl.Float32,
+            "close": pl.Float32,
+            "volume": pl.Int64,
+            "ticker": pl.String,
+        }
+    )
 
 
 def download_specific_date_ticker_history(

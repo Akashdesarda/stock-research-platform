@@ -4,6 +4,7 @@ services:
     build:
       context: ./stockdb
       dockerfile: Dockerfile
+    image: akashdesarda/srp-stockdb-api:latest
     ports:
       - "8000:8000"
     volumes:

@@ -1,5 +1,19 @@
-name: stock-research-platform
+name: Stock-Research-Assistant
 services:
+  init:
+    image: alpine:latest
+    volumes:
+      - shared-data:/shared
+      - type: bind
+        # Copy the config file from the host to the container's /tmp directory
+        source: ./config.toml
+        target: /tmp/config.toml
+        read_only: true
+    # Copy the config file from container's /tmp to the shared volume
+    command: cp /tmp/config.toml /shared/config.toml
+    profiles:
+      - init
+
   stockdb-api:
     build:
       context: ./stockdb
@@ -7,9 +21,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - type: bind
-        source: C:\Users\AkashDesarda\AppData\Roaming\stock-research-platform
-        target: /stockdb/data
+      - shared-data:/stockdb/shared
     environment:
-      CONFIG_FILE: /stockdb/data/config.toml
+      CONFIG_FILE: /stockdb/shared/config.toml
       DOCKER_CONTAINER: "true" # Explicit Docker environment flag
+
+volumes:
+  shared-data:
+    name: "sra-shared-data"

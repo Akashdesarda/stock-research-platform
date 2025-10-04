@@ -19,7 +19,7 @@ settings = Settings()
 router = APIRouter(prefix="/api/task", tags=[APITags.task])
 
 
-@router.post("/ticker-history")
+@router.post("/ticker/history")
 async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInput):
     """Trigger daily ticker history download for all tickers in given exchange"""
     # SECTION 1- Auto mode

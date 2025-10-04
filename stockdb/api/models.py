@@ -9,6 +9,7 @@ class APITags(Enum):
     per_security = "Per Security"
     bulk = "Bulk"
     dataset = "Dataset"
+    task = "Task"
 
 
 class Period(Enum):
@@ -98,6 +99,16 @@ class SuperTrendRecentNDatasetFormat(Enum):
     ticker_only = "tickers-only"
 
 
+class TickerHistoryDownloadMode(Enum):
+    full = "full"
+    incremental = "incremental"
+
+
+class TaskMode(Enum):
+    auto = "auto"
+    manual = "manual"
+
+
 class YahooTickerIdentifier(BaseModel):
     symbol: str
     exchange: str
@@ -163,12 +174,12 @@ class TickerHistoryQuery(BaseModel):
         Period.ONE_DAY,
         description="Day period between historical data points. This is mutually exclusive with `start_date` and `end_date`",
     )
-    start_date: date = Field(
+    start_date: date | None = Field(
         None,
         description="Start date for historical data points. This is mutually exclusive with `period`",
         examples=["2024-01-01", "2020-12-31"],
     )
-    end_date: date = Field(
+    end_date: date | None = Field(
         None,
         description="End date for historical data points. This is mutually exclusive with `period`",
         examples=["2024-02-01", "2021-01-31"],
@@ -235,6 +246,81 @@ class TickerInput(BaseModel):
                 symbol=t,
                 exchange=exchange.name,
                 exch_id=getattr(StockExchangeYahooIdentifier, exchange.name),
+            )
+            for t in self.ticker
+        ]
+
+
+class TaskTickerHistoryDownloadInput(BaseModel):
+    exchange: StockExchange = Field(
+        StockExchange.nse, description="Stock Exchange to download ticker history for"
+    )
+    task_mode: TaskMode = Field(TaskMode.auto, description="Mode of task execution")
+    download_mode: TickerHistoryDownloadMode = Field(
+        TickerHistoryDownloadMode.incremental,
+        description="Download mode. `full` mode downloads complete history. `incremental` mode downloads only latest/missing data.",
+    )
+    ticker: list[str] | None = Field(
+        None,
+        description="Desired company's `Ticker` symbol. If not provided, all tickers in the exchange will be processed.",
+        examples=[
+            ["infy", "tcs", "AKASH"],
+            ["AAPL", "msft"],
+        ],
+    )
+    start_date: date | None = Field(
+        None,
+        description="Start date for historical data points. Only used in `manual` mode.",
+        examples=["2024-01-01", "2021-01-01"],
+    )
+    end_date: date | None = Field(
+        None,
+        description="End date for historical data points. Only used in `manual` mode.",
+        examples=["2024-02-01", "2021-01-31"],
+    )
+
+    @model_validator(mode="after")
+    def validate_manual_mode_dates(self):
+        # In auto mode, start_date and end_date should not be provided
+        if self.task_mode == TaskMode.auto and (
+            self.start_date is not None or self.end_date is not None
+        ):
+            raise ValueError(
+                "start_date and end_date should not be provided in auto mode"
+            )
+        if self.task_mode == TaskMode.manual:
+            if self.start_date is None or self.end_date is None:
+                raise ValueError("start_date and end_date are required in manual mode")
+            if self.start_date > self.end_date:
+                raise ValueError("start_date must be less than end_date")
+        return self
+
+    def get_yahoo_aware_ticker(self) -> list[YahooTickerIdentifier]:
+        """Get Ticker wrt to yahoo aware exchange."""
+        if self.ticker is None:
+            from polars import scan_delta
+
+            from api.config import Settings
+
+            settings = Settings()
+
+            self.ticker = (
+                scan_delta(settings.stockdb.data_base_path / "common/security")
+                .select(self.exchange.value)
+                .explode(self.exchange.value)
+                .collect()
+                .to_series()
+                .to_list()
+            )
+
+        self.ticker = [
+            t.upper() for t in self.ticker
+        ]  # making sure that ticker symbol are always Upper case
+        return [
+            YahooTickerIdentifier(
+                symbol=t,
+                exchange=self.exchange.name,
+                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
             )
             for t in self.ticker
         ]

@@ -5,7 +5,7 @@ import traceback
 from about_time import about_time
 from api.config import Settings
 from api.models import APITags
-from api.routers import per_security
+from api.routers import per_security, tasks
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from scalar_fastapi import get_scalar_api_reference
@@ -14,7 +14,7 @@ logger = logging.getLogger("stockdb")
 settings = Settings()
 
 app = FastAPI(
-    debug=True, title="StockDB API", version="0.0.3", docs_url=None, redoc_url=None
+    debug=True, title="StockDB API", version="0.1.3", docs_url=None, redoc_url=None
 )
 
 
@@ -58,8 +58,9 @@ async def _index():
     return {"message": "StockDB API is up and running"}
 
 
-# adding all the routers from submodules wrt to v2 model
+# adding all the routers from submodules
 app.include_router(per_security.router, tags=[APITags.per_security])
+app.include_router(tasks.router, tags=[APITags.task])
 
 
 # Scalar interactive docs

@@ -1,19 +1,18 @@
 name: Stock-Research-Assistant
 services:
-  init:
-    image: alpine:latest
+  # 1. Snapshot Data Initialization Service
+  init_snapshot:
+    image: akashdesarda/srp-snapshot-data:latest
     volumes:
-      - shared-data:/shared
-      - type: bind
-        # Copy the config file from the host to the container's /tmp directory
-        source: ./config.toml
-        target: /tmp/config.toml
-        read_only: true
-    # Copy the config file from container's /tmp to the shared volume
-    command: cp /tmp/config.toml /shared/config.toml
-    profiles:
-      - init
-
+      - shared-data:/snapshot
+      - ./config.toml:/tmp/config.toml
+    command:
+      [
+        "/bin/sh",
+        "-c",
+        "/snapshot_data_decompress.sh && cp /tmp/config.toml /snapshot/config.toml",
+      ]
+  # 2. Stock Database API Service
   stockdb-api:
     build:
       context: ./stockdb
@@ -25,6 +24,7 @@ services:
     environment:
       CONFIG_FILE: /stockdb/shared/config.toml
       DOCKER_CONTAINER: "true" # Explicit Docker environment flag
+    tty: true
 
 volumes:
   shared-data:

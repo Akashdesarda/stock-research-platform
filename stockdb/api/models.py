@@ -174,12 +174,12 @@ class TickerHistoryQuery(BaseModel):
         Period.ONE_DAY,
         description="Day period between historical data points. This is mutually exclusive with `start_date` and `end_date`",
     )
-    start_date: date = Field(
+    start_date: date | None = Field(
         None,
         description="Start date for historical data points. This is mutually exclusive with `period`",
         examples=["2024-01-01", "2020-12-31"],
     )
-    end_date: date = Field(
+    end_date: date | None = Field(
         None,
         description="End date for historical data points. This is mutually exclusive with `period`",
         examples=["2024-02-01", "2021-01-31"],
@@ -312,7 +312,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
                 .to_series()
                 .to_list()
             )
-            raise ValueError("Ticker list is None. Cannot get Yahoo aware ticker.")
+
         self.ticker = [
             t.upper() for t in self.ticker
         ]  # making sure that ticker symbol are always Upper case

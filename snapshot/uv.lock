@@ -60,6 +60,9 @@ requires-dist = [
     { name = "zstandard", specifier = ">=0.25.0" },
 ]
 
+[package.metadata.requires-dev]
+dev = []
+
 [[package]]
 name = "zstandard"
 version = "0.25.0"

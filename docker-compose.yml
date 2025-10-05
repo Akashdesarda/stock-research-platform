@@ -1,15 +1,45 @@
-name: stock-research-platform
+name: Stock-Research-Assistant
 services:
+  # 1. Snapshot Data Initialization Service
+  init_snapshot:
+    build:
+      context: ./snapshot
+      dockerfile: Dockerfile
+    image: akashdesarda/srp-snapshot-data:latest
+    volumes:
+      - shared-data:/assets
+      - ./config.toml:/tmp/config.toml
+    environment:
+      FORCE_DECOMPRESSION: "false" # Force decompression only if required
+    command:
+      [
+        "uv",
+        "run",
+        "/snapshot_data_decompress.py",
+        "&&",
+        "cp",
+        "/tmp/config.toml",
+        "/assets/config.toml",
+      ]
+    tty: true
+  # 2. Stock Database API Service
   stockdb-api:
     build:
       context: ./stockdb
       dockerfile: Dockerfile
+    image: akashdesarda/srp-stockdb-api:latest
     ports:
       - "8000:8000"
     volumes:
-      - type: bind
-        source: C:\Users\AkashDesarda\AppData\Roaming\stock-research-platform
-        target: /stockdb/data
+      - shared-data:/shared
     environment:
-      CONFIG_FILE: /stockdb/data/config.toml
+      CONFIG_FILE: /shared/assets/config.toml
       DOCKER_CONTAINER: "true" # Explicit Docker environment flag
+    depends_on:
+      init_snapshot:
+        condition: service_completed_successfully
+    tty: true
+
+volumes:
+  shared-data:
+    name: "sra-shared-data"

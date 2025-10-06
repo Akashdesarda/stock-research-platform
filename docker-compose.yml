@@ -2,13 +2,10 @@ name: Stock-Research-Assistant
 services:
   # 1. Snapshot Data Initialization Service
   init_snapshot:
-    build:
-      context: ./snapshot
-      dockerfile: Dockerfile
     image: akashdesarda/srp-snapshot-data:latest
     volumes:
-      - shared-data:/assets
       - ./config.toml:/tmp/config.toml
+      - shared-data:/shared
     environment:
       FORCE_DECOMPRESSION: "false" # Force decompression only if required
     command:
@@ -19,7 +16,7 @@ services:
         "&&",
         "cp",
         "/tmp/config.toml",
-        "/assets/config.toml",
+        "/shared/assets/config.toml",
       ]
     tty: true
   # 2. Stock Database API Service

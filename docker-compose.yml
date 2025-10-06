@@ -8,16 +8,7 @@ services:
       - shared-data:/shared
     environment:
       FORCE_DECOMPRESSION: "false" # Force decompression only if required
-    command:
-      [
-        "uv",
-        "run",
-        "/snapshot_data_decompress.py",
-        "&&",
-        "cp",
-        "/tmp/config.toml",
-        "/shared/assets/config.toml",
-      ]
+    command: ["uv", "run", "/snapshot_data_decompress.py"]
     tty: true
   # 2. Stock Database API Service
   stockdb-api:

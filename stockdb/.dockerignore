@@ -1,4 +1,8 @@
 .venv
+.idea
+.vscode
+,pytest_cache
+.ruff_cache
 __pycache__
 temp_data
 tests

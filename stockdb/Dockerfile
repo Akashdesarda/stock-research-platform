@@ -7,7 +7,7 @@ RUN apt update -y && \
 WORKDIR /stockdb
 
 # Setting up uv environment
-COPY --from=ghcr.io/astral-sh/uv:python3.13-bookworm-slim /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \

@@ -2,6 +2,7 @@ import os
 import shutil
 import tarfile
 import time
+from pathlib import Path
 
 import zstandard as zstd
 from rich.console import Console
@@ -10,11 +11,14 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 console = Console()
 
 
-def is_dir_empty(path):
-    return not any(os.scandir(path))
+def is_dir_empty(path: Path):
+    # Return True if directory does not exist or is empty
+    return not any(path.iterdir()) if path.exists() else True
 
 
-def decompress_archive(archive_path, extract_dir, force_decompression=False):
+def decompress_archive(
+    archive_path: Path, extract_dir: Path, force_decompression=False
+):
     if not force_decompression and not is_dir_empty(extract_dir):
         console.print(
             f"[yellow]Skipping decompression: {extract_dir} is not empty.[/yellow]"
@@ -46,7 +50,7 @@ if __name__ == "__main__":
         os.environ.get("FORCE_DECOMPRESSION", "false").lower() == "true"
     )
     decompress_archive(
-        "assets.tar.zst", "/shared/assets", force_decompression=FORCE_DECOMPRESSION
+        Path("assets.tar.zst"), Path("/shared"), force_decompression=FORCE_DECOMPRESSION
     )
     console.print(
         "[bold green]copying config.toml to shared assets directory...[/bold green]"

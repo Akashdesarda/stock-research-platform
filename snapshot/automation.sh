@@ -1,5 +1,5 @@
 echo "[1/4] Running container and compressing snapshot data..."
-docker run --name snapshot-temp \
+docker run -t --name snapshot-temp \
   -v sra-shared-data:/assets \
   akashdesarda/srp-snapshot-base \
   uv run snapshot_data_compress.py

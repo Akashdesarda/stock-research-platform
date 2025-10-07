@@ -1,6 +1,6 @@
 Write-Host "[1/4] Running container and compressing snapshot data from docker volume..."
 docker run -t --name snapshot-temp `
-  -v sra-shared-data:/assets `
+  -v sra-shared-data:/shared `
   akashdesarda/srp-snapshot-base `
   uv run snapshot_data_compress.py
 

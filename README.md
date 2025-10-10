@@ -1,1 +1,1 @@
-# stock-research-platform
+# StockSense - Stock Research Platform

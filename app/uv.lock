@@ -550,6 +550,17 @@ wheels = [
 ]
 
 [[package]]
+name = "stocksense-app"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "reflex" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "reflex", specifier = "==0.8.14" }]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -623,17 +634,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/10/8c/22b074814970eeef43b7c44df98c3e9667c1f7bf5b83e0ff0201b0bd43f9/watchfiles-1.1.0-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:d0e10e6f8f6dc5762adee7dece33b722282e1f59aa6a55da5d493a97282fedd8", size = 625607, upload-time = "2025-06-15T19:06:27.606Z" },
     { url = "https://files.pythonhosted.org/packages/32/fa/a4f5c2046385492b2273213ef815bf71a0d4c1943b784fb904e184e30201/watchfiles-1.1.0-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:af06c863f152005c7592df1d6a7009c836a247c9d8adb78fef8575a5a98699db", size = 623315, upload-time = "2025-06-15T19:06:29.076Z" },
 ]
-
-[[package]]
-name = "web-app"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "reflex" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "reflex", specifier = "==0.8.14" }]
 
 [[package]]
 name = "wrapt"

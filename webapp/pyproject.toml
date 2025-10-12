@@ -1,0 +1,11 @@
+[project]
+name = "stocksense-app"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "reflex==0.8.14",
+]
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""

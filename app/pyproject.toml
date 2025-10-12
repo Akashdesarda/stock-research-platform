@@ -1,7 +1,0 @@
-[project]
-name = "StockSense-App"
-version = "0.1.0"
-description = "StockSense: Your AI-Powered Stock Market Companion"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = ["reflex==0.8.14"]

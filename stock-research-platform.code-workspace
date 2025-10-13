@@ -1,0 +1,64 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"conventionalCommits.scopes": [
+			"stockDB",
+			"snapshot",
+			"app",
+			"docs",
+		],
+		"python-envs.pythonProjects": [
+			{
+				"path": "stockdb",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:uv",
+				"defaultInterpreterPath": "${cwd}/stockdb/.venv/Scripts/python.exe"
+			},
+			{
+				"path": "snapshot",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:uv",
+				"defaultInterpreterPath": "${cwd}/snapshot/.venv/Scripts/python.exe"
+			},
+			{
+				"path": "webapp",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:uv",
+				"defaultInterpreterPath": "${cwd}/webapp/.venv/Scripts/python.exe"
+			}
+		],
+		"python.defaultInterpreterPath": "python",
+		"testing.coverageToolbarEnabled": true,
+		"cSpell.words": [
+			"stockdb",
+			"stocksense"
+		],
+		"editor.fontFamily": "'Monaspace Krypton NF', monospace",
+		"ruff.format.preview": true
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "stockdb api",
+				"type": "shell",
+				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log",
+				"problemMatcher": [
+					"$python"
+				]
+			},
+			{
+				"label": "reflex app",
+				"type": "shell",
+				"command": "cd ${cwd}/webapp && uv run reflex run",
+				"problemMatcher": [
+					"$python"
+				]
+			}
+		],
+	}
+}

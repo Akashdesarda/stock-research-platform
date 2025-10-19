@@ -27,7 +27,8 @@ jobs:
       packages: write
     env:
       REGISTRY: ghcr.io
-      REPO: ${{ toLower(github.repository) }}
+      REPO: akashdesarda/stock-research-platform
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

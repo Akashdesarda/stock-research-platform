@@ -27,7 +27,7 @@ jobs:
       packages: write
     env:
       REGISTRY: ghcr.io
-      REPO: ${{ github.repository }}
+      REPO: ${{ toLower(github.repository) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

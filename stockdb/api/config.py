@@ -67,6 +67,17 @@ def _resolve_data_path(config_path: str) -> Path:
     return Path(config_path)
 
 
+# Model for the 'common' section
+class Common(BaseModel):
+    base_url: str
+
+
+# Model for the 'App' section
+class App(BaseModel):
+    frontend_port: int
+    backend_port: int
+
+
 # StockDB model for the 'stockdb' section
 class StockDB(BaseModel):
     data_base_path: str | DirectoryPath
@@ -86,6 +97,8 @@ class StockDB(BaseModel):
 
 # the Settings model
 class Settings(BaseSettings):
+    common: Common
+    app: App
     stockdb: StockDB
 
     model_config = SettingsConfigDict(

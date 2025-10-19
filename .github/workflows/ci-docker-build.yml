@@ -9,6 +9,15 @@ on:
       # Optional: run when this workflow file changes
       - ".github/workflows/ci-docker-build.yml"
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: "Force build and push even if no relevant files changed"
+        type: choice
+        options:
+          - "false"
+          - "true"
+        default: "false"
+        required: false
 
 jobs:
   build-and-push:
@@ -54,7 +63,7 @@ jobs:
           driver: docker-container
 
       - name: Build and (conditionally) push srp-stockdb-api
-        if: steps.changes.outputs.stockdb == 'true'
+        if: steps.changes.outputs.stockdb == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./stockdb
@@ -67,7 +76,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and (conditionally) push srp-snapshot-data
-        if: steps.changes.outputs.snapshot == 'true'
+        if: steps.changes.outputs.snapshot == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./snapshot

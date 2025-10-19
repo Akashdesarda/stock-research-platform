@@ -67,9 +67,11 @@ def _resolve_data_path(config_path: str) -> Path:
     return Path(config_path)
 
 
+from pydantic import AnyUrl
+
 # Model for the 'common' section
 class Common(BaseModel):
-    base_url: str
+    base_url: AnyUrl
 
 
 # Model for the 'App' section

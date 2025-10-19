@@ -1,0 +1,75 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "stockdb/**"
+      - "snapshot/**"
+      # Optional: run when this workflow file changes
+      - ".github/workflows/ci-docker-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect directory changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            stockdb:
+              - 'stockdb/**'
+            snapshot:
+              - 'snapshot/**'
+
+      # Only log in when we are going to push (skip on PRs)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image tags
+        run: |
+          echo "IMAGE_TAG_TS=$(date -u +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
+          echo "IMAGE_TAG_SHA=${GITHUB_SHA::12}" >> $GITHUB_ENV
+
+      - name: Build and (conditionally) push srp-stockdb-api
+        if: steps.changes.outputs.stockdb == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./stockdb
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:${{ env.IMAGE_TAG_TS }}
+            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:${{ env.IMAGE_TAG_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and (conditionally) push srp-snapshot-data
+        if: steps.changes.outputs.snapshot == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./snapshot
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:${{ env.IMAGE_TAG_TS }}
+            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:${{ env.IMAGE_TAG_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

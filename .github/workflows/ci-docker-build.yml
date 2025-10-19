@@ -56,7 +56,6 @@ jobs:
       - name: Prepare image tags
         run: |
           echo "IMAGE_TAG_TS=$(date -u +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:

@@ -56,7 +56,6 @@ jobs:
       - name: Prepare image tags
         run: |
           echo "IMAGE_TAG_TS=$(date -u +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
-          echo "IMAGE_TAG_SHA=${GITHUB_SHA::12}" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -73,7 +72,6 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:latest
             ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:${{ env.IMAGE_TAG_TS }}
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:${{ env.IMAGE_TAG_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -87,6 +85,5 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:latest
             ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:${{ env.IMAGE_TAG_TS }}
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:${{ env.IMAGE_TAG_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

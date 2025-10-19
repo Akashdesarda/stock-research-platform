@@ -67,7 +67,8 @@ jobs:
         if: steps.changes.outputs.stockdb == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: ./stockdb
+          context: .
+          file: ./stockdb/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:latest
@@ -80,7 +81,8 @@ jobs:
         if: steps.changes.outputs.snapshot == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: ./snapshot
+          context: .
+          file: ./snapshot/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:latest

@@ -48,9 +48,14 @@ jobs:
           echo "IMAGE_TAG_TS=$(date -u +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
           echo "IMAGE_TAG_SHA=${GITHUB_SHA::12}" >> $GITHUB_ENV
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
       - name: Build and (conditionally) push srp-stockdb-api
         if: steps.changes.outputs.stockdb == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./stockdb
           push: ${{ github.event_name != 'pull_request' }}
@@ -63,7 +68,7 @@ jobs:
 
       - name: Build and (conditionally) push srp-snapshot-data
         if: steps.changes.outputs.snapshot == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./snapshot
           push: ${{ github.event_name != 'pull_request' }}

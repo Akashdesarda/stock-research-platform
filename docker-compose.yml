@@ -2,7 +2,7 @@ name: Stock-Research-Assistant
 services:
   # 1. Snapshot Data Initialization Service
   init_snapshot:
-    image: akashdesarda/srp-snapshot-data:latest
+    image: ghcr.io/akashdesarda/stock-research-platform/srp-snapshot-data:latest
     volumes:
       - ./config.toml:/tmp/config.toml
       - shared-data:/shared
@@ -15,9 +15,9 @@ services:
     build:
       context: ./stockdb
       dockerfile: Dockerfile
-    image: akashdesarda/srp-stockdb-api:latest
+    image: ghcr.io/akashdesarda/stock-research-platform/srp-stockdb-api:latest
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - shared-data:/shared
     environment:

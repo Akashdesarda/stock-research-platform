@@ -2,6 +2,7 @@ import os
 import platform
 from pathlib import Path
 
+from pydantic import AnyUrl
 from pydantic import BaseModel, field_validator
 from pydantic.types import DirectoryPath
 from pydantic_settings import (
@@ -67,8 +68,6 @@ def _resolve_data_path(config_path: str) -> Path:
     return Path(config_path)
 
 
-from pydantic import AnyUrl
-
 
 # Model for the 'common' section
 class Common(BaseModel):
@@ -85,18 +84,6 @@ class StockDB(BaseModel):
     port: int
     data_base_path: str | DirectoryPath
     download_batch_size: int
-
-    @field_validator("data_base_path")
-    @classmethod
-    def resolve_path(cls, v):
-        """Resolve the path based on the current environment."""
-        resolved_path = _resolve_data_path(str(v))
-
-        # Ensure the directory exists
-        resolved_path.mkdir(parents=True, exist_ok=True)
-
-        return resolved_path
-
 
 # the Settings model
 class Settings(BaseSettings):

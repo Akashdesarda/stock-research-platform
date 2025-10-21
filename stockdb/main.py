@@ -67,3 +67,14 @@ app.include_router(tasks.router, tags=[APITags.task])
 @app.get("/docs", include_in_schema=False)
 async def _internal_scalar_html():
     return get_scalar_api_reference(openapi_url=app.openapi_url, title=app.title)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        # host="0.0.0.0",
+        port=settings.stockdb.port,
+        access_log=False,
+    )

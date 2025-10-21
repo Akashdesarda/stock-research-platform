@@ -1,6 +1,5 @@
 [server]
 enableStaticServing = true
-port = 8001
 
 [theme]
 primaryColor = "#bb5a38"

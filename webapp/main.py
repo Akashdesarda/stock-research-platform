@@ -4,6 +4,7 @@ Entry point for the multi-page Streamlit app.
 """
 
 from pathlib import Path
+
 import streamlit as st
 
 logo = Path(__file__).parent / "static/chart-growth-invest.svg"
@@ -24,14 +25,25 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-    # Define pages with programmatic navigation
+# Define pages with programmatic navigation
 
-home = st.Page("app/pages/home.py", title="Home", icon=":material/house:")#"🏠")
+home = st.Page("app/pages/home.py", title="Home", icon=":material/house:")
 # Playground Section
-data = st.Page("app/pages/playground/data.py", title="Data Explore", icon=":material/data_exploration:")#"🎯")
-strategy = st.Page("app/pages/playground/strategy.py", title="Strategy", icon=":material/candlestick_chart:")#"💼")
-chat = st.Page("app/pages/ai/chat.py", title="Chat", icon=":material/chat:")#"💬")
-research = st.Page("app/pages/ai/research.py", title="Research", icon=":material/query_stats:")#"🔍"
+data = st.Page(
+    "app/pages/playground/data.py",
+    title="Data Explore",
+    icon=":material/data_exploration:",
+)
+strategy = st.Page(
+    "app/pages/playground/strategy.py",
+    title="Strategy",
+    icon=":material/candlestick_chart:",
+)
+# AI Section
+chat = st.Page("app/pages/ai/chat.py", title="Chat", icon=":material/chat:")  # "💬")
+research = st.Page(
+    "app/pages/ai/research.py", title="Research", icon=":material/query_stats:"
+)
 
 
 # Create navigation
@@ -41,7 +53,7 @@ pg = st.navigation(
         "Playground": [data, strategy],
         "AI": [chat, research],
     },
-    expanded=True
+    expanded=True,
 )
 
 # Run the selected page

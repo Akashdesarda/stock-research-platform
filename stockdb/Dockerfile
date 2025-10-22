@@ -22,5 +22,5 @@ COPY ./stockdb .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
-EXPOSE 8001
+EXPOSE 8000
 CMD ["uv", "run","main.py"]

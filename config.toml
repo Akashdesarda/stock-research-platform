@@ -1,8 +1,8 @@
 [common]
 base_url = 'http://localhost'
 [stockdb]
-port = 8001
+port = 8000
 data_base_path = '/shared/assets/stockdb' # Use Docker mount target path
 download_batch_size = 50
 [app]
-port = 8000
+port = 4000

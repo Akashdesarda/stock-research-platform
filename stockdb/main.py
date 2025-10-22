@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        # host="0.0.0.0",
+        host="0.0.0.0",
         port=settings.stockdb.port,
         access_log=False,
     )

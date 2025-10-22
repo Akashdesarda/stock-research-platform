@@ -16,6 +16,7 @@ services:
       context: ./stockdb
       dockerfile: Dockerfile
     image: ghcr.io/akashdesarda/stock-research-platform/srp-stockdb-api:latest
+    pull_policy: always
     ports:
       - "8000:8000"
     volumes:

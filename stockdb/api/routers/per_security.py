@@ -1,3 +1,4 @@
+import pathlib
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -44,8 +45,16 @@ async def list_ticker(
     # REVIEW - Should I add more exchange info?
 ) -> ORJSONResponse:
     """Get all the available `ticker` in given `exchange`"""
+    table_path: pathlib.Path = (
+        settings.stockdb.data_base_path / f"{exchange.value}/equity"
+    )
+    if not table_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Exchange data for '{exchange.value}' not found",
+        )
     result = await (
-        pl.scan_delta(settings.stockdb.data_base_path / f"{exchange.value}/equity")
+        pl.scan_delta(table_path)
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
         .collect_async()

@@ -2,7 +2,7 @@ import os
 import platform
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from pydantic import AnyHttpUrl, BaseModel, field_validator
 from pydantic.types import DirectoryPath
 from pydantic_settings import (
     BaseSettings,
@@ -67,12 +67,9 @@ def _resolve_data_path(config_path: str) -> Path:
     return Path(config_path)
 
 
-from pydantic import AnyUrl
-
-
 # Model for the 'common' section
 class Common(BaseModel):
-    base_url: AnyUrl
+    base_url: AnyHttpUrl
 
 
 # Model for the 'App' section

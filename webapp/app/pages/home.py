@@ -1,38 +1,37 @@
-"""
-Home Page - StockSense Stock Research Platform
-"""
-
 import streamlit as st
 
+from app.core.utils import rest_request_sync
 
 
-st.title("🏠 Welcome to StockSense")
-st.markdown("---")
+# Adding service status check in sidebar
+def check_service_status(service_name: str, service_url: str) -> bool:
+    """Simple service status check using existing utilities"""
+    try:
+        response = rest_request_sync(service_url, method="GET", timeout=5)
+        return response.status_code == 200
+    except Exception:
+        return False
 
-st.markdown("""
-## Your Stock Research Platform
 
-Welcome to **StockSense** - a simple platform for stock research and analysis.
+with st.sidebar:
+    st.markdown("## Service Status")
+    services = {
+        # NOTE - add other services as needed
+        "StockDB API": "http://localhost:8000",
+    }
+    for service_name, service_url in services.items():
+        status = check_service_status(service_name, service_url)
 
-### 🚀 Features:
+        # Display service name and status badge
+        col1, col2 = st.columns([2, 1])
 
-- **📊 Data Analysis**: View stock data
-- **🎯 Strategy Development**: Build trading strategies  
-- **💬 AI Chat**: Investment assistant
-- **🔍 Research**: Market research tools
-""")
+        with col1:
+            st.markdown(service_name)
 
-# Quick navigation
-st.subheader("🧭 Navigation")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.info("📊 **Data Detail View** - Explore stock data")
-    st.info("💬 **Chat** - AI assistant")
-
-with col2:
-    st.info("🎯 **Strategy** - Trading strategies")
-    st.info("🔍 **Research** - Market research")
-
-st.success("Use the navigation menu on the left to explore different sections!")
+        with col2:
+            if status:
+                # Available - Green badge with OK text
+                st.badge("OK", color="green")
+            else:
+                # Not available - Red badge with ERROR text
+                st.badge("", icon=":material/error:", color="red")

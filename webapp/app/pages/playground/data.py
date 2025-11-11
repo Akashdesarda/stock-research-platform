@@ -171,8 +171,8 @@ with manual_query:
                 max_value="today",
             )
 
-        # if user_query := st.text_area("Use your own query:"):
-        #     st.code(user_query, language="sql")
+        if user_query := st.text_area("Use your own query:"):
+            st.code(user_query, language="sql")
         submit_query = st.form_submit_button("Submit", icon=":material/play_arrow:")
 
 with ai_query:
@@ -197,12 +197,76 @@ if submit_query:
                 query_data_collection.append(pl.LazyFrame(response.json()))
             else:
                 st.error(f"Error fetching data for {ticker[0]}")
-else:
-    query_data_collection = [pl.LazyFrame()]
+
+    # Store the results in session state
+    st.session_state.query_data_collection = query_data_collection
+    st.session_state.query_submitted = True
 
 
-# Query data Preview
-with st.container(border=True):
-    st.subheader("Queried Data Preview")
-    query_data = pl.concat(query_data_collection)
-    st.dataframe(query_data.head(10).collect())
+# SECTION - Query data Preview
+with st.container():
+    if st.session_state.get("query_submitted", False):
+        st.subheader("Query Data Preview")
+        query_data = pl.concat(st.session_state.query_data_collection)
+
+        # Preview options
+        preview_col, control_col = st.columns([0.3, 0.7])
+
+        with preview_col:
+            preview_method = st.radio(
+                "Preview Method",
+                options=["Head", "Tail", "Desired Range", "Random"],
+                index=None,
+                help="Choose how to preview the data",
+            )
+
+        # Initialize variables
+        n_rows = 10
+        start_idx = 0
+        end_idx = 10
+
+        with control_col:
+            if preview_method in ["Head", "Tail", "Random"]:
+                n_rows = st.slider(
+                    "Number of rows",
+                    min_value=1,
+                    max_value=100,
+                    value=10,
+                    help="Number of rows to display",
+                )
+            elif preview_method == "Desired Range":
+                range_col1, range_col2 = st.columns(2)
+                with range_col1:
+                    start_idx = st.number_input(
+                        "Start index",
+                        min_value=0,
+                        value=0,
+                        step=1,
+                        help="Starting row index (0-based)",
+                    )
+                with range_col2:
+                    end_idx = st.number_input(
+                        "End index",
+                        min_value=1,
+                        value=10,
+                        step=1,
+                        help="Ending row index (exclusive)",
+                    )
+
+        # Display data based on selected method
+        if preview_method == "Head":
+            st.dataframe(query_data.head(n_rows).collect())
+        elif preview_method == "Tail":
+            st.dataframe(query_data.tail(n_rows).collect())
+        elif preview_method == "Desired Range":
+            st.dataframe(query_data.slice(start_idx, end_idx - start_idx).collect())
+        elif preview_method == "Random":
+            st.dataframe(
+                query_data.with_row_index()
+                .with_columns(pl.col("index").shuffle(seed=42).alias("_rand"))
+                .sort("_rand")
+                .limit(n_rows)
+                .drop("index", "_rand")
+                .sort("date")
+                .collect()
+            )

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime, timedelta
 
 import polars as pl
 from fastapi import APIRouter, HTTPException, status
@@ -25,13 +25,17 @@ async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInp
     # SECTION 1- Auto mode
     if task_input.task_mode == TaskMode.auto:
         # checking if download is actually needed
+        now = datetime.now()
+        latest_data_date = (
+            now.date() if now.hour >= 18 else now.date() - timedelta(days=1)
+        )
         stock_db = StockDataDB(
             settings.stockdb.data_base_path
             / f"{task_input.exchange.value}/ticker_history"
         )
         date_check = (
             await stock_db.polars_filter(
-                pl.col("date").max().cast(pl.Date) < date.today()
+                pl.col("date").max().cast(pl.Date) < latest_data_date
             )
             .select("close")
             .count()

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 import polars as pl
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.responses import ORJSONResponse
 
 from api.config import Settings
@@ -62,6 +62,35 @@ async def list_ticker(
     return ORJSONResponse(result.to_dicts())
 
 
+@router.post("/{exchange}/query", response_model=TickerHistoryOutput)
+async def ticker_query(
+    exchange: Annotated[
+        StockExchange,
+        Path(
+            description="Symbol of the exchange",
+            examples=["nse", "nyse"],
+        ),
+    ],
+    sql_query: Annotated[
+        str,
+        Body(
+            embed=True,
+            description="""SQL query to get ticker(s) history data.
+
+            NOTE: Always use `self` as table name in the sql query.""",
+        ),
+    ],
+) -> ORJSONResponse:
+    """Get stock history data for given `exchange` using SQL query"""
+    history_data = StockDataDB(
+        settings.stockdb.data_base_path / f"{exchange.value}/ticker_history"
+    )
+    # Execute SQL query
+    result = history_data.sql_filter(sql_query)
+    result = await result.collect_async()
+    return ORJSONResponse(result.to_dicts())
+
+
 @router.get("/{exchange}/{ticker}")
 async def ticker_information(
     ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
@@ -81,7 +110,7 @@ async def ticker_history(
     query_param: Annotated[TickerHistoryQuery, Query()],
 ) -> ORJSONResponse:
     """Get stock history data for given `Ticker`"""
-    nse_history_data = StockDataDB(
+    history_data = StockDataDB(
         settings.stockdb.data_base_path / f"{ticker.exchange.lower()}/ticker_history"
     )
     # Building the query
@@ -103,7 +132,7 @@ async def ticker_history(
                 else pl.col("date").max().dt.offset_by(f"-{query_param.period.value}")
             )
         )
-    result = nse_history_data.polars_filter(query)
+    result = history_data.polars_filter(query)
 
     # 3. Interval condition
     if query_param.interval not in {

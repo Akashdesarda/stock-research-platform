@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class APITags(Enum):
     root = "Root"
+    health = "Health"
     per_security = "Per Security"
     bulk = "Bulk"
     dataset = "Dataset"

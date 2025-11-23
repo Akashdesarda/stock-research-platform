@@ -1,20 +1,24 @@
 import http
 import logging
 import traceback
-from pathlib import Path
+from datetime import datetime, timedelta
+from pathlib import Path as Pathlib_Path
+from typing import Annotated
 
+import polars as pl
 from about_time import about_time
 from api.config import Settings
-from api.models import APITags
+from api.data import StockDataDB
+from api.models import APITags, StockExchange
 from api.routers import per_security, tasks
-from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Path, Request, status
+from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from scalar_fastapi import get_scalar_api_reference
 
 logger = logging.getLogger("stockdb")
 settings = Settings()
-STATIC_DIR = Path(__file__).parent / "static"  # points to stockdb/static
+STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
     debug=True, title="StockDB API", version="0.1.3", docs_url=None, redoc_url=None
@@ -55,7 +59,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Serve static assets and favicon
-app.mount("/static", StaticFiles(directory="./static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 # REST API for health check
@@ -63,6 +67,48 @@ app.mount("/static", StaticFiles(directory="./static"), name="static")
 async def _index():
     """API Health check"""
     return {"message": "StockDB API is up and running"}
+
+
+@app.get("/health/api", status_code=200, tags=[APITags.health])
+async def _health():
+    """API Health check"""
+    return {"message": "StockDB API is up and running"}
+
+
+@app.get("/health/data/{exchange}", status_code=200, tags=[APITags.health])
+async def _stockdb_data_health(
+    exchange: Annotated[
+        StockExchange,
+        Path(
+            description="Symbol of the exchange",
+            examples=["nse", "nyse"],
+        ),
+    ],
+    # REVIEW - Should I add more exchange info?
+) -> ORJSONResponse:
+    """StockDB Data Health check"""
+    now = datetime.now()
+    latest_data_date = now.date() if now.hour >= 18 else now.date() - timedelta(days=1)
+    stock_db = StockDataDB(
+        settings.stockdb.data_base_path / f"{exchange.value}/ticker_history"
+    )
+    date_check = (
+        await stock_db.polars_filter(
+            pl.col("date").max().cast(pl.Date) < latest_data_date
+        )
+        .select("close")
+        .count()
+        .collect_async()
+    )
+
+    if date_check.item() == 0:
+        # No new data to download
+        return {"message": "StockDB Data is up to date"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="StockDB Data is outdated",
+        )
 
 
 # adding all the routers from submodules

@@ -77,6 +77,8 @@ with manual_query:
                 .filter(pl.col("dropdown").is_in(_))
                 .select("ticker")
             )
+        else:
+            selected_tickers = pl.DataFrame([])
 
         # SECTION - Time Range Selection
         st.write("Time Range Selection")
@@ -150,7 +152,7 @@ with manual_query:
         # custom query input
         if user_query := st.text_area("Use your own query:"):
             st.code(user_query, language="sql")
-        
+
         # submit query button
         submit_query = st.form_submit_button("Submit", icon=":material/play_arrow:")
 

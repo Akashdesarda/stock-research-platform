@@ -45,6 +45,11 @@ research = st.Page(
     "app/pages/ai/research.py", title="Research", icon=":material/query_stats:"
 )
 
+# Management Section
+management = st.Page(
+    "app/pages/management.py", title="Settings & Management", icon=":material/settings:"
+)
+
 
 # Create navigation
 pg = st.navigation(
@@ -52,6 +57,7 @@ pg = st.navigation(
         "Home": [home],
         "Playground": [data, strategy],
         "AI": [chat, research],
+        "Management": [management],
     },
     expanded=True,
 )

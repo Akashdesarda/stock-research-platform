@@ -1,9 +1,9 @@
 import os
 import platform
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import AnyHttpUrl, BaseModel, field_validator
-from pydantic.types import DirectoryPath
+from pydantic import AfterValidator, BaseModel, DirectoryPath
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -59,20 +59,21 @@ def _resolve_data_path(config_path: str) -> Path:
         return Path(config_path)
 
     # Running locally - translate Docker paths to local OS-appropriate paths
-    if config_path.startswith("/shared/assets/stockdb"):
+    elif config_path.startswith("/shared/assets/stockdb"):
         # This is the Docker mount target, translate to local data directory
         resolved_path = _get_local_data_directory()
         # Ensure the directory exists
         resolved_path.mkdir(parents=True, exist_ok=True)
         return resolved_path
 
-    # If it's already a local path, use as-is
-    return Path(config_path)
+    else:
+        # If it's already a local path, use as-is
+        return Path(config_path)
 
 
 # Model for the 'common' section
 class Common(BaseModel):
-    base_url: AnyHttpUrl
+    base_url: str
 
 
 # Model for the 'App' section

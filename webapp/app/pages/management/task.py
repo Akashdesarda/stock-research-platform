@@ -15,7 +15,6 @@ available_tickers = get_available_tickers(
     available_exchange.select("symbol").to_series().to_list()
 )
 
-st.title("Settings & Management")
 st.markdown("Manage application settings and configurations.")
 
 # using tab layout for different management sections

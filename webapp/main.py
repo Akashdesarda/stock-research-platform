@@ -17,16 +17,17 @@ body {
 
 st.html(f"<style>{css}</style>")
 st.logo(logo)
-st.title(title)
 st.set_page_config(
     page_title=title,
     page_icon=logo,
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# Title
+# WARNING - cannot use st.title as it adds same title in all pages
+st.markdown(f"# {title}")
 
 # Define pages with programmatic navigation
-
 home = st.Page("app/pages/home.py", title="Home", icon=":material/house:")
 # Playground Section
 data = st.Page(
@@ -46,8 +47,15 @@ research = st.Page(
 )
 
 # Management Section
-management = st.Page(
-    "app/pages/management.py", title="Settings & Management", icon=":material/settings:"
+config_management = st.Page(
+    "app/pages/management/configuration.py",
+    title="Configuration",
+    icon=":material/settings:",
+)
+task_management = st.Page(
+    "app/pages/management/task.py",
+    title="Task Management",
+    icon=":material/construction:",
 )
 
 
@@ -57,7 +65,7 @@ pg = st.navigation(
         "Home": [home],
         "Playground": [data, strategy],
         "AI": [chat, research],
-        "Management": [management],
+        "Settings & Management": [config_management, task_management],
     },
     expanded=True,
 )

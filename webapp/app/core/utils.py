@@ -1,4 +1,11 @@
 import httpx
+import orjson
+import polars as pl
+import streamlit as st
+
+from app.config import Settings
+
+settings = Settings()
 
 
 def rest_request_sync(
@@ -20,12 +27,43 @@ def rest_request_sync(
             method=method,
             url=url,
             params=params,
-            json=payload_data,
+            content=orjson.dumps(payload_data) if payload_data else None,
             headers=headers,
         )
 
     return response
 
 
-def rest_sync_client(base_url: str = "http://localhost:8001") -> httpx.Client:
-    return httpx.Client(base_url=base_url)
+@st.cache_data(show_spinner=True)
+def get_available_exchanges() -> pl.DataFrame:
+    exch_response = rest_request_sync(
+        url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security",
+        method="GET",
+        follow_redirects=True,
+    ).json()
+    return pl.DataFrame({
+        "symbol": exch_response.keys(),
+        "name": exch_response.values(),
+    }).with_columns(dropdown=pl.col("name") + " (" + pl.col("symbol") + ")")
+
+
+@st.cache_data(show_spinner=True)
+def get_available_tickers(available_exchange: list[str]) -> dict[str, pl.DataFrame]:
+    available_tickers = dict.fromkeys(available_exchange, pl.DataFrame())
+    for exch in available_tickers:
+        _ = rest_request_sync(
+            url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{exch}",
+            method="GET",
+            follow_redirects=True,
+        )
+        if _.status_code == 200:
+            available_tickers[exch] = pl.DataFrame(_.json())
+            available_tickers[exch] = available_tickers[exch].with_columns(
+                dropdown=pl.col("ticker") + " - " + pl.col("company")
+            )
+        else:
+            available_tickers[exch] = pl.DataFrame({
+                "ticker": [],
+                "company": [],
+            }).with_columns(dropdown=pl.lit(""))
+    return available_tickers

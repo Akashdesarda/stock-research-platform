@@ -3,6 +3,7 @@ import polars as pl
 import streamlit as st
 
 from app.config import Settings
+from app.core.utils import get_available_exchanges, get_available_tickers
 
 settings = Settings()
 
@@ -10,34 +11,10 @@ settings = Settings()
 st.title("Data Explore")
 st.markdown("Explore stock data and analytics.")
 
-# SECTION - Preparing query to pull data
-with httpx.Client(
-    base_url=f"{settings.common.base_url}:{settings.stockdb.port}",
-    follow_redirects=True,
-) as client:
-    # exchange dropdown data
-    exch_response = client.get("/api/per-security").json()
-    available_exchange = pl.DataFrame({
-        "symbol": exch_response.keys(),
-        "name": exch_response.values(),
-    }).with_columns(dropdown=pl.col("name") + " (" + pl.col("symbol") + ")")
-    # ticker dropdown data
-    available_tickers = dict.fromkeys(
-        available_exchange.select("symbol").to_series().to_list()
-    )
-    for exch in available_tickers:
-        _ = client.get(f"/api/per-security/{exch}")
-        if _.status_code == 200:
-            available_tickers[exch] = pl.DataFrame(_.json())
-            available_tickers[exch] = available_tickers[exch].with_columns(
-                dropdown=pl.col("ticker") + " - " + pl.col("company")
-            )
-        else:
-            available_tickers[exch] = pl.DataFrame({
-                "ticker": [],
-                "company": [],
-            }).with_columns(dropdown=pl.lit(""))
-
+available_exchange = get_available_exchanges()
+available_tickers = get_available_tickers(
+    available_exchange.select("symbol").to_series().to_list()
+)
 
 # create tabs for manual and AI-powered queries
 manual_query, ai_query = st.tabs([
@@ -59,7 +36,7 @@ with manual_query:
             options=available_exchange.select("dropdown").to_series().to_list(),
         )
         # updating state
-        st.session_state.selected_exchange = (
+        st.session_state.selected_exchange_data = (
             available_exchange.filter(pl.col("dropdown") == selected_exchange)
             .select("symbol")
             .item()
@@ -83,7 +60,7 @@ with manual_query:
         if st.session_state.tickers_selection_choice == "All":
             st.multiselect("Ticker Symbols", disabled=True, options=[])
             selected_tickers = available_tickers[
-                st.session_state.selected_exchange
+                st.session_state.selected_exchange_data
             ].select("ticker")
         elif st.session_state.tickers_selection_choice == "Index Based":
             st.error("Index Based selection is not yet implemented.")
@@ -91,12 +68,12 @@ with manual_query:
         elif st.session_state.tickers_selection_choice == "Desired":
             _ = st.multiselect(
                 "Ticker Symbols",
-                options=available_tickers[st.session_state.selected_exchange][
+                options=available_tickers[st.session_state.selected_exchange_data][
                     "dropdown"
                 ].to_list(),
             )
             selected_tickers = (
-                available_tickers[st.session_state.selected_exchange]
+                available_tickers[st.session_state.selected_exchange_data]
                 .filter(pl.col("dropdown").is_in(_))
                 .select("ticker")
             )
@@ -170,9 +147,11 @@ with manual_query:
                 help="If set, 'Data Period' selection is ignored.",
                 max_value="today",
             )
-
+        # custom query input
         if user_query := st.text_area("Use your own query:"):
             st.code(user_query, language="sql")
+        
+        # submit query button
         submit_query = st.form_submit_button("Submit", icon=":material/play_arrow:")
 
 with ai_query:
@@ -183,7 +162,7 @@ if submit_query:
     # SECTION - Getting the data based on query
     query_data_collection = []
     with httpx.Client(
-        base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{st.session_state.selected_exchange}",
+        base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{st.session_state.selected_exchange_data}",
         params={
             "interval": selected_interval,
             "period": selected_period,

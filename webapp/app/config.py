@@ -59,12 +59,16 @@ def _resolve_data_path(config_path: str) -> Path:
         return Path(config_path)
 
     # Running locally - translate Docker paths to local OS-appropriate paths
-    if config_path.startswith("/shared/assets/stockdb"):
+    elif config_path.startswith("/shared/assets/stockdb"):
         # This is the Docker mount target, translate to local data directory
         resolved_path = _get_local_data_directory()
         # Ensure the directory exists
         resolved_path.mkdir(parents=True, exist_ok=True)
         return resolved_path
+
+    else:
+        # If it's already a local path, use as-is
+        return Path(config_path)
 
 
 # Model for the 'common' section

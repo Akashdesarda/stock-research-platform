@@ -1,9 +1,9 @@
 import os
 import platform
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import BaseModel, field_validator
-from pydantic.types import DirectoryPath
+from pydantic import AfterValidator, BaseModel, DirectoryPath
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,

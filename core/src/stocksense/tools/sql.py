@@ -15,7 +15,9 @@ class SQLQueryValidator:
     def run(self, optimize: bool = True) -> str:
         """Run the SQL query validations and return the original query if valid."""
         return (
-            optimizer.optimize(self.query).sql(pretty=True, dialect=self.dialect)
+            optimizer.optimize(self.query, dialect=self.dialect).sql(
+                pretty=True, dialect=self.dialect
+            )
             if optimize
             else self.query
         )
@@ -56,7 +58,7 @@ class SQLQueryValidator:
         """Method to verify if the SQL query contains the specified columns."""
         try:
             # Parse the SQL query
-            expression = parse_one(self.query)
+            expression = parse_one(self.query, dialect=self.dialect)
 
             # Find all 'exp.Column' nodes in the AST
             column_expressions = expression.find_all(exp.Column)

@@ -1,13 +1,16 @@
 [project]
 name = "Stocksense-Core"
-version = "0.1.0"
+version = "0.3.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Akash Desarda", email = "desardaakash@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = [
+    "duckdb>=1.4.2",
     "httpx>=0.28.1",
-    "polars>=1.35.2",
+    "orjson>=3.11.4",
+    "polars[deltalake,pyarrow]>=1.35.2",
+    "sqlglot>=27.29.0",
 ]
 
 [build-system]
@@ -18,7 +21,4 @@ build-backend = "uv_build"
 module-name = "stocksense"
 
 [dependency-groups]
-dev = [
-    "ipykernel>=7.1.0",
-    "pytest>=9.0.0",
-]
+dev = ["ipykernel>=7.1.0", "pytest>=9.0.0"]

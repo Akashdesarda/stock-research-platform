@@ -1,8 +1,11 @@
+import logging
 from dataclasses import dataclass
 from typing import Self
 
 from sqlglot import Dialects, DialectType, exp, optimizer, parse_one
 from sqlglot.errors import ParseError
+
+logger = logging.getLogger("stocksense")
 
 
 @dataclass
@@ -29,7 +32,7 @@ class SQLQueryValidator:
             return self
         except ParseError as e:
             # TODO - use logging instead of print
-            print(f"Invalid SQL syntax: {e}")
+            logger.error(f"Invalid SQL syntax: {e}")
             raise e
 
     def verify_table_name(self, table_name: str = "self") -> Self:
@@ -52,6 +55,7 @@ class SQLQueryValidator:
                 )
 
         except ParseError as e:
+            logger.error(f"Invalid SQL syntax: {e}")
             raise e
 
     def verify_columns(self, required_columns: list[str]) -> Self:
@@ -76,6 +80,7 @@ class SQLQueryValidator:
             else:
                 return self
         except ParseError as e:
+            logger.error(f"Invalid SQL syntax: {e}")
             raise e
 
     # TODO - add more validation methods as needed

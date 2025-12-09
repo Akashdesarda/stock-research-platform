@@ -10,6 +10,7 @@ dependencies = [
     "httpx>=0.28.1",
     "orjson>=3.11.4",
     "polars[deltalake,pyarrow]>=1.35.2",
+    "rich>=14.2.0",
     "sqlglot>=27.29.0",
 ]
 

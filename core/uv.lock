@@ -776,15 +776,19 @@ wheels = [
 
 [[package]]
 name = "stocksense-core"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "." }
 dependencies = [
-    { name = "duckdb" },
     { name = "httpx" },
     { name = "orjson" },
     { name = "polars", extra = ["deltalake", "pyarrow"] },
     { name = "rich" },
     { name = "sqlglot" },
+]
+
+[package.optional-dependencies]
+data = [
+    { name = "duckdb" },
 ]
 
 [package.dev-dependencies]
@@ -795,13 +799,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "duckdb", specifier = ">=1.4.2" },
+    { name = "duckdb", marker = "extra == 'data'", specifier = ">=1.4.2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "orjson", specifier = ">=3.11.4" },
     { name = "polars", extras = ["deltalake", "pyarrow"], specifier = ">=1.35.2" },
     { name = "rich", specifier = ">=14.2.0" },
     { name = "sqlglot", specifier = ">=27.29.0" },
 ]
+provides-extras = ["data"]
 
 [package.metadata.requires-dev]
 dev = [

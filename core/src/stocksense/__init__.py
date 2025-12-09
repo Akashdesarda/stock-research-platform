@@ -15,4 +15,4 @@ console_handler.setFormatter(log_format)
 logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

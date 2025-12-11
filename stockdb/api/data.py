@@ -1,10 +1,7 @@
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from pathlib import Path
-from typing import Any
+from datetime import date, timedelta
 
-import deltalake
 import polars as pl
 import yfinance as yf
 
@@ -146,45 +143,4 @@ class YFStockData:
             .drop_nulls()
             .cast({pl.Float64: pl.Float32, "volume": pl.Int64})
             .select("date", "open", "high", "low", "close", "volume")
-        )
-
-
-@dataclass
-class StockDataDB:
-    db_path: Path
-    table_version: int | str | datetime | None = None
-
-    def __post_init__(self):
-        self._table = pl.scan_delta(
-            source=self.db_path,
-            version=self.table_version,
-        )
-
-    @property
-    def table_data(self):
-        return self._table
-
-    def sql_filter(self, query: str) -> pl.LazyFrame:
-        return self._table.sql(query)
-
-    def polars_filter(self, *predicates: Any, **constraints: Any) -> pl.LazyFrame:
-        return self._table.filter(*predicates, **constraints)
-
-    def merge(self, data: pl.DataFrame):
-        return (
-            data.write_delta(
-                target=self.db_path,
-                mode="merge",
-                delta_merge_options={
-                    "writer_properties": deltalake.WriterProperties(
-                        compression="ZSTD", compression_level=5
-                    ),
-                    "source_alias": "s",
-                    "target_alias": "t",
-                    "predicate": "s.date = t.date AND s.ticker = t.ticker",
-                },
-            )
-            .when_matched_update_all()
-            .when_not_matched_insert_all()
-            .execute()
         )

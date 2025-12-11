@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from datetime import date
+
 import polars as pl
 import pytest
 from api.models import StockExchange
@@ -18,18 +19,15 @@ def ticker_data(tickers) -> pl.LazyFrame:
 
 
 def test_schema(ticker_data):
-    assert ticker_data.collect_schema() == pl.Schema(
-        {
-            "date": pl.Datetime(time_unit="ns", time_zone=None),
-            "key": pl.String,
-            "ticker": pl.String,
-            "open": pl.Float64,
-            "high": pl.Float64,
-            "low": pl.Float64,
-            "close": pl.Float64,
-            "volume": pl.Float64,
-        }
-    )
+    assert ticker_data.collect_schema() == pl.Schema({
+        "date": pl.Datetime(time_unit="ns", time_zone=None),
+        "ticker": pl.String,
+        "open": pl.Float64,
+        "high": pl.Float64,
+        "low": pl.Float64,
+        "close": pl.Float64,
+        "volume": pl.Float64,
+    })
 
 
 def test_download_initial_date(tickers, ticker_data):
@@ -61,14 +59,15 @@ def test_ticker_symbol(tickers, ticker_data):
     )
 
 
-def test_key_presence(tickers, ticker_data):
-    today_key = tickers[1].lower() + str(date.today() - timedelta(days=1)).replace(
-        "-", ""
-    )
-    assert (
-        today_key
-        in ticker_data.filter(pl.col("ticker") == tickers[1])
-        .select(pl.col("key"))
-        .collect()
-        .to_series()
-    )
+# DEPRECATED - key column is removed
+# def test_key_presence(tickers, ticker_data):
+#     today_key = tickers[1].lower() + str(date.today() - timedelta(days=1)).replace(
+#         "-", ""
+#     )
+#     assert (
+#         today_key
+#         in ticker_data.filter(pl.col("ticker") == tickers[1])
+#         .select(pl.col("key"))
+#         .collect()
+#         .to_series()
+#     )

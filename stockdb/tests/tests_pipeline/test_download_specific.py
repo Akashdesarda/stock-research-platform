@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+
 import polars as pl
 import pytest
 from api.models import StockExchange
@@ -38,18 +39,15 @@ def nasdaq_ticker_data(nasdaq_tickers) -> pl.LazyFrame:
 
 
 def test_schema(nse_ticker_data):
-    assert nse_ticker_data.collect_schema() == pl.Schema(
-        {
-            "date": pl.Datetime(time_unit="ns", time_zone=None),
-            "key": pl.String,
-            "ticker": pl.String,
-            "open": pl.Float32,
-            "high": pl.Float32,
-            "low": pl.Float32,
-            "close": pl.Float32,
-            "volume": pl.UInt64,
-        }
-    )
+    assert nse_ticker_data.collect_schema() == pl.Schema({
+        "date": pl.Datetime(time_unit="ns", time_zone=None),
+        "ticker": pl.String,
+        "open": pl.Float32,
+        "high": pl.Float32,
+        "low": pl.Float32,
+        "close": pl.Float32,
+        "volume": pl.UInt64,
+    })
 
 
 # SECTION - NSE
@@ -77,15 +75,16 @@ def test_ticker_symbol_nse(nse_tickers, nse_ticker_data):
     )
 
 
-def test_key_presence_nse(nse_tickers, nse_ticker_data):
-    today_key = nse_tickers[1].lower() + str(date.today()).replace("-", "")
-    assert (
-        today_key
-        in nse_ticker_data.filter(pl.col("ticker") == nse_tickers[1])
-        .select(pl.col("key"))
-        .collect()
-        .to_series()
-    )
+# DEPRECATED - key column is removed
+# def test_key_presence_nse(nse_tickers, nse_ticker_data):
+#     today_key = nse_tickers[1].lower() + str(date.today()).replace("-", "")
+#     assert (
+#         today_key
+#         in nse_ticker_data.filter(pl.col("ticker") == nse_tickers[1])
+#         .select(pl.col("key"))
+#         .collect()
+#         .to_series()
+#     )
 
 
 # SECTION - NASDAQ
@@ -113,12 +112,13 @@ def test_download_date_range_nasdaq(nasdaq_tickers, nasdaq_ticker_data):
     assert dates.item(0, "max_date") <= date.today()
 
 
-def test_key_presence_nasdaq(nasdaq_tickers, nasdaq_ticker_data):
-    today_key = nasdaq_tickers[1].lower() + str(date.today()).replace("-", "")
-    assert (
-        today_key
-        in nasdaq_ticker_data.filter(pl.col("ticker") == nasdaq_tickers[1])
-        .select(pl.col("key"))
-        .collect()
-        .to_series()
-    )
+# DEPRECATED - key column is removed
+# def test_key_presence_nasdaq(nasdaq_tickers, nasdaq_ticker_data):
+#     today_key = nasdaq_tickers[1].lower() + str(date.today()).replace("-", "")
+#     assert (
+#         today_key
+#         in nasdaq_ticker_data.filter(pl.col("ticker") == nasdaq_tickers[1])
+#         .select(pl.col("key"))
+#         .collect()
+#         .to_series()
+#     )

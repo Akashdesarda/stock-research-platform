@@ -8,20 +8,20 @@ from typing import Annotated
 import polars as pl
 from about_time import about_time
 from api.config import Settings
-from api.data import StockDataDB
 from api.models import APITags, StockExchange
 from api.routers import per_security, tasks
 from fastapi import FastAPI, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from scalar_fastapi import get_scalar_api_reference
+from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
 settings = Settings()
 STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
-    debug=True, title="StockDB API", version="0.1.3", docs_url=None, redoc_url=None
+    debug=True, title="StockDB API", version="1.0.3", docs_url=None, redoc_url=None
 )
 
 

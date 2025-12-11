@@ -5,9 +5,10 @@ from typing import Annotated, Any
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.responses import ORJSONResponse
+from stocksense.data import StockDataDB
 
 from api.config import Settings
-from api.data import StockDataDB, YFStockData
+from api.data import YFStockData
 from api.dependency.utils import yahoo_finance_aware_ticker
 from api.models import (
     APITags,

@@ -5,10 +5,10 @@ import polars as pl
 import pytest
 import pytest_asyncio
 from api.config import Settings
-from api.data import StockDataDB
 from api.models import Interval, Period
 from httpx import ASGITransport, AsyncClient
 from main import app
+from stocksense.data import StockDataDB
 
 settings = Settings()
 

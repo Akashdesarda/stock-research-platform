@@ -2,8 +2,8 @@ from pathlib import Path
 
 import polars as pl
 from api.config import Settings
-from api.data import StockDataDB
 from deltalake.table import DeltaTable
+from stocksense.data import StockDataDB
 
 settings = Settings()
 

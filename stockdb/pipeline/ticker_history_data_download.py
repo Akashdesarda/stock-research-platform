@@ -4,10 +4,11 @@ from datetime import date, timedelta
 
 import polars as pl
 from api.config import Settings
-from api.data import StockDataDB, YFStockData
+from api.data import YFStockData
 from api.models import Interval, Period, StockExchange, StockExchangeYahooIdentifier
 from rich.progress import track
 from rich.prompt import Prompt
+from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
 settings = Settings()

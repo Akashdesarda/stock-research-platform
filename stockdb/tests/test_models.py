@@ -66,7 +66,7 @@ def test_task_ticker_history_download_input_happy_paths(
         end_date=end_date,
         download_mode=download_mode,
     )
-    yahoo_tickers = input_obj.get_yahoo_aware_ticker(exchange)
+    yahoo_tickers = input_obj.get_yahoo_aware_ticker()
 
     # Assert
     assert [yt.symbol for yt in yahoo_tickers] == expected_tickers
@@ -185,10 +185,10 @@ def test_get_yahoo_aware_ticker_edge_cases(ticker, expected_error, expected_msg)
     # Act & Assert
     if expected_error:
         with pytest.raises(expected_error) as exc_info:
-            input_obj.get_yahoo_aware_ticker(StockExchange.nse)
+            input_obj.get_yahoo_aware_ticker()
         assert expected_msg in str(exc_info.value)
     else:
-        result = input_obj.get_yahoo_aware_ticker(StockExchange.nse)
+        result = input_obj.get_yahoo_aware_ticker()
         assert result == []
 
 
@@ -217,7 +217,7 @@ def test_get_yahoo_aware_ticker_uppercase_conversion(tickers, expected_upper):
     )
 
     # Act
-    result = input_obj.get_yahoo_aware_ticker(StockExchange.nse)
+    result = input_obj.get_yahoo_aware_ticker()
 
     # Assert
     assert [yt.symbol for yt in result] == expected_upper

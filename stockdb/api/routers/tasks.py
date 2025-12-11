@@ -4,9 +4,9 @@ import polars as pl
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import ORJSONResponse
 from pipeline.ticker_history_data_download import download_ticker_history
+from stocksense.data import StockDataDB
 
 from api.config import Settings
-from api.data import StockDataDB
 from api.models import (
     APITags,
     TaskMode,

@@ -1,6 +1,6 @@
 [project]
 name = "StockSense-Stockdb"
-version = "0.1.0"
+version = "1.0.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -13,6 +13,7 @@ dependencies = [
     "rich>=14.1.0",
     "scalar-fastapi>=1.4.3",
     "scipy>=1.16.2",
+    "stocksense-core[data]",
     "uvicorn>=0.37.0",
     "yfinance>=0.2.65",
 ]
@@ -32,3 +33,6 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "api"
 module-root = ""
+
+[tool.uv.sources]
+stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }

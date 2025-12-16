@@ -28,6 +28,23 @@ services:
       init_snapshot:
         condition: service_completed_successfully
     tty: true
+  # 3. MLflow tracking server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - shared-data:/shared
+    environment:
+      MLFLOW_TRACKING_URI: http://0.0.0.0:5000
+      MLFLOW_ARTIFACT_ROOT: /shared/mlflow/artifacts
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////shared/mlflow/mlflow.db
+      --default-artifact-root /shared/mlflow/artifacts
+    tty: true
 
 volumes:
   shared-data:

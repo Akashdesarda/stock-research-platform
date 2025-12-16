@@ -2,7 +2,8 @@ import logging
 from dataclasses import dataclass
 from typing import Self
 
-from sqlglot import Dialects, DialectType, exp, optimizer, parse_one
+from sqlglot import exp, optimizer, parse_one
+from sqlglot.dialects.dialect import Dialects, DialectType
 from sqlglot.errors import ParseError
 
 logger = logging.getLogger("stocksense")
@@ -35,7 +36,7 @@ class SQLQueryValidator:
             logger.error(f"Invalid SQL syntax: {e}")
             raise e
 
-    def verify_table_name(self, table_name: str = "self") -> Self:
+    def verify_table_name(self, table_name: str = "stockdb") -> Self:
         """Method to verify if the SQL query contains the specified table name."""
         try:
             # Parse the SQL query
@@ -60,6 +61,9 @@ class SQLQueryValidator:
 
     def verify_columns(self, required_columns: list[str]) -> Self:
         """Method to verify if the SQL query contains the specified columns."""
+        # FIXME - The columns name provided as input param are too hardcoded and rigid. In case
+        # where the resultant query will have a new calculated column then current logic won't work
+
         try:
             # Parse the SQL query
             expression = parse_one(self.query, dialect=self.dialect)

@@ -11,7 +11,7 @@ GROQ_API_KEY = "<set here or add during runtime>"
 OPENAI_API_KEY = "<set here or add during runtime>"
 ANTHROPIC_API_KEY = "<set here or add during runtime>"
 OLLAMA_API_KEY = "<set here or add during runtime>"
-GOOGLE_GLA_API_KEY = "<set here or add during runtime>"
+GOOGLE_API_KEY = "<set here or add during runtime>"
 mlflow_port = 5000
 
 [stockdb]

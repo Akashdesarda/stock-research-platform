@@ -34,6 +34,7 @@
 		"python.defaultInterpreterPath": "python",
 		"testing.coverageToolbarEnabled": true,
 		"cSpell.words": [
+			"groq",
 			"stockdb",
 			"stocksense"
 		],
@@ -52,9 +53,9 @@
 				]
 			},
 			{
-				"label": "reflex app",
+				"label": "streamlit app",
 				"type": "shell",
-				"command": "cd ${cwd}/webapp && uv run reflex run",
+				"command": "cd ${cwd}/webapp && uv run run.py",
 				"problemMatcher": [
 					"$python"
 				]

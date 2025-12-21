@@ -18,14 +18,12 @@ body {
 st.html(f"<style>{css}</style>")
 st.logo(logo)
 st.set_page_config(
-    page_title=title,
     page_icon=logo,
     layout="wide",
     initial_sidebar_state="expanded",
 )
 # Title
-# WARNING - cannot use st.title as it adds same title in all pages
-st.markdown(f"# {title}")
+# st.markdown(f"# {title}")
 
 # Define pages with programmatic navigation
 home = st.Page("app/pages/home.py", title="Home", icon=":material/house:")

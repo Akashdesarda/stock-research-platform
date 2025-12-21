@@ -75,7 +75,7 @@ class Common(BaseModel):
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str
     OLLAMA_API_KEY: str
-    GOOGLE_GLA_API_KEY: str
+    GOOGLE_API_KEY: str
     mlflow_port: int
 
 
@@ -94,8 +94,35 @@ class StockDB(BaseModel):
     download_batch_size: int
 
 
+class Settings(BaseSettings):
+    common: Common
+    app: App
+    stockdb: StockDB
+
+    model_config = SettingsConfigDict()
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (TomlConfigSettingsSource(settings_cls),)
+
+    def save_as_toml(self) -> None:
+        """Save the current settings to a TOML file."""
+        import toml
+
+        _file = self.model_config.get("toml_file")
+        with open(_file, "w") as f:
+            toml.dump(self.model_dump(), f)
+
+
 # the Settings model
-def get_settings(config_path: Path | None = None) -> "Settings":
+def get_settings(config_path: Path | None = None) -> Settings:
     """Get the application settings."""
 
     if _file := os.getenv("CONFIG_FILE"):
@@ -105,31 +132,7 @@ def get_settings(config_path: Path | None = None) -> "Settings":
     else:
         raise ValueError("No configuration file path provided.")
 
-    class Settings(BaseSettings):
-        common: Common
-        app: App
-        stockdb: StockDB
+    # set toml file path for Settings before instantiation so BaseSettings reads it
+    Settings.model_config["toml_file"] = _file.resolve().as_posix()
 
-        model_config = SettingsConfigDict(
-            toml_file=_file.resolve().as_posix(),
-        )
-
-        @classmethod
-        def settings_customise_sources(
-            cls,
-            settings_cls: type[BaseSettings],
-            init_settings: PydanticBaseSettingsSource,
-            env_settings: PydanticBaseSettingsSource,
-            dotenv_settings: PydanticBaseSettingsSource,
-            file_secret_settings: PydanticBaseSettingsSource,
-        ) -> tuple[PydanticBaseSettingsSource, ...]:
-            return (TomlConfigSettingsSource(settings_cls),)
-
-        def save_as_toml(self) -> None:
-            """Save the current settings to a TOML file."""
-            import toml
-
-            with open(_file.resolve().as_posix(), "w") as f:
-                toml.dump(self.model_dump(), f)
-
-    return Settings()
+    return Settings()  # pyright: ignore[reportCallIssue]

@@ -12,6 +12,7 @@ dependencies = [
     "polars[deltalake,pyarrow]>=1.35.2",
     "rich>=14.2.0",
     "sqlglot>=27.29.0",
+    "toml>=0.10.2",
 ]
 
 [project.optional-dependencies]

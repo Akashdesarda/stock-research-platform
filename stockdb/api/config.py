@@ -3,7 +3,7 @@ import platform
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, DirectoryPath
+from pydantic import AfterValidator, BaseModel, DirectoryPath, SecretStr
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -74,11 +74,21 @@ def _resolve_data_path(config_path: str) -> Path:
 # Model for the 'common' section
 class Common(BaseModel):
     base_url: str
+    available_llm_providers: list[str]
+    GROQ_API_KEY: SecretStr
+    OPENAI_API_KEY: SecretStr
+    ANTHROPIC_API_KEY: SecretStr
+    OLLAMA_API_KEY: SecretStr
+    GOOGLE_GLA_API_KEY: SecretStr
+    mlflow_port: int
 
 
 # Model for the 'App' section
 class App(BaseModel):
     port: int
+    text_to_sql_model: str
+    company_summary_model: str
+    company_summary_qa_model: str
 
 
 # StockDB model for the 'stockdb' section

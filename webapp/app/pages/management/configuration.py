@@ -33,18 +33,23 @@ with st.form("configuration_form", border=True):
         )
         st.session_state.common.available_llm_providers = common_available_llm_providers
         GROQ_API_KEY = st.text_input(
-            "GROQ API Key", type="password", help="API key for GROQ service."
+            "GROQ API Key",
+            type="password",
+            help="API key for GROQ service.",
+            value=settings.common.GROQ_API_KEY,
         )
         st.session_state.common.GROQ_API_KEY = GROQ_API_KEY
         OPENAI_API_KEY = st.text_input(
             "OPENAI API Key",
             type="password",
+            value=settings.common.OPENAI_API_KEY,
             help="API key for OpenAI ChatGPT service.",
         )
         st.session_state.common.OPENAI_API_KEY = OPENAI_API_KEY
         ANTHROPIC_API_KEY = st.text_input(
             "ANTHROPIC API Key",
             type="password",
+            value=settings.common.ANTHROPIC_API_KEY,
             help="API key for Anthropic Claude service.",
         )
         st.session_state.common.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY
@@ -52,11 +57,15 @@ with st.form("configuration_form", border=True):
             "OLLAMA API Key",
             type="password",
             placeholder="Not Needed",
+            value=settings.common.OLLAMA_API_KEY,
             help="OLLAMA runs locally, so no API key is needed. Leave blank if using local Ollama.",
         )
         st.session_state.common.OLLAMA_API_KEY = ""
         GOOGLE_API_KEY = st.text_input(
-            "GOOGLE API Key", type="password", help="API key for Google Gemini service."
+            "GOOGLE API Key",
+            type="password",
+            value=settings.common.GOOGLE_API_KEY,
+            help="API key for Google Gemini service.",
         )
         st.session_state.common.GOOGLE_API_KEY = GOOGLE_API_KEY
         mlflow_port = st.number_input(

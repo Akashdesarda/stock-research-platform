@@ -25,7 +25,12 @@ def get_model(model_name: str, api_key: str) -> Model:
     """
     # 1. Extract provider to guess the Env Var Name (e.g., 'openai' -> 'OPENAI_API_KEY')
     if ":" in model_name:
-        provider_prefix = model_name.split(":")[0].upper()
+        provider_prefix = (
+            model_name.split(":")[0]
+            # EG google-gla -> google (since google have multiple providers)
+            .split("-")[0]
+            .upper()
+        )
     else:
         # Fallback or default logic if needed
         raise ValueError(

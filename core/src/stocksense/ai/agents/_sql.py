@@ -52,15 +52,7 @@ def text_to_sql(
     # Adding instruction to the agent
     @agent.instructions
     def adding_tasks(ctx: RunContext[StockDBContextDependency]) -> str:
-        # getting current available columns from stockdb
-        # columns = (
-        #     ctx.deps.http_client.get(
-        #         "/per-security/nse/tcs/history",
-        #         params={"interval": "1d", "period": "1d"},
-        #     )
-        #     .json()[0]
-        #     .keys()
-        # )
+
         return str(
             load_prompt("text_to_sql_task").format(
                 table_name=ctx.deps.table_name,

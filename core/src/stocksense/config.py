@@ -76,15 +76,19 @@ class Common(BaseModel):
     base_url: str
     available_llm_providers: list[str]
     GROQ_API_KEY: SecretStr
+    OPENAI_API_KEY: SecretStr
+    ANTHROPIC_API_KEY: SecretStr
+    OLLAMA_API_KEY: SecretStr
+    GOOGLE_GLA_API_KEY: SecretStr
     mlflow_port: int
 
 
 # Model for the 'App' section
 class App(BaseModel):
     port: int
-    llm_provider: str
-    llm_provider_api_key: str
-    model: str
+    text_to_sql_model: str
+    company_summary_model: str
+    company_summary_qa_model: str
 
 
 # StockDB model for the 'stockdb' section

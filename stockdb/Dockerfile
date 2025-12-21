@@ -1,7 +1,7 @@
 FROM python:3.13-slim-bookworm
 
 RUN apt update -y && \
-    apt --no-install-recommends -y install gcc g++ && \
+    apt --no-install-recommends -y install gcc g++ git && \
     apt clean -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /stockdb

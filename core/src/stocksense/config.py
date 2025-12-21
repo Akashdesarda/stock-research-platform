@@ -3,7 +3,7 @@ import platform
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, DirectoryPath, SecretStr
+from pydantic import AfterValidator, BaseModel, DirectoryPath
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -71,11 +71,11 @@ def _resolve_data_path(config_path: str) -> Path:
 class Common(BaseModel):
     base_url: str
     available_llm_providers: list[str]
-    GROQ_API_KEY: SecretStr
-    OPENAI_API_KEY: SecretStr
-    ANTHROPIC_API_KEY: SecretStr
-    OLLAMA_API_KEY: SecretStr
-    GOOGLE_GLA_API_KEY: SecretStr
+    GROQ_API_KEY: str
+    OPENAI_API_KEY: str
+    ANTHROPIC_API_KEY: str
+    OLLAMA_API_KEY: str
+    GOOGLE_GLA_API_KEY: str
     mlflow_port: int
 
 
@@ -111,7 +111,7 @@ def get_settings(config_path: Path | None = None) -> "Settings":
         stockdb: StockDB
 
         model_config = SettingsConfigDict(
-            toml_file=_file,
+            toml_file=_file.resolve().as_posix(),
         )
 
         @classmethod
@@ -124,5 +124,12 @@ def get_settings(config_path: Path | None = None) -> "Settings":
             file_secret_settings: PydanticBaseSettingsSource,
         ) -> tuple[PydanticBaseSettingsSource, ...]:
             return (TomlConfigSettingsSource(settings_cls),)
+
+        def save_as_toml(self) -> None:
+            """Save the current settings to a TOML file."""
+            import toml
+
+            with open(_file.resolve().as_posix(), "w") as f:
+                toml.dump(self.model_dump(), f)
 
     return Settings()

@@ -1,8 +1,26 @@
 [common]
 base_url = 'http://localhost'
+available_llm_providers = [
+    'openai',
+    'groq',
+    'anthropic',
+    'ollama',
+    'google-gla',
+]
+GROQ_API_KEY = "<set here or add during runtime>"
+OPENAI_API_KEY = "<set here or add during runtime>"
+ANTHROPIC_API_KEY = "<set here or add during runtime>"
+OLLAMA_API_KEY = "<set here or add during runtime>"
+GOOGLE_GLA_API_KEY = "<set here or add during runtime>"
+mlflow_port = 5000
+
 [stockdb]
 port = 8000
 data_base_path = '/shared/assets/stockdb' # Use Docker mount target path
 download_batch_size = 50
+
 [app]
 port = 4000
+text_to_sql_model = 'google-gla:gemini-2.5-flash'
+company_summary_model = 'groq:openai/gpt-oss-120b'
+company_summary_qa_model = 'google-gla:gemini-2.5-flash'

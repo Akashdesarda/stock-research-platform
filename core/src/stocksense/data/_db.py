@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Final
 
 import deltalake
 import duckdb
@@ -11,6 +11,8 @@ import polars as pl
 @dataclass
 class StockDataDB:
     """A class to interact with stock data stored in Delta Lake format."""
+
+    table_name: ClassVar[Final[str]] = "stockdb"
 
     db_path: Path
     table_version: int | str | datetime | None = None
@@ -28,6 +30,7 @@ class StockDataDB:
     def sql_filter(self, query: str) -> pl.LazyFrame:
         # NOTE - duckdb needs df variable in local scope to refer as table. Here `self._table` is
         # referred as `stockdb` table locally
+        # WARNING - this should match the table_name variable above
         stockdb = self._table  # noqa: F841
         return duckdb.sql(query).pl(lazy=True)
 

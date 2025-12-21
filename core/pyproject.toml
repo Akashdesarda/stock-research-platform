@@ -1,6 +1,6 @@
 [project]
 name = "Stocksense-Core"
-version = "0.4.0"
+version = "0.4.1"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Akash Desarda", email = "desardaakash@gmail.com" }]

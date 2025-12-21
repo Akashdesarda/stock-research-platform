@@ -11,10 +11,6 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
-# Define the default config path
-default_config_path = Path(__file__).parent.parent.parent.parent / "config.toml"
-config_path = Path(os.getenv("CONFIG_FILE", default_config_path.resolve().as_posix()))
-
 
 def _is_running_in_docker() -> bool:
     """Check if the application is running inside a Docker container."""
@@ -99,22 +95,34 @@ class StockDB(BaseModel):
 
 
 # the Settings model
-class Settings(BaseSettings):
-    common: Common
-    app: App
-    stockdb: StockDB
+def get_settings(config_path: Path | None = None) -> "Settings":
+    """Get the application settings."""
 
-    model_config = SettingsConfigDict(
-        toml_file=config_path,
-    )
+    if _file := os.getenv("CONFIG_FILE"):
+        _file = Path(_file)
+    elif config_path is not None:
+        _file = config_path
+    else:
+        raise ValueError("No configuration file path provided.")
 
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return (TomlConfigSettingsSource(settings_cls),)
+    class Settings(BaseSettings):
+        common: Common
+        app: App
+        stockdb: StockDB
+
+        model_config = SettingsConfigDict(
+            toml_file=_file,
+        )
+
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (TomlConfigSettingsSource(settings_cls),)
+
+    return Settings()

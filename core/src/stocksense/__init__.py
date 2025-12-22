@@ -21,7 +21,7 @@ logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
 
 
-# Setting CONFIG_PATH environment variable if not already set
+# Setting CONFIG_FILE environment variable if not already set
 base_dir = Path(__file__).resolve().parent.parent.parent.parent
 default_config_path = base_dir / "config.toml"
-os.environ.setdefault("CONFIG_PATH", default_config_path.resolve().as_posix())
+os.environ.setdefault("CONFIG_FILE", default_config_path.resolve().as_posix())

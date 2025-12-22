@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, ClassVar, Final
 
 import deltalake
-import duckdb
 import polars as pl
 
 
@@ -28,6 +27,8 @@ class StockDataDB:
         return self._table
 
     def sql_filter(self, query: str) -> pl.LazyFrame:
+        import duckdb
+
         # NOTE - duckdb needs df variable in local scope to refer as table. Here `self._table` is
         # referred as `stockdb` table locally
         # WARNING - this should match the table_name variable above

@@ -7,11 +7,11 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from stocksense.ai.models import get_model
-from stocksense.config import Settings
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.tools.sql import ParseError, SQLQueryValidator
 
-settings = Settings()
+settings = get_settings()
 # mlflow setup
 mlflow.set_tracking_uri(f"{settings.common.base_url}:{settings.common.mlflow_port}")
 mlflow.set_experiment("stocksense")

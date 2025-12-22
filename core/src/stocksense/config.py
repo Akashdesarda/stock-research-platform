@@ -124,11 +124,12 @@ class Settings(BaseSettings):
 # the Settings model
 def get_settings(config_path: Path | None = None) -> Settings:
     """Get the application settings."""
-
-    if _file := os.getenv("CONFIG_FILE"):
-        _file = Path(_file)
-    elif config_path is not None:
+    # Sequence to look for config file path
+    # 1. argument 2. env variable 3. raise error
+    if config_path is not None:
         _file = config_path
+    elif _file := os.getenv("CONFIG_FILE"):
+        _file = Path(_file)
     else:
         raise ValueError("No configuration file path provided.")
 

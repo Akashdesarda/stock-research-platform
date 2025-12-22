@@ -8,7 +8,6 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 
 from stocksense.ai.models import get_model
 from stocksense.config import Settings
-from stocksense.data import StockDataDB
 from stocksense.tools.sql import ParseError, SQLQueryValidator
 
 settings = Settings()
@@ -23,7 +22,7 @@ class StockDBContextDependency:
     """Context that can be used as dependency injection by the Agent"""
 
     columns: list[str]
-    table_name: str = StockDataDB.table_name
+    table_name: str = "stockdb"
     stockdb_api_base_url: str = (
         f"{settings.common.base_url}:{settings.stockdb.port}/api"
     )

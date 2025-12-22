@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 import mlflow
@@ -11,7 +12,7 @@ from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.tools.sql import ParseError, SQLQueryValidator
 
-settings = get_settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 # mlflow setup
 mlflow.set_tracking_uri(f"{settings.common.base_url}:{settings.common.mlflow_port}")
 mlflow.set_experiment("stocksense")

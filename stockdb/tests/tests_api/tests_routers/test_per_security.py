@@ -4,13 +4,13 @@ from typing import AsyncGenerator
 import polars as pl
 import pytest
 import pytest_asyncio
-from api.config import Settings
 from api.models import Interval, Period
 from httpx import ASGITransport, AsyncClient
 from main import app
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 
 @pytest_asyncio.fixture(scope="module")

@@ -1,17 +1,18 @@
 import asyncio
 import logging
+import os
 from datetime import date, timedelta
 
 import polars as pl
-from api.config import Settings
 from api.data import YFStockData
 from api.models import Interval, Period, StockExchange, StockExchangeYahooIdentifier
 from rich.progress import track
 from rich.prompt import Prompt
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 
 def calculate_batches(n: int, batch_size: int) -> int:

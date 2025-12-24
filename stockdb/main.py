@@ -24,9 +24,6 @@ STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/stati
 app = FastAPI(
     debug=True, title="StockDB API", version="1.1.3", docs_url=None, redoc_url=None
 )
-os.environ["CONFIG_FILE"] = (
-    "C:/Users/AkashDesarda/projects/personal/stock-research-platform/config.toml"
-)
 
 
 # Middleware to log incoming request & processing timing
@@ -133,6 +130,7 @@ async def _internal_scalar_html():
 if __name__ == "__main__":
     import uvicorn
 
+    # FIXME - remove below prints after testing
     print("initial", os.getenv("CONFIG_FILE"))
     setup()
     print("after setup", os.getenv("CONFIG_FILE"))

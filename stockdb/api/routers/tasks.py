@@ -1,8 +1,10 @@
 import os
 from datetime import datetime, timedelta
+from typing import Annotated
 
 import polars as pl
-from fastapi import APIRouter, HTTPException, status
+from deltalake import DeltaTable
+from fastapi import APIRouter, HTTPException, Path, status
 from fastapi.responses import ORJSONResponse
 from pipeline.ticker_history_data_download import download_ticker_history
 from stocksense.config import get_settings
@@ -10,6 +12,7 @@ from stocksense.data import StockDataDB
 
 from api.models import (
     APITags,
+    StockExchange,
     TaskMode,
     TaskTickerHistoryDownloadInput,
     TickerHistoryDownloadMode,
@@ -18,6 +21,37 @@ from api.models import (
 settings = get_settings(os.getenv("CONFIG_FILE"))
 
 router = APIRouter(prefix="/api/task", tags=[APITags.task])
+
+
+@router.put("/{exchange}/ticker/history")
+async def table_optimize_ticker_history(
+    exchange: Annotated[
+        StockExchange,
+        Path(
+            description="Symbol of the exchange",
+            examples=["nse", "nyse"],
+        ),
+    ],
+    compact: bool = True,
+    vacuum: bool = True,
+) -> ORJSONResponse:
+    """Optimize ticker history table for given exchange
+    Optimization includes -
+    1. compaction of small files and reorganization of data for better query performance.
+    2. vacuuming to remove old data files and free up storage space.
+    """
+    result = {}
+    dt_table = DeltaTable(
+        settings.stockdb.data_base_path / f"{exchange.value}/ticker_history"
+    )
+    if compact:
+        compact_result = dt_table.optimize.compact()
+        result["compaction"] = compact_result
+    if vacuum:
+        vaccum_result = dt_table.vacuum(dry_run=False)
+        result["vacuum"] = vaccum_result
+
+    return ORJSONResponse(result)
 
 
 @router.post("/ticker/history")

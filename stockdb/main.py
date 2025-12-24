@@ -1,27 +1,31 @@
 import http
 import logging
+import os
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path as Pathlib_Path
-from typing import Annotated
 
 import polars as pl
 from about_time import about_time
-from api.config import Settings
+from api import setup
 from api.models import APITags, StockExchange
 from api.routers import per_security, tasks
-from fastapi import FastAPI, HTTPException, Path, Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from scalar_fastapi import get_scalar_api_reference
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
     debug=True, title="StockDB API", version="1.0.3", docs_url=None, redoc_url=None
+)
+os.environ["CONFIG_FILE"] = (
+    "C:/Users/AkashDesarda/projects/personal/stock-research-platform/config.toml"
 )
 
 
@@ -75,40 +79,40 @@ async def _health():
     return {"message": "StockDB API is up and running"}
 
 
-@app.get("/health/data/{exchange}", status_code=200, tags=[APITags.health])
-async def _stockdb_data_health(
-    exchange: Annotated[
-        StockExchange,
-        Path(
-            description="Symbol of the exchange",
-            examples=["nse", "nyse"],
-        ),
-    ],
+@app.get(
+    "/health/data/",
+    status_code=200,
+    tags=[APITags.health],
+    response_class=ORJSONResponse,
+)
+async def _stockdb_data_health() -> dict:
     # REVIEW - Should I add more exchange info?
-) -> ORJSONResponse:
     """StockDB Data Health check"""
+    all_exchanges = dict.fromkeys(StockExchange.__members__.keys())
     now = datetime.now()
     latest_data_date = now.date() if now.hour >= 18 else now.date() - timedelta(days=1)
-    stock_db = StockDataDB(
-        settings.stockdb.data_base_path / f"{exchange.value}/ticker_history"
-    )
-    date_check = (
-        await stock_db.polars_filter(
-            pl.col("date").max().cast(pl.Date) < latest_data_date
-        )
-        .select("close")
-        .count()
-        .collect_async()
-    )
 
-    if date_check.item() == 0:
-        # No new data to download
-        return {"message": "StockDB Data is up to date"}
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="StockDB Data is outdated",
+    # Getting data health loop
+    for exch in all_exchanges:
+        stock_db = StockDataDB(
+            settings.stockdb.data_base_path / f"{exch}/ticker_history"
         )
+        count = await stock_db.table_data.select("close").count().collect_async()
+        if count.item() == 0:
+            all_exchanges[exch] = "NO DATA"
+            continue
+        date_check = (
+            await stock_db.polars_filter(
+                pl.col("date").max().cast(pl.Date) < latest_data_date
+            )
+            .select("close")
+            .count()
+            .collect_async()
+        )
+
+        all_exchanges[exch] = "OK" if date_check.item() == 0 else "OUTDATED"
+
+    return all_exchanges
 
 
 # adding all the routers from submodules
@@ -129,6 +133,9 @@ async def _internal_scalar_html():
 if __name__ == "__main__":
     import uvicorn
 
+    print("initial", os.getenv("CONFIG_FILE"))
+    setup()
+    print("after setup", os.getenv("CONFIG_FILE"))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

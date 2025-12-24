@@ -1,18 +1,18 @@
 import logging
+import os
 
 import deltalake
 import polars as pl
-from deltalake.table import DeltaTable
 from api.models import StockExchange
-from api.config import Settings
+from deltalake.table import DeltaTable
+from stocksense.config import get_settings
 
 logger = logging.getLogger("stockdb")
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 ticker_history = pl.DataFrame(
     schema={
         "date": pl.Datetime,
-        # "key": pl.String,
         "ticker": pl.String,
         "company": pl.String,
         "open": pl.Float32,

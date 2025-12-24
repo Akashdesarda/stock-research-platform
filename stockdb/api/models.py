@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime
 from enum import Enum
 
@@ -300,10 +301,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
         """Get Ticker wrt to yahoo aware exchange."""
         if self.ticker is None:
             from polars import scan_delta
+            from stocksense.config import get_settings
 
-            from api.config import Settings
-
-            settings = Settings()
+            settings = get_settings(os.getenv("CONFIG_FILE"))
 
             self.ticker = (
                 scan_delta(settings.stockdb.data_base_path / "common/security")

@@ -1,3 +1,4 @@
+import os
 import pathlib
 from datetime import datetime
 from typing import Annotated, Any
@@ -5,9 +6,9 @@ from typing import Annotated, Any
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.responses import ORJSONResponse
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
-from api.config import Settings
 from api.data import YFStockData
 from api.dependency.utils import yahoo_finance_aware_ticker
 from api.models import (
@@ -23,7 +24,7 @@ from api.models import (
     YahooTickerIdentifier,
 )
 
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 router = APIRouter(prefix="/api/per-security", tags=[APITags.per_security])
 

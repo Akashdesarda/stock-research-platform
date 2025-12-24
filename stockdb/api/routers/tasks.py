@@ -1,12 +1,13 @@
+import os
 from datetime import datetime, timedelta
 
 import polars as pl
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import ORJSONResponse
 from pipeline.ticker_history_data_download import download_ticker_history
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
-from api.config import Settings
 from api.models import (
     APITags,
     TaskMode,
@@ -14,7 +15,7 @@ from api.models import (
     TickerHistoryDownloadMode,
 )
 
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 router = APIRouter(prefix="/api/task", tags=[APITags.task])
 

@@ -1,11 +1,12 @@
+import os
 from pathlib import Path
 
 import polars as pl
-from api.config import Settings
 from deltalake.table import DeltaTable
+from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 
 def test_settings():

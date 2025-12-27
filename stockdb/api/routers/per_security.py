@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 import polars as pl
+from duckdb import BinderException
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.responses import ORJSONResponse
 from stocksense.config import get_settings
@@ -88,9 +89,14 @@ async def ticker_query(
         settings.stockdb.data_base_path / f"{exchange.value}/ticker_history"
     )
     # Execute SQL query
-    result = history_data.sql_filter(sql_query)
-    result = await result.collect_async()
-    return ORJSONResponse(result.to_dicts())
+    try:
+        result = history_data.sql_filter(sql_query)
+        result = await result.collect_async()
+        return ORJSONResponse(result.to_dicts())
+    except BinderException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
 
 
 @router.get("/{exchange}/{ticker}")

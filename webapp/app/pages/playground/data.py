@@ -26,9 +26,7 @@ st.markdown("# Data Explorer")
 st.markdown("Explore stock data and analytics.")
 
 available_exchange = get_available_exchanges()
-available_tickers = get_available_tickers(
-    available_exchange.select("symbol").to_series().to_list()
-)
+available_tickers = get_available_tickers()
 
 # create tabs for manual and AI-powered queries
 manual_query, ai_query = st.tabs([

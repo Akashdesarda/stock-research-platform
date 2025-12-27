@@ -13,9 +13,7 @@ from app.core.utils import (
 settings = get_settings(os.getenv("CONFIG_FILE"))
 
 available_exchange = get_available_exchanges()
-available_tickers = get_available_tickers(
-    available_exchange.select("symbol").to_series().to_list()
-)
+available_tickers = get_available_tickers()
 
 st.markdown("Manage application settings and configurations.")
 

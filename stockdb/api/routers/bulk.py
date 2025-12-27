@@ -1,5 +1,4 @@
 import os
-import pathlib
 
 import polars as pl
 from fastapi import APIRouter
@@ -17,15 +16,15 @@ settings = get_settings(os.getenv("CONFIG_FILE"))
 router = APIRouter(prefix="/api/bulk", tags=[APITags.bulk])
 
 
-@router.get("/list-tickers", response_model=dict[str, list[ExchangeTickerInfo]])
+@router.get("/list-tickers", response_model=dict[str, list[ExchangeTickerInfo] | None])
 async def list_exchange_wise_ticker() -> ORJSONResponse:
     """Get all the available `ticker` for all `exchange`"""
-    all_exchanges = dict.fromkeys(StockExchange.__members__.keys())
+    all_exchanges = {}
 
-    for exch in all_exchanges:
-        table_path: pathlib.Path = settings.stockdb.data_base_path / f"{exch}/equity"
+    for exch in StockExchange:
+        table_path = settings.stockdb.data_base_path / f"{exch.value}/equity"
         if not table_path.exists():
-            all_exchanges[exch] = None
+            all_exchanges[exch.value] = None
         else:
             result = await (
                 pl.scan_delta(table_path)
@@ -33,6 +32,6 @@ async def list_exchange_wise_ticker() -> ORJSONResponse:
                 .sort("ticker")
                 .collect_async()
             )
-            all_exchanges[exch] = result.to_dicts()
+            all_exchanges[exch.value] = result.to_dicts()
 
     return ORJSONResponse(all_exchanges)

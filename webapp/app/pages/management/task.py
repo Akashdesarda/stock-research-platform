@@ -1,14 +1,16 @@
+import os
+
 import polars as pl
 import streamlit as st
+from stocksense.config import get_settings
 
-from app.config import Settings
 from app.core.utils import (
     get_available_exchanges,
     get_available_tickers,
     rest_request_sync,
 )
 
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 available_exchange = get_available_exchanges()
 available_tickers = get_available_tickers(

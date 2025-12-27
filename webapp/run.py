@@ -2,10 +2,12 @@ import os
 import subprocess
 import sys
 
-from app.config import Settings
+from app import setup
+from stocksense.config import get_settings
 
 if __name__ == "__main__":
-    settings = Settings()
+    setup()
+    settings = get_settings(os.getenv("CONFIG_FILE"))
     env = os.environ.copy()
     env["STREAMLIT_SERVER_PORT"] = str(settings.app.port)
     try:

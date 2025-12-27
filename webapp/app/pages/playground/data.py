@@ -12,11 +12,12 @@ from app.core.utils import (
 )
 from app.pages.playground._helper import (
     data_preview,
+    data_preview_control,
     fetch_data_from_form,
     fetch_data_from_sql_query,
 )
 from app.state.manager import StateManager
-from app.state.model import PreviewMethodChoice, TickerChoice
+from app.state.model import TickerChoice
 
 settings = get_settings(os.getenv("CONFIG_FILE"))
 state = StateManager.init()
@@ -69,12 +70,12 @@ with manual_query:
             key="ticker_selection_manual",
         )
         # updating state
-        state.ticker_choice_data = tickers_selection_choice
+        state.ticker_choice = tickers_selection_choice
 
     # SECTION - Query Form
     with st.form(key="manual_data_query_form", border=True):
         # ticker symbol selection
-        match state.ticker_choice_data:
+        match state.ticker_choice:
             case TickerChoice.all:
                 st.multiselect("Ticker Symbols", disabled=True, options=[])
                 selected_tickers = available_tickers[
@@ -167,16 +168,29 @@ with manual_query:
                 help="If set, 'Data Period' selection is ignored.",
                 max_value="today",
             )
+        # horizontal OR divider between date selection and custom query
+        st.space()
+        st.markdown(
+            """
+            <div style="display:flex; align-items:center; margin: 8px 0;">
+                <hr style="flex:1; border:none; border-top:1px solid #ccc; margin:0 12px;">
+                <span style="color:#666; font-weight:bold;">OR</span>
+                <hr style="flex:1; border:none; border-top:1px solid #ccc; margin:0 12px;">
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
         # custom query input
         if user_query := st.text_area(
             "Use your own sql query",
         ):
             # storing in state so that it can be accessed outside of form
-            state.user_query_data = user_query
+            state.query_user = user_query
 
         # preview data option
         preview_selection_data = st.checkbox("Preview Data", value=True)
-        state.preview_selection_data = preview_selection_data
+        state.preview_selection = preview_selection_data
 
         # submit query button
         manual_submit_query = st.form_submit_button(
@@ -186,7 +200,7 @@ with manual_query:
     # SECTION - Data preview for manual query
     if manual_submit_query:
         st.subheader("Query Data Preview")
-        if user_query:
+        if state.query_user:
             # Fetch data based on sql query
             query_manual_collection_data = fetch_data_from_sql_query(
                 state.selected_exchange_data, user_query
@@ -201,95 +215,51 @@ with manual_query:
                 },
                 selected_tickers=selected_tickers,
             )
-        state.query_manual_collection_data = query_manual_collection_data
+        state.query_data_collection_manual = query_manual_collection_data
 
     # Persisted preview rendering (survives widget interactions)
-    if (state.preview_selection_data is True) and (
-        state.query_manual_collection_data is not None
+    if (state.preview_selection is True) and (
+        state.query_data_collection_manual is not None
     ):
         with st.container():
             st.subheader("Query Data Preview")
             # If used custom query the displaying in proper format
-            if state.user_query_data:
+            if state.query_user:
                 st.write("Executed SQL Query:")
                 st.code(
-                    state.user_query_data,
+                    state.query_user,
                     language="sql",
                     line_numbers=True,
                     wrap_lines=True,
                 )
-
-            # Preview options (explicit "Select Preview" as first choice so
-            # nothing is shown until the user picks a real method)
-            preview_col, control_col = st.columns([0.3, 0.7])
-            with preview_col:
-                preview_method_choice_data = st.radio(
-                    "Preview Method",
-                    options=list(PreviewMethodChoice),
-                    format_func=lambda x: x.value,
-                    index=None,
-                    key="preview_method_choice_manual",
-                    help="Choose how to preview the data",
-                )
-                state.preview_method_choice_data = preview_method_choice_data
-
-            # Control widgets use keys so their values persist even when
-            # the radio changes (avoids losing slider/number inputs)
-            with control_col:
-                if state.preview_method_choice_data in [
-                    PreviewMethodChoice.head,
-                    PreviewMethodChoice.tail,
-                    PreviewMethodChoice.random,
-                ]:
-                    n_rows = st.slider(
-                        "Number of rows",
-                        min_value=1,
-                        max_value=100,
-                        value=state.preview_n_rows_data,
-                        key="preview_n_rows_manual",
-                        help="Number of rows to display",
-                    )
-                    state.preview_n_rows_data = n_rows
-                elif state.preview_method_choice_data is PreviewMethodChoice.desired:
-                    range_col1, range_col2 = st.columns(2)
-                    with range_col1:
-                        start_idx = st.number_input(
-                            "Start index",
-                            min_value=0,
-                            value=state.preview_start_idx_data,
-                            step=1,
-                            key="preview_start_idx_manual",
-                            help="Starting row index (0-based)",
-                        )
-                        state.preview_start_idx_data = start_idx
-                    with range_col2:
-                        end_idx = st.number_input(
-                            "End index",
-                            min_value=1,
-                            value=state.preview_end_idx_data,
-                            step=1,
-                            key="preview_end_idx_manual",
-                            help="Ending row index (exclusive)",
-                        )
-                        state.preview_end_idx_data = end_idx
+            (
+                state.preview_method_choice_manual,
+                state.preview_n_rows_manual,
+                state.preview_start_idx_manual,
+                state.preview_end_idx_manual,
+            ) = data_preview_control(
+                key_suffix="manual",
+                current_n_rows=state.preview_n_rows_manual,
+                current_start=state.preview_start_idx_manual,
+                current_end=state.preview_end_idx_manual,
+            )
 
             # Only preview when a real method is selected
-            if state.preview_method_choice_data:
-                preview_data = data_preview(
-                    data=state.query_manual_collection_data,
-                    preview_method=state.preview_method_choice_data,
-                    n_rows=int(state.preview_n_rows_data),
-                    start_idx=int(state.preview_start_idx_data),
-                    end_idx=int(state.preview_end_idx_data),
+            if state.preview_method_choice_manual:
+                preview_data_manual = data_preview(
+                    data=state.query_data_collection_manual,
+                    preview_method=state.preview_method_choice_manual,
+                    n_rows=int(state.preview_n_rows_manual),
+                    start_idx=int(state.preview_start_idx_manual),
+                    end_idx=int(state.preview_end_idx_manual),
                 )
-                st.dataframe(preview_data)
+                st.dataframe(preview_data_manual, key="preview_data_manual")
             else:
                 st.info("Select a preview method to display data.")
 
-
+# SECTION - AI-Powered Query tab
 with ai_query:
     st.subheader("AI-Powered Data Query")
-    # exchange_col, query_prompt_col = st.columns([0.3, 0.7])
 
     # exchange selection dropdown
     # NOTE - storing selected exchange, prompt in session state for inter-widgets & cross-tab access
@@ -330,7 +300,7 @@ with ai_query:
             st.code(user_query, language="sql")
             # preview data option
             preview_selection_data = st.checkbox("Preview Data", value=True)
-            state.preview_selection_data = preview_selection_data
+            state.preview_selection = preview_selection_data
             # submit query button
             ai_submit_query = st.form_submit_button(
                 "Submit", icon=":material/play_arrow:"
@@ -339,82 +309,38 @@ with ai_query:
         # SECTION - AI Query Data Preview
         if ai_submit_query:
             # Fetch data based on sql query & storing into sate
-            state.query_ai_collection_data = fetch_data_from_sql_query(
+            state.query_data_collection_ai = fetch_data_from_sql_query(
                 exchange=state.selected_exchange_data,
                 sql_query=user_query,
             )
 
         # Persisted preview rendering (survives widget interactions)
-        if (state.preview_selection_data is True) and (
-            state.query_ai_collection_data is not None
+        if (state.preview_selection is True) and (
+            state.query_data_collection_ai is not None
         ):
             with st.container():
                 st.subheader("Query Data Preview")
-
-                # nothing is shown until the user picks a real method)
-                preview_col, control_col = st.columns([0.3, 0.7])
-                with preview_col:
-                    preview_method_choice_ai = st.radio(
-                        "Preview Method",
-                        options=list(PreviewMethodChoice),
-                        format_func=lambda x: x.value,
-                        index=None,
-                        key="preview_method_choice_ai",
-                        help="Choose how to preview the data",
-                    )
-                    state.preview_method_choice_data = preview_method_choice_ai
-
-                # Control widgets use keys so their values persist even when
-                # the radio changes (avoids losing slider/number inputs)
-                with control_col:
-                    if state.preview_method_choice_data in [
-                        PreviewMethodChoice.head,
-                        PreviewMethodChoice.tail,
-                        PreviewMethodChoice.random,
-                    ]:
-                        preview_n_rows_ai = st.slider(
-                            "Number of rows",
-                            min_value=1,
-                            max_value=100,
-                            value=state.preview_n_rows_data,
-                            key="preview_n_rows_ai",
-                            help="Number of rows to display",
-                        )
-                        state.preview_n_rows_data = preview_n_rows_ai
-                    elif (
-                        state.preview_method_choice_data is PreviewMethodChoice.desired
-                    ):
-                        range_col1, range_col2 = st.columns(2)
-                        with range_col1:
-                            start_idx_ai = st.number_input(
-                                "Start index",
-                                min_value=0,
-                                value=state.preview_start_idx_data,
-                                step=1,
-                                key="preview_start_idx_ai",
-                                help="Starting row index (0-based)",
-                            )
-                            state.preview_start_idx_data = start_idx_ai
-                        with range_col2:
-                            end_idx_ai = st.number_input(
-                                "End index",
-                                min_value=1,
-                                value=state.preview_end_idx_data,
-                                step=1,
-                                key="preview_end_idx_ai",
-                                help="Ending row index (exclusive)",
-                            )
-                            state.preview_end_idx_data = end_idx_ai
+                (
+                    state.preview_method_choice_ai,
+                    state.preview_n_rows_ai,
+                    state.preview_start_idx_ai,
+                    state.preview_end_idx_ai,
+                ) = data_preview_control(
+                    key_suffix="ai",
+                    current_n_rows=state.preview_n_rows_ai,
+                    current_start=state.preview_start_idx_ai,
+                    current_end=state.preview_end_idx_ai,
+                )
 
                 # Only preview when a real method is selected
-                if state.preview_method_choice_data:
-                    preview_data = data_preview(
-                        data=state.query_ai_collection_data,
-                        preview_method=state.preview_method_choice_data,
-                        n_rows=int(state.preview_n_rows_data),
-                        start_idx=int(state.preview_start_idx_data),
-                        end_idx=int(state.preview_end_idx_data),
+                if state.preview_method_choice_ai:
+                    preview_data_ai = data_preview(
+                        data=state.query_data_collection_ai,
+                        preview_method=state.preview_method_choice_ai,
+                        n_rows=int(state.preview_n_rows_ai),
+                        start_idx=int(state.preview_start_idx_ai),
+                        end_idx=int(state.preview_end_idx_ai),
                     )
-                    st.dataframe(preview_data)
+                    st.dataframe(preview_data_ai, key="preview_data_ai")
                 else:
                     st.info("Select a preview method to display data.")

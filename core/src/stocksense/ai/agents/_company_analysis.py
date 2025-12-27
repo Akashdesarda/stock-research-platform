@@ -17,7 +17,7 @@ mlflow.set_experiment("stocksense")
 mlflow.pydantic_ai.autolog()
 
 
-class CompanySummary(BaseModel):
+class CompanySummaryOutput(BaseModel):
     company_overview: str = Field(..., description="High level overview of the company")
     business_summary: str = Field(
         ..., description="Summary regarding all the business the company does"
@@ -62,12 +62,12 @@ class CompanyDataContextDependency:
 
 def company_summary(
     model_name: str, api_key: str, exchange: str, ticker: str
-) -> AgentRunResult[CompanySummary]:
+) -> AgentRunResult[CompanySummaryOutput]:
     # initialize the agent
     agent = Agent(
         model=get_model(model_name, api_key),
         deps_type=CompanyDataContextDependency,
-        output_type=CompanySummary,
+        output_type=CompanySummaryOutput,
         system_prompt=str(load_prompt("company_analysis_report_system").format()),
     )
 
@@ -89,7 +89,9 @@ def company_summary(
     )
 
 
-def company_summary_qa(model_name: str, api_key: str, company_summary: CompanySummary):
+def company_summary_qa(
+    model_name: str, api_key: str, company_summary: CompanySummaryOutput
+):
     agent = Agent(
         model=get_model(model_name, api_key),
         system_prompt="You are a finance analyst helping assistant.",

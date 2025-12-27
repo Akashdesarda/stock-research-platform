@@ -3159,8 +3159,8 @@ dev = [{ name = "ipykernel", specifier = ">=7.0.1" }]
 
 [[package]]
 name = "stocksense-core"
-version = "0.4.3"
-source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#912bdac45a87505c60a0256f5647b10f0daff51d" }
+version = "0.4.5"
+source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#536a11bd13407ff09bdfab1266df545f50d2a298" }
 dependencies = [
     { name = "httpx" },
     { name = "numpy" },

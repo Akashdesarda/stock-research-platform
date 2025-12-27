@@ -6,9 +6,11 @@ Entry point for the multi-page Streamlit app.
 from pathlib import Path
 
 import streamlit as st
+from app import setup
 
+setup()
 logo = Path(__file__).parent / "static/chart-growth-invest.svg"
-title = "StockSense: AI Research Platform"
+title = "StockSense: AI Powered Stock Research Platform"
 css = """
 body {
     -webkit-font-smoothing: antialiased;
@@ -19,6 +21,7 @@ st.html(f"<style>{css}</style>")
 st.logo(logo)
 st.set_page_config(
     page_icon=logo,
+    page_title=title,
     layout="wide",
     initial_sidebar_state="expanded",
 )

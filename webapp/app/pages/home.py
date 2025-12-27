@@ -1,9 +1,11 @@
+import os
+
 import streamlit as st
+from stocksense.config import get_settings
 
-from app.config import Settings
-from app.core.utils import get_available_exchanges, rest_request_sync
+from app.core.utils import rest_request_sync
 
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 
 # Adding service status check in sidebar
@@ -42,22 +44,25 @@ with st.sidebar:
 
     st.markdown("## Data Status")
     # Display service name and status badge
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([1.5, 1], vertical_alignment="center")
     with col1:
+        status = rest_request_sync(
+            f"{settings.common.base_url}:{settings.stockdb.port}/health/data/"
+        ).json()
         selected_exchange = st.selectbox(
             "Select Exchange",
-            options=get_available_exchanges().select("symbol").to_series().to_list(),
+            options=status.keys(),
             label_visibility="collapsed",
         )
-        status = check_service_status(
-            f"{settings.common.base_url}:{settings.stockdb.port}/health/data/{selected_exchange}"
-        )
     with col2:
-        if status:
+        if status[selected_exchange] == "OK":
             # Available - Green badge with OK text
             st.badge("OK", color="green")
+        elif status[selected_exchange] == "OUTDATED":
+            # Outdated - orange badge with Outdated text
+            st.badge("Outdated", icon=":material/warning:", color="orange")
         else:
             # Not available - Red badge with ERROR text
-            st.badge("Outdated", icon=":material/error:", color="red")
+            st.badge("No Data", icon=":material/error:", color="red")
 
 # TODO - Add home page description content and useful links

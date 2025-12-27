@@ -1,11 +1,12 @@
+import os
+
 import httpx
 import orjson
 import polars as pl
 import streamlit as st
+from stocksense.config import get_settings
 
-from app.config import Settings
-
-settings = Settings()
+settings = get_settings(os.getenv("CONFIG_FILE"))
 
 
 def rest_request_sync(
@@ -67,3 +68,17 @@ def get_available_tickers(available_exchange: list[str]) -> dict[str, pl.DataFra
                 "company": [],
             }).with_columns(dropdown=pl.lit(""))
     return available_tickers
+
+
+@st.cache_data(show_spinner=True)
+def get_ticker_history_columns() -> list[str]:
+    _ = rest_request_sync(
+        url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/nse/tcs/history",
+        method="GET",
+        follow_redirects=True,
+        query_params={"interval": "1d", "period": "1d"},
+    )
+    if _.status_code == 200:
+        return list(_.json()[0].keys())
+    else:
+        raise BrokenPipeError("StockDB API is not reachable")

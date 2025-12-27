@@ -277,6 +277,7 @@ with ai_query:
 
     if query_prompt := st.chat_input("Enter your data query prompt"):
         state.query_prompt = query_prompt
+        state.agent_text_to_sql = None  # regenerate for updated prompt
 
     if state.query_prompt and state.agent_text_to_sql is None:
         stockdb_ctx = StockDBContextDependency(columns=get_ticker_history_columns())

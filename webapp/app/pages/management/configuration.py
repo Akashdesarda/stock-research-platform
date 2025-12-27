@@ -1,11 +1,10 @@
+import os
 from pathlib import Path
 
 import streamlit as st
 from stocksense.config import get_settings
 
-config_path = Path(__file__).parent.parent.parent.parent.parent / "config.toml"
-
-settings = get_settings(config_path=config_path)
+settings = get_settings(os.getenv("CONFIG_FILE"))
 st.title("Configuration management")
 st.markdown("Manage all configuration settings to run StockSense")
 
@@ -25,9 +24,10 @@ with st.form("configuration_form", border=True):
             help="Base URL for the APIs. Only change if you know what you are doing.",
         )
         st.session_state.common.base_url = common_base_url
-        common_available_llm_providers = st.multiselect(
+        common_available_llm_providers = st.pills(
             "Available LLM Providers",
             options=settings.common.available_llm_providers,
+            selection_mode="multi",
             default=settings.common.available_llm_providers,
             help="Select the LLM providers that you want to enable.",
         )

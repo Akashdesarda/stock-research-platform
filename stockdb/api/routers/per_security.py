@@ -95,7 +95,7 @@ async def ticker_query(
         return ORJSONResponse(result.to_dicts())
     except BinderException as e:
         raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE, detail=str(e)
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         ) from e
 
 

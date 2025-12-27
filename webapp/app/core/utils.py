@@ -49,24 +49,26 @@ def get_available_exchanges() -> pl.DataFrame:
 
 
 @st.cache_data(show_spinner=True)
-def get_available_tickers(available_exchange: list[str]) -> dict[str, pl.DataFrame]:
-    available_tickers = dict.fromkeys(available_exchange, pl.DataFrame())
+def get_available_tickers() -> dict[str, pl.DataFrame]:
+    tickers_wrt_exchange: dict = rest_request_sync(
+        url=f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/list-tickers",
+        method="GET",
+        follow_redirects=True,
+    ).json()
+    available_tickers = dict.fromkeys(tickers_wrt_exchange.keys(), pl.DataFrame())
+
     for exch in available_tickers:
-        _ = rest_request_sync(
-            url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{exch}",
-            method="GET",
-            follow_redirects=True,
-        )
-        if _.status_code == 200:
-            available_tickers[exch] = pl.DataFrame(_.json())
-            available_tickers[exch] = available_tickers[exch].with_columns(
-                dropdown=pl.col("ticker") + " - " + pl.col("company")
-            )
-        else:
+        if tickers_wrt_exchange[exch] is None:
             available_tickers[exch] = pl.DataFrame({
                 "ticker": [],
                 "company": [],
             }).with_columns(dropdown=pl.lit(""))
+        else:
+            available_tickers[exch] = pl.DataFrame(tickers_wrt_exchange[exch])
+            available_tickers[exch] = available_tickers[exch].with_columns(
+                dropdown=pl.col("ticker") + " - " + pl.col("company")
+            )
+
     return available_tickers
 
 

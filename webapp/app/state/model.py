@@ -19,6 +19,11 @@ class PreviewMethodChoice(Enum):
     random = "Random"
 
 
+class PageKey(Enum):
+    data = "data_explore"
+    research = "research"
+
+
 class DataPageAppState(BaseModel):
     # For Page: Playground --> data
     selected_exchange_data: str = Field(default_factory=str)

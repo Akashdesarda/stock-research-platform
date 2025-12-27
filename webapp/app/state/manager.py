@@ -1,37 +1,56 @@
-import streamlit as st
+from typing import Type, TypeVar
 
-from app.state.model import DataPageAppState
+import streamlit as st
+from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class StateManager:
     """
-    Typed, centralized Streamlit state manager using Pydantic.
+    Page-scoped, typed Streamlit state manager.
     """
 
-    _SESSION_KEY = "__APP_STATE__"
+    _ROOT_KEY = "__STATE__"
 
     @classmethod
-    def init(cls) -> DataPageAppState:
-        """
-        Initialize state if missing.
-        Safe to call on every rerun and every page.
-        """
-        if cls._SESSION_KEY not in st.session_state:
-            st.session_state[cls._SESSION_KEY] = DataPageAppState()
-        return st.session_state[cls._SESSION_KEY]
+    def _root(cls) -> dict:
+        if cls._ROOT_KEY not in st.session_state:
+            st.session_state[cls._ROOT_KEY] = {}
+        return st.session_state[cls._ROOT_KEY]
 
     @classmethod
-    def get(cls) -> DataPageAppState:
+    def init(cls, page_key: str, model: Type[T]) -> T:
         """
-        Get state. Fails loudly if init() was forgotten.
+        Initialize state for a specific page.
+        Safe to call on every rerun.
         """
-        if cls._SESSION_KEY not in st.session_state:
+        root = cls._root()
+
+        if page_key not in root:
+            root[page_key] = model()
+
+        return root[page_key]
+
+    @classmethod
+    def get(cls, page_key: str, model: Type[T]) -> T:
+        """
+        Get state for a page. Fails loudly if not initialized.
+        """
+        root = cls._root()
+
+        if page_key not in root:
             raise RuntimeError(
-                "StateManager not initialized. Call StateManager.init() first."
+                f"State for page '{page_key}' not initialized. "
+                f"Call StateManager.init('{page_key}', {model.__name__}) first."
             )
-        return st.session_state[cls._SESSION_KEY]
+
+        state = root[page_key]
+        if not isinstance(state, model):
+            raise TypeError(f"State for '{page_key}' is not of type {model.__name__}")
+
+        return state
 
     @classmethod
-    def reset(cls):
-        """Clear all app state (logout / debug use)"""
-        st.session_state.pop(cls._SESSION_KEY, None)
+    def reset(cls, page_key: str):
+        cls._root().pop(page_key, None)

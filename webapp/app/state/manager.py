@@ -1,6 +1,6 @@
 import streamlit as st
 
-from app.state.model import AppState
+from app.state.model import DataPageAppState
 
 
 class StateManager:
@@ -11,17 +11,17 @@ class StateManager:
     _SESSION_KEY = "__APP_STATE__"
 
     @classmethod
-    def init(cls) -> AppState:
+    def init(cls) -> DataPageAppState:
         """
         Initialize state if missing.
         Safe to call on every rerun and every page.
         """
         if cls._SESSION_KEY not in st.session_state:
-            st.session_state[cls._SESSION_KEY] = AppState()
+            st.session_state[cls._SESSION_KEY] = DataPageAppState()
         return st.session_state[cls._SESSION_KEY]
 
     @classmethod
-    def get(cls) -> AppState:
+    def get(cls) -> DataPageAppState:
         """
         Get state. Fails loudly if init() was forgotten.
         """

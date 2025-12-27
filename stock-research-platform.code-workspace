@@ -39,7 +39,8 @@
 			"stocksense"
 		],
 		"editor.fontFamily": "'Monaspace Krypton NF', monospace",
-		"ruff.format.preview": true
+		"ruff.format.preview": true,
+		"ruff.organizeImports": true
 	},
 	"tasks": {
 		"version": "2.0.0",
@@ -47,7 +48,7 @@
 			{
 				"label": "stockdb api",
 				"type": "shell",
-				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log",
+				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 8080",
 				"problemMatcher": [
 					"$python"
 				]
@@ -61,5 +62,23 @@
 				]
 			}
 		],
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Debug Streamlit App",
+				"type": "debugpy",
+				"request": "launch",
+				"program": "${workspaceFolder}/webapp/.venv/Scripts/streamlit.exe",
+				"args": [
+					// "uv",
+					"run",
+					"${workspaceFolder}/webapp/main.py"
+				],
+				"console": "integratedTerminal",
+				"justMyCode": true
+			}
+		]
 	}
 }

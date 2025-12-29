@@ -17,18 +17,16 @@ from app.pages.playground._helper import (
     fetch_data_from_sql_query,
 )
 from app.state.manager import StateManager
-from app.state.model import TickerChoice
+from app.state.model import DataPageAppState, PageKey, TickerChoice
 
 settings = get_settings(os.getenv("CONFIG_FILE"))
-state = StateManager.init()
+state = StateManager.init(PageKey.data.value, DataPageAppState)
 
 st.markdown("# Data Explorer")
 st.markdown("Explore stock data and analytics.")
 
 available_exchange = get_available_exchanges()
-available_tickers = get_available_tickers(
-    available_exchange.select("symbol").to_series().to_list()
-)
+available_tickers = get_available_tickers()
 
 # create tabs for manual and AI-powered queries
 manual_query, ai_query = st.tabs([

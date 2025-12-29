@@ -3,7 +3,12 @@ from enum import Enum
 import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_ai import AgentRunResult
-from stocksense.ai.agents import TextToSQLOutput
+from stocksense.ai.agents import CompanySummaryOutput, TextToSQLOutput
+
+
+class PageKey(Enum):
+    data = "data_explore"
+    research = "research"
 
 
 class TickerChoice(Enum):
@@ -19,9 +24,15 @@ class PreviewMethodChoice(Enum):
     random = "Random"
 
 
-class PageKey(Enum):
-    data = "data_explore"
-    research = "research"
+class ResearchPageAvailableTools(Enum):
+    company_summary = "Company Summary"
+    dummy = "dummy"
+
+
+class ResearchPhase(Enum):
+    INIT = "init"
+    SUMMARY_READY = "summary_ready"
+    QA = "qa"
 
 
 class DataPageAppState(BaseModel):
@@ -59,3 +70,20 @@ class DataPageAppState(BaseModel):
         arbitrary_types_allowed=True,  # passthrough non-pydantic supported type like pl.LazyFrame
         validate_assignment=True,  # runtime safety during every assignment
     )
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class ResearchPageAppSate(BaseModel):
+    selected_exchange: str | None = None
+    selected_ticker: str | None = None
+
+    # agent outputs
+    company_summary: AgentRunResult[CompanySummaryOutput] | None = None
+
+    # chat
+    messages: list[ChatMessage] = []
+    phase: ResearchPhase = ResearchPhase.INIT

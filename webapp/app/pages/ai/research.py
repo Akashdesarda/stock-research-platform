@@ -20,7 +20,7 @@ from app.state.model import (
 )
 
 settings = get_settings(os.getenv("CONFIG_FILE"))
-state = StateManager.init(PageKey.data.value, ResearchPageAppSate)
+state = StateManager.init(PageKey.research.value, ResearchPageAppSate)
 available_exchange = get_available_exchanges()
 available_tickers = get_available_tickers()
 

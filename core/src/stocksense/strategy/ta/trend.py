@@ -8,7 +8,7 @@ import talib
 class TrendAccessor:
     df: pl.LazyFrame
 
-    def sma(self, period: int = 14, col: str = "close") -> pl.DataFrame | pl.LazyFrame:
+    def sma(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
         """Simple Moving Average"""
         return self.df.with_columns(
             pl.col(col).rolling_mean(window_size=period).alias(f"SMA_{period}")
@@ -35,7 +35,7 @@ class TrendAccessor:
 
     def ema_crossover(
         self, fast: int = 12, slow: int = 26, col: str = "close"
-    ) -> pl.DataFrame | pl.LazyFrame:
+    ) -> pl.LazyFrame:
         """Compute EMA fast/slow and crossover signal."""
 
         close = self.df.select(col).collect().to_series().to_numpy()
@@ -58,7 +58,7 @@ class TrendAccessor:
         slowperiod: int = 26,
         signalperiod: int = 9,
         col: str = "close",
-    ) -> pl.DataFrame | pl.LazyFrame:
+    ) -> pl.LazyFrame:
         """MACD line, signal, and histogram."""
 
         close = self.df.select(col).collect().to_series().to_numpy()
@@ -74,7 +74,7 @@ class TrendAccessor:
             pl.Series("MACD_hist", macdhist),
         ])
 
-    def adx_dmi(self, period: int = 14) -> pl.DataFrame | pl.LazyFrame:
+    def adx_dmi(self, period: int = 14) -> pl.LazyFrame:
         """Average Directional Index with +DI and -DI."""
 
         high = self.df.select("high").collect().to_series().to_numpy()
@@ -91,7 +91,7 @@ class TrendAccessor:
 
     def parabolic_sar(
         self, acceleration: float = 0.02, maximum: float = 0.2
-    ) -> pl.DataFrame | pl.LazyFrame:
+    ) -> pl.LazyFrame:
         """Parabolic SAR."""
 
         sar = talib.SAR(
@@ -102,7 +102,7 @@ class TrendAccessor:
         )
         return self.df.with_columns(pl.Series("SAR", sar))
 
-    def kama(self, period: int = 30, col: str = "close") -> pl.DataFrame | pl.LazyFrame:
+    def kama(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
         """Kaufman Adaptive Moving Average."""
 
         kama = talib.KAMA(
@@ -112,7 +112,7 @@ class TrendAccessor:
 
     def t3(
         self, period: int = 5, vfactor: float = 0.7, col: str = "close"
-    ) -> pl.DataFrame | pl.LazyFrame:
+    ) -> pl.LazyFrame:
         """T3 moving average variant."""
 
         t3 = talib.T3(

@@ -39,8 +39,6 @@ class VolumeAccessor:
 
     def obv(self, col: str = "close") -> pl.LazyFrame:
         """On Balance Volume."""
-
-        close = self.df.select(col).collect().to_series().to_numpy()
-        volume = self.df.select("volume").collect().to_series().to_numpy()
-        obv = talib.OBV(close, volume)
+        close, volume = self.df.select([col, "volume"]).collect().get_columns()
+        obv = talib.OBV(close.to_numpy(), volume.to_numpy())
         return self.df.with_columns(pl.Series("OBV", obv))

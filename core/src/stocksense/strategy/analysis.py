@@ -6,12 +6,11 @@ import polars.selectors as cs
 from .ta.cycle import CycleAccessor
 from .ta.momentum import MomentumAccessor
 from .ta.overlap_study import OverlapStudyAccessor
-from .ta.pattern_recognition import PatternRecognitionAccessor 
+from .ta.pattern_recognition import PatternRecognitionAccessor
 from .ta.stats import StatsAccessor
 from .ta.trend import TrendAccessor
 from .ta.volatility import VolatilityAccessor
 from .ta.volume import VolumeAccessor
-from .ta.
 
 
 @pl.api.register_dataframe_namespace("ta")

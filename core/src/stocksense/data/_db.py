@@ -38,7 +38,11 @@ class StockDataDB:
     def polars_filter(self, *predicates: Any, **constraints: Any) -> pl.LazyFrame:
         return self._table.filter(*predicates, **constraints)
 
-    def merge(self, data: pl.DataFrame):
+    def merge(
+        self,
+        data: pl.DataFrame,
+        predicate: str = "s.date = t.date AND s.ticker = t.ticker",
+    ) -> pl.DataFrame:
         return (
             data.write_delta(
                 target=self.db_path,
@@ -49,7 +53,7 @@ class StockDataDB:
                     ),
                     "source_alias": "s",
                     "target_alias": "t",
-                    "predicate": "s.date = t.date AND s.ticker = t.ticker",
+                    "predicate": predicate,
                 },
             )
             .when_matched_update_all()

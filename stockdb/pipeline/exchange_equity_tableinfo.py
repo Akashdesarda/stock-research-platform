@@ -56,7 +56,7 @@ def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
 
         data.append({
             "symbol": info.get("symbol"),
-            "company": info.get("company"),
+            "company": info.get("companyName"),
             "index_symbol": index,
             "series": series,
             "listing_date": listing_date,

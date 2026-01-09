@@ -300,7 +300,7 @@ class PromptCacheInput(BaseModel):
         description="The model string associated with the prompt",
         examples=[
             "gpt-5",
-            "gemini-3-`",
+            "gemini-3-pro",
         ],
     )
     response: str | None = Field(

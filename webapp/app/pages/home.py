@@ -66,3 +66,10 @@ with st.sidebar:
             st.badge("No Data", icon=":material/error:", color="red")
 
 # TODO - Add home page description content and useful links
+# SECTION - Home Page Content
+st.markdown(
+    """
+    StockSense is a comprehensive platform for stock market research and analysis. It provides 
+    tools and data to help investors make informed decisions.
+    """
+)

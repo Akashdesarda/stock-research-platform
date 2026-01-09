@@ -4,6 +4,7 @@ import polars as pl
 from fastapi import APIRouter
 from fastapi.responses import ORJSONResponse
 from stocksense.config import get_settings
+from stocksense.data import Exchange
 
 from api.models import (
     APITags,
@@ -33,5 +34,23 @@ async def list_exchange_wise_ticker() -> ORJSONResponse:
                 .collect_async()
             )
             all_exchanges[exch.value] = result.to_dicts()
+
+    return ORJSONResponse(all_exchanges)
+
+
+@router.get("/list-indexes", response_model=dict[str, list[str] | None])
+async def list_exchange_wise_indexes() -> ORJSONResponse:
+    """Get all the available `index_symbol` for all `exchange`"""
+    exch = Exchange()
+    all_exchanges = {}
+
+    for exch_name in StockExchange:
+        try:
+            exch_accessor = getattr(exch, exch_name.value.lower())
+            all_exchanges[exch_name.value] = exch_accessor.get_index_list()
+        # NOTE - Some exchanges may not have index info implemented. So there won't be any accessor
+        # property for those exchanges in `Exchange` class.
+        except AttributeError:
+            all_exchanges[exch_name.value] = None
 
     return ORJSONResponse(all_exchanges)

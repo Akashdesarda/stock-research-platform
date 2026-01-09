@@ -36,7 +36,9 @@
 		"cSpell.words": [
 			"groq",
 			"stockdb",
-			"stocksense"
+			"stocksense",
+			"talib",
+			"timeperiod"
 		],
 		"editor.fontFamily": "'Monaspace Krypton NF', monospace",
 		"ruff.format.preview": true,
@@ -48,7 +50,7 @@
 			{
 				"label": "stockdb api",
 				"type": "shell",
-				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 8080",
+				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 8000",
 				"problemMatcher": [
 					"$python"
 				]

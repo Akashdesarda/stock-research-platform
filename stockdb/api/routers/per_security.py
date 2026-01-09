@@ -1,5 +1,4 @@
 import os
-import pathlib
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -8,9 +7,8 @@ from duckdb import BinderException, ParserException
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.responses import ORJSONResponse
 from stocksense.config import get_settings
-from stocksense.data import StockDataDB
+from stocksense.data import StockDataDB, YFStockData
 
-from api.data import YFStockData
 from api.dependency.utils import yahoo_finance_aware_ticker
 from api.models import (
     APITags,
@@ -48,16 +46,51 @@ async def list_ticker(
     # REVIEW - Should I add more exchange info?
 ) -> ORJSONResponse:
     """Get all the available `ticker` in given `exchange`"""
-    table_path: pathlib.Path = (
-        settings.stockdb.data_base_path / f"{exchange.value}/equity"
-    )
+    table_path = settings.stockdb.data_base_path / f"{exchange.value}/equity"
+
     if not table_path.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Exchange data for '{exchange.value}' not found",
         )
     result = await (
-        pl.scan_delta(table_path)
+        pl
+        .scan_delta(table_path)
+        .select(pl.col("symbol").alias("ticker"), "company")
+        .sort("ticker")
+        .collect_async()
+    )
+    return ORJSONResponse(result.to_dicts())
+
+
+@router.get("/{exchange}/{index}", response_model=ExchangeTickerInfo)
+async def list_ticker_in_index(
+    exchange: Annotated[
+        StockExchange,
+        Path(
+            description="Symbol of the exchange",
+            examples=["nse", "nyse"],
+        ),
+    ],
+    index: Annotated[
+        str,
+        Path(
+            description="Index symbol to filter tickers",
+            examples=["NIFTY 50", "S&P 500"],
+        ),
+    ],
+) -> ORJSONResponse:
+    """Get all the available `ticker` in given `exchange` & `index`"""
+    table_path = settings.stockdb.data_base_path / f"{exchange.value}/equity"
+    if not table_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Exchange data for '{exchange.value}' not found",
+        )
+    result = await (
+        pl
+        .scan_delta(table_path)
+        .filter(pl.col("index_symbol").list.contains(index))
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
         .collect_async()
@@ -160,7 +193,8 @@ async def ticker_history(
         interval_value = "1w"
 
     result = (
-        result.sort("date")  # grouping requires ascending sorted data
+        result
+        .sort("date")  # grouping requires ascending sorted data
         .group_by_dynamic(
             index_column="date",
             every=interval_value,

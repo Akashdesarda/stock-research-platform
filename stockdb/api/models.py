@@ -4,6 +4,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
 
+from api.dependency import stable_hash
+
 
 class APITags(Enum):
     root = "Root"
@@ -12,6 +14,7 @@ class APITags(Enum):
     bulk = "Bulk"
     dataset = "Dataset"
     task = "Task"
+    ops = "Operation"
 
 
 class Period(Enum):
@@ -92,15 +95,6 @@ class StockExchangeFullName(Enum):
     euronext = "euronext"
 
 
-class DBTableName(Enum):
-    ticker_history = "factor_investing.ticker_history"
-
-
-class SuperTrendRecentNDatasetFormat(Enum):
-    detail = "detail"
-    ticker_only = "tickers-only"
-
-
 class TickerHistoryDownloadMode(Enum):
     full = "full"
     incremental = "incremental"
@@ -109,6 +103,12 @@ class TickerHistoryDownloadMode(Enum):
 class TaskMode(Enum):
     auto = "auto"
     manual = "manual"
+
+
+class PromptCacheTier(Enum):
+    auto = "auto"  # Auto select tier based on data size
+    tier1 = "tier1"  # Delta Lake Storage
+    tier2 = "tier2"  # Vector DB Storage
 
 
 class YahooTickerIdentifier(BaseModel):
@@ -148,24 +148,6 @@ class ExchangeTickersHistory(BaseModel):
     history: list[TickerHistoryOutput] | None = None
 
 
-class TickerIndicatorSuperTrendOutput(BaseModel):
-    date: date
-    # open: float | None = None
-    # high: float | None = None
-    # low: float | None = None
-    # close: float | None = None
-    # volume: float | None = None
-    super_trend: float | None = None
-    upper: float | None = None
-    lower: float | None = None
-
-
-class ExchangeTickersIndicatorSuperTrend(BaseModel):
-    exchange: str
-    ticker: str
-    indicator: list[dict] | None = None
-
-
 class TickerHistoryQuery(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -194,37 +176,6 @@ class TickerHistoryQuery(BaseModel):
         if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self
-
-
-class SuperTrendIndicatorQuery(TickerHistoryQuery):
-    lookback_periods: int = Field(
-        10,
-        description="Number of periods (N) for the ATR evaluation. Must be greater than 1 and is "
-        "usually set between 7 and 14.",
-    )
-    multiplier: float = Field(
-        3,
-        description="Multiplier sets the ATR band width. Must be greater than 0 and is usually set "
-        "around 2 to 3.",
-    )
-    retain_source_column: list[str] | None = Field(
-        default=None,
-        description="List of column to retain from source ticker history data into indicator result",
-        examples=[["close"], ["open", "high"]],
-    )
-
-
-class SuperTrendRecentNDatasetQuery(SuperTrendIndicatorQuery):
-    recent_n: int = Field(
-        5,
-        description="Number of recent N days to evaluate Lower band v/s SuperTrend. Must be greater than 0.",
-        ge=0,
-        examples=[[5], [10]],
-    )
-    result_format: SuperTrendRecentNDatasetFormat = Field(
-        SuperTrendRecentNDatasetFormat.detail,
-        description="Format of the output dataset. `detail` format includes complete table data. `ticker_only` format only includes ticker symbol.",
-    )
 
 
 class TickerInput(BaseModel):
@@ -325,3 +276,98 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             )
             for t in self.ticker
         ]
+
+
+class PromptCacheInput(BaseModel):
+    prompt: str = Field(
+        ...,
+        description="The prompt string to be cached",
+        examples=[
+            "What is the stock price of AAPL?",
+            "Give me the latest news on TSLA.",
+        ],
+    )
+    agent: str = Field(
+        ...,
+        description="The agent string associated with the prompt",
+        examples=[
+            "Agent1",
+            "text-to-sql",
+        ],
+    )
+    model: str | None = Field(
+        None,
+        description="The model string associated with the prompt",
+        examples=[
+            "gpt-5",
+            "gemini-3-pro",
+        ],
+    )
+    response: str | None = Field(
+        None,
+        description="The LLM response string corresponding to the prompt",
+        examples=[
+            "The stock price of AAPL is $150.",
+            "The latest news on TSLA is that they are launching a new model.",
+        ],
+    )
+    thinking: str | None = Field(
+        None,
+        description="The LLM thinking string corresponding to the prompt",
+        examples=[
+            "Analyzing stock price trends for AAPL.",
+            "Gathering latest news on TSLA.",
+        ],
+    )
+    ttl: int = Field(
+        30_000,
+        description="Time-to-live (TTL) in days for the cached prompt-response pair",
+        examples=[7, 30, 90],
+    )
+
+    def get_cache_key(self) -> str:
+        """
+        Create a cache key as a forever-stable hash from structured input.
+        """
+
+        return stable_hash(self.prompt, self.agent)
+
+
+class PromptSearchInput(BaseModel):
+    prompt: str = Field(
+        ...,
+        description="The prompt string to be searched in cache to get its cached response",
+        examples=[
+            "What is the stock price of AAPL?",
+            "Give me the latest news on TSLA.",
+        ],
+    )
+    agent: str = Field(
+        ...,
+        description="The agent string associated with the prompt",
+        examples=[
+            "Agent1",
+            "text-to-sql",
+        ],
+    )
+    cache_tier: PromptCacheTier = Field(
+        PromptCacheTier.auto,
+        description="The cache tier to be used for storing or retrieving the prompt cache",
+        examples=[
+            PromptCacheTier.auto,
+            PromptCacheTier.tier1,
+            PromptCacheTier.tier2,
+        ],
+    )
+
+    def get_cache_key(self) -> str:
+        """
+        Create a cache key as a forever-stable hash from structured input.
+        """
+
+        return stable_hash(self.prompt, self.agent)
+
+
+class PromptCacheOutput(BaseModel):
+    response: str
+    thinking: str | None = None

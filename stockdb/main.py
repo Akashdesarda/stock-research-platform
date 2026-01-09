@@ -9,7 +9,7 @@ import polars as pl
 from about_time import about_time
 from api import setup
 from api.models import APITags, StockExchange
-from api.routers import bulk, per_security, tasks
+from api.routers import bulk, ops, per_security, tasks
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -116,6 +116,7 @@ async def _stockdb_data_health() -> dict:
 app.include_router(per_security.router)
 app.include_router(tasks.router)
 app.include_router(bulk.router)
+app.include_router(ops.router)
 
 
 # Scalar interactive docs

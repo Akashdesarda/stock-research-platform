@@ -18,7 +18,7 @@
 - **Modular Imports**: Utilities and shared logic are imported from `core/src/stocksense/`.
 - **Router Organization**: API endpoints are grouped by domain in `stockdb/api/routers/` (e.g., `per_security.py`, `tasks.py`).
 - **Data Pipelines**: ETL and table creation scripts are in `stockdb/pipeline/`.
-- **Frontend Pages**: Reflex pages are organized by feature in `webapp/app/pages/` (e.g., `ai/`, `playground/`).
+- **Frontend Pages**: Streamlit pages are organized by feature in `webapp/app/pages/` (e.g., `ai/`, `playground/`).
 
 ## Integration Points
 - **Internal Communication**: Webapp interacts with API via HTTP endpoints defined in `stockdb/api/routers/`.
@@ -31,7 +31,7 @@
 - **Configuration**: Use `config.py` or `config.toml` for settings; avoid hardcoding.
 
 ## Key Files & Directories
-- `core/src/stocksense/utils.py`: Shared utilities
+- `core/src/stocksense/`: Core business logic library used in all downstream components
 - `stockdb/api/routers/`: API endpoint definitions
 - `webapp/app/pages/`: Reflex frontend pages
 - `docker-compose.yml`: Multi-service orchestration

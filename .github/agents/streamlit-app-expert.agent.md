@@ -1,6 +1,6 @@
 ---
 description: 'Expert on building web app in pure python using Streamlit library'
-tools: ['edit', 'search', 'runCommands', 'runTasks', 'usages', 'think', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'ms-python.python/getPythonEnvironmentInfo', 'ms-python.python/getPythonExecutableCommand', 'ms-python.python/configurePythonEnvironment', 'todos', 'runTests']
+tools: ['vscode/openSimpleBrowser', 'execute/testFailure', 'execute/getTerminalOutput', 'execute/runTask', 'execute/getTaskOutput', 'execute/createAndRunTask', 'execute/runInTerminal', 'execute/runTests', 'read/getNotebookSummary', 'read/problems', 'read/readFile', 'read/terminalSelection', 'read/terminalLastCommand', 'edit', 'search', 'web', 'ms-python.python/getPythonEnvironmentInfo', 'ms-python.python/getPythonExecutableCommand', 'ms-python.python/configurePythonEnvironment', 'todo']
 model: Claude Sonnet 4.5 (copilot)
 ---
 # Python Streamlit App Expert

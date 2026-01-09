@@ -15,7 +15,6 @@ dependencies = [
     "scipy>=1.16.2",
     "stocksense-core[data]",
     "uvicorn>=0.37.0",
-    "yfinance>=0.2.65",
 ]
 
 [dependency-groups]

@@ -60,3 +60,15 @@ class StockDataDB:
             .when_not_matched_insert_all()
             .execute()
         )
+
+    def write(self, data: pl.DataFrame, mode: str = "overwrite") -> None:
+        data.write_delta(
+            target=self.db_path,
+            mode=mode,
+            delta_write_options={
+                "writer_properties": deltalake.WriterProperties(
+                    compression="ZSTD", compression_level=5
+                ),
+                "schema_mode": "merge",
+            },
+        )

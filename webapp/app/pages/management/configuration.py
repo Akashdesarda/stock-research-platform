@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import streamlit as st
 from stocksense.config import get_settings
@@ -84,14 +83,14 @@ with st.form("configuration_form", border=True):
             help="Port for StockDB API server. Only change if you know what you are doing.",
         )
         st.session_state.stockdb.port = stockdb_port
-        stockdb_data_base_path = st.text_input(
-            "StockDB Data Base Path",
-            value=settings.stockdb.data_base_path,
-            help="Base path where StockDB stores its data. Only change if you know what you are doing.",
-        )
-        st.session_state.stockdb.data_base_path = (
-            Path(stockdb_data_base_path).resolve().as_posix()
-        )
+        # stockdb_data_base_path = st.text_input(
+        #     "StockDB Data Base Path",
+        #     value=settings.stockdb.data_base_path,
+        #     help="Base path where StockDB stores its data. Only change if you know what you are doing.",
+        # )
+        # st.session_state.stockdb.data_base_path = (
+        #     Path(stockdb_data_base_path).resolve().as_posix()
+        # )
         stockdb_download_batch_size = st.number_input(
             "StockDB Download Batch Size",
             value=settings.stockdb.download_batch_size,
@@ -145,7 +144,7 @@ if submit_config:
     settings.common.mlflow_port = st.session_state.common.mlflow_port
     # StockDB API settings
     settings.stockdb.port = st.session_state.stockdb.port
-    settings.stockdb.data_base_path = st.session_state.stockdb.data_base_path
+    # settings.stockdb.data_base_path = st.session_state.stockdb.data_base_path
     settings.stockdb.download_batch_size = st.session_state.stockdb.download_batch_size
     # Web App settings
     settings.app.port = st.session_state.app.port

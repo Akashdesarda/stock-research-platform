@@ -69,9 +69,8 @@ async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInp
             / f"{task_input.exchange.value}/ticker_history"
         )
         date_check = (
-            await stock_db.polars_filter(
-                pl.col("date").max().cast(pl.Date) < latest_data_date
-            )
+            await stock_db
+            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
             .select("close")
             .count()
             .collect_async()
@@ -86,12 +85,11 @@ async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInp
         if task_input.download_mode == TickerHistoryDownloadMode.incremental:
             result = await download_ticker_history(exchange=task_input.exchange)
             return ORJSONResponse(result)
-        # TODO - implement full download mode
         if task_input.download_mode == TickerHistoryDownloadMode.full:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail="Full download mode in auto mode is not implemented yet",
+            result = await download_ticker_history(
+                exchange=task_input.exchange, full_download=True
             )
+            return ORJSONResponse(result)
 
     # SECTION 2 - Manual mode
     elif task_input.task_mode == TaskMode.manual:

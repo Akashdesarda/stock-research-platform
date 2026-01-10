@@ -125,7 +125,7 @@ def download_entire_ticker_history(
 
 
 async def download_ticker_history(
-    exchange: StockExchange,
+    exchange: StockExchange, full_download: bool = False
 ) -> dict:
     batch_size = settings.stockdb.download_batch_size
     tickers = (
@@ -152,7 +152,10 @@ async def download_ticker_history(
     )
 
     # Determining mode to run from - 'max' or 'last run date'
-    if latest_date_df.is_empty():
+    if full_download:
+        use_max = True
+        logger.info("full download requested, running for max date")
+    elif latest_date_df.is_empty():
         use_max = True
         logger.info(f"no data found for {exchange}, running for max date")
     else:

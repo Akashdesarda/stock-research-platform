@@ -50,7 +50,7 @@
 			{
 				"label": "stockdb api",
 				"type": "shell",
-				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 8000",
+				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 8080",
 				"problemMatcher": [
 					"$python"
 				]

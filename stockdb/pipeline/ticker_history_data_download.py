@@ -4,12 +4,17 @@ import os
 from datetime import date, timedelta
 
 import polars as pl
-from api.data import YFStockData
-from api.models import Interval, Period, StockExchange, StockExchangeYahooIdentifier
+from api.models import StockExchange
 from rich.progress import track
 from rich.prompt import Prompt
 from stocksense.config import get_settings
-from stocksense.data import StockDataDB
+from stocksense.data import (
+    Interval,
+    Period,
+    StockDataDB,
+    StockExchangeYahooIdentifier,
+    YFStockData,
+)
 
 logger = logging.getLogger("stockdb")
 settings = get_settings(os.getenv("CONFIG_FILE"))
@@ -29,7 +34,8 @@ def calculate_batches(n: int, batch_size: int) -> int:
 def prepare_ticker_history_table(symbol: str, df: pl.DataFrame) -> pl.LazyFrame:
     if not df.is_empty():
         return (
-            df.lazy()  # converting to lazyframe
+            df
+            .lazy()  # converting to lazyframe
             .with_columns(
                 # creating primary key
                 # key=pl.lit(symbol.lower())
@@ -73,7 +79,8 @@ def download_specific_date_ticker_history(
     )
 
     return (
-        pl.concat(
+        pl
+        .concat(
             [prepare_ticker_history_table(symbol, result[symbol]) for symbol in result],
             how="vertical",
         )
@@ -100,7 +107,8 @@ def download_entire_ticker_history(
     result = yf.get_ticker_history(period=Period.MAX, interval=Interval.ONE_DAY)
 
     return (
-        pl.concat(
+        pl
+        .concat(
             [prepare_ticker_history_table(symbol, result[symbol]) for symbol in result],
             how="vertical",
         )
@@ -121,9 +129,9 @@ async def download_ticker_history(
 ) -> dict:
     batch_size = settings.stockdb.download_batch_size
     tickers = (
-        await pl.scan_delta(settings.stockdb.data_base_path / "common/security")
-        .select(exchange.value)
-        .explode(exchange.value)
+        await pl
+        .scan_delta(settings.stockdb.data_base_path / f"{exchange.value}/equity")
+        .select(pl.col("symbol").alias("ticker"))
         .collect_async()
     )
     ticker_length = tickers.count()
@@ -136,9 +144,8 @@ async def download_ticker_history(
     logger.info("getting last inserted date")
 
     latest_date_df = (
-        await ticker_history_table.table_data.select(
-            pl.col("date").max()
-        )  # to get latest available date
+        await ticker_history_table.table_data
+        .select(pl.col("date").max())  # to get latest available date
         # NOTE - polars return null row if no date found, which makes `is_empty()` `False`
         .filter(~pl.col("date").is_null())
         .collect_async()
@@ -161,8 +168,9 @@ async def download_ticker_history(
         total=no_of_batches,
     ):
         current_tickers = (
-            tickers.slice(batch * batch_size, batch_size)
-            .select(exchange.value)
+            tickers
+            .slice(batch * batch_size, batch_size)
+            .select("ticker")
             .to_series()
             .to_list()
         )

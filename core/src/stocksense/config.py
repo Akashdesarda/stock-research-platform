@@ -3,7 +3,7 @@ import platform
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, DirectoryPath
+from pydantic import AfterValidator, BaseModel
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -45,17 +45,17 @@ def _get_local_data_directory() -> Path:
     return base_dir / "stock-research-platform"
 
 
-def _resolve_data_path(config_path: str) -> Path:
+def _resolve_data_path(config_path: Path) -> Path:
     """
     Resolve the data path based on the environment.
     - In Docker: use the path as-is (mounted volume path)
     - On local machine: translate Docker path to appropriate OS-specific path
     """
     if _is_running_in_docker():
-        return Path(config_path)
+        return config_path
 
     # Running locally - translate Docker paths to local OS-appropriate paths
-    elif config_path.startswith("/shared/assets/stockdb"):
+    elif config_path.as_posix().startswith("/shared/assets/stockdb"):
         # This is the Docker mount target, translate to local data directory
         resolved_path = _get_local_data_directory()
         # Ensure the directory exists
@@ -64,7 +64,7 @@ def _resolve_data_path(config_path: str) -> Path:
 
     else:
         # If it's already a local path, use as-is
-        return Path(config_path)
+        return config_path
 
 
 # Model for the 'common' section
@@ -90,7 +90,7 @@ class App(BaseModel):
 # StockDB model for the 'stockdb' section
 class StockDB(BaseModel):
     port: int
-    data_base_path: Annotated[str | DirectoryPath, AfterValidator(_resolve_data_path)]
+    data_base_path: Annotated[Path, AfterValidator(_resolve_data_path)]
     download_batch_size: int
 
 

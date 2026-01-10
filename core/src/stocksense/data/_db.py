@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, ClassVar, Final
+from typing import Any, ClassVar, Final, Literal
 
 import deltalake
 import polars as pl
@@ -31,8 +31,7 @@ class StockDataDB:
 
         # NOTE - duckdb needs df variable in local scope to refer as table. Here `self._table` is
         # referred as `stockdb` table locally
-        # WARNING - this should match the table_name variable above
-        stockdb = self._table  # noqa: F841
+        exec(f"{self.table_name} = self._table")
         return duckdb.sql(query).pl(lazy=True)
 
     def polars_filter(self, *predicates: Any, **constraints: Any) -> pl.LazyFrame:
@@ -42,9 +41,10 @@ class StockDataDB:
         self,
         data: pl.DataFrame,
         predicate: str = "s.date = t.date AND s.ticker = t.ticker",
-    ) -> pl.DataFrame:
+    ) -> dict:
         return (
-            data.write_delta(
+            data
+            .write_delta(
                 target=self.db_path,
                 mode="merge",
                 delta_merge_options={
@@ -61,7 +61,11 @@ class StockDataDB:
             .execute()
         )
 
-    def write(self, data: pl.DataFrame, mode: str = "overwrite") -> None:
+    def write(
+        self,
+        data: pl.DataFrame,
+        mode: Literal["error", "append", "overwrite", "ignore"] = "overwrite",
+    ) -> None:
         data.write_delta(
             target=self.db_path,
             mode=mode,

@@ -5,7 +5,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.logging import RichHandler
 
-__version__ = "0.5.4"
+__version__ = "0.5.5"
 
 # Setting logging
 logger = logging.getLogger("stocksense")

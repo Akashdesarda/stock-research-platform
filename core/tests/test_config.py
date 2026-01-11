@@ -6,6 +6,14 @@ from tempfile import TemporaryDirectory
 from stocksense.config import get_settings
 
 
+def test_default_config_file():
+
+    settings = get_settings()
+    assert settings.common.base_url == "http://localhost"
+    assert settings.app.port == 3000
+    assert settings.stockdb.download_batch_size == 50
+
+
 def test_env_variable_config_file():
     _ = Path(__file__).parent.parent.parent / "config.toml"
     os.environ["CONFIG_FILE"] = _.resolve().as_posix()
@@ -55,9 +63,7 @@ def test_config_values():
 
 
 def test_save_as_toml():
-    settings = get_settings(
-        config_path=Path(__file__).parent.parent.parent / "config.toml"
-    )
+    settings = get_settings()
 
     with TemporaryDirectory() as temp_dir:
         temp_config_file = Path(temp_dir) / "temp_config.toml"

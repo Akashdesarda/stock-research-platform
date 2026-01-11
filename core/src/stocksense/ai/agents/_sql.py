@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 
 import mlflow
@@ -12,7 +11,7 @@ from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.tools.sql import ParseError, SQLQueryValidator
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 # mlflow setup
 mlflow.set_tracking_uri(f"{settings.common.base_url}:{settings.common.mlflow_port}")
 mlflow.set_experiment("stocksense")
@@ -87,7 +86,8 @@ def text_to_sql(
         validator = SQLQueryValidator(query=query)
         try:
             return (
-                validator.verify_syntax()
+                validator
+                .verify_syntax()
                 # TODO - improved column verification logic
                 # .verify_columns(ctx.deps.columns)
                 .verify_table_name(ctx.deps.table_name)

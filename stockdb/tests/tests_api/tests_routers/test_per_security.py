@@ -10,7 +10,7 @@ from main import app
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -44,7 +44,8 @@ async def test_ticker_history_tcs(
     assert result.collect_schema().names() == nse_stock_data.collect_schema().names()
     assert not result.select("close").collect().is_empty()
     count = (
-        await result.filter(pl.col("ticker") == "TCS")
+        await result
+        .filter(pl.col("ticker") == "TCS")
         .select("ticker")
         .count()
         .collect_async()

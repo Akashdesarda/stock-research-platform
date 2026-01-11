@@ -1,12 +1,10 @@
-import os
-
 import httpx
 import orjson
 import polars as pl
 import streamlit as st
 from stocksense.config import get_settings
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 def rest_request_sync(

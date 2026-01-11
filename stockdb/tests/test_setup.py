@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import polars as pl
@@ -6,7 +5,7 @@ from deltalake.table import DeltaTable
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 def test_settings():

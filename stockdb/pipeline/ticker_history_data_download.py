@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from datetime import date, timedelta
 
 import polars as pl
@@ -17,7 +16,7 @@ from stocksense.data import (
 )
 
 logger = logging.getLogger("stockdb")
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 def calculate_batches(n: int, batch_size: int) -> int:

@@ -1,5 +1,3 @@
-import os
-
 import httpx
 import polars as pl
 import streamlit as st
@@ -7,7 +5,7 @@ from stocksense.config import get_settings
 
 from app.state.model import PreviewMethodChoice
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 def fetch_data_from_sql_query(exchange: str, sql_query: str) -> pl.LazyFrame | None:
@@ -120,7 +118,8 @@ def data_preview(
             return query_data.slice(start_idx, end_idx - start_idx)
         case PreviewMethodChoice.random:
             return (
-                query_data.with_row_index()
+                query_data
+                .with_row_index()
                 .with_columns(pl.col("index").shuffle(seed=42).alias("_rand"))
                 .sort("_rand")
                 .limit(n_rows)

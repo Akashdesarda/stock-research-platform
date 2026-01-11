@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime
 
 import polars as pl
@@ -10,7 +9,7 @@ from stocksense.config import get_settings
 from stocksense.data import Exchange, StockDataDB
 
 logger = logging.getLogger("stockdb")
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 exch = Exchange()
 
 

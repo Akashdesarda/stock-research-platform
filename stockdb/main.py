@@ -18,7 +18,7 @@ from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
@@ -99,9 +99,8 @@ async def _stockdb_data_health() -> dict:
             all_exchanges[exch] = "NO DATA"
             continue
         date_check = (
-            await stock_db.polars_filter(
-                pl.col("date").max().cast(pl.Date) < latest_data_date
-            )
+            await stock_db
+            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
             .select("close")
             .count()
             .collect_async()

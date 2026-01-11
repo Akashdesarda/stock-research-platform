@@ -1,5 +1,3 @@
-import os
-
 import polars as pl
 import streamlit as st
 from stocksense.config import get_settings
@@ -10,7 +8,7 @@ from app.core.utils import (
     rest_request_sync,
 )
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 available_exchange = get_available_exchanges()
 available_tickers = get_available_tickers()
@@ -59,7 +57,8 @@ with tasks_tab:
         )
         # updating state
         st.session_state.selected_exchange_mngt = (
-            available_exchange.filter(pl.col("dropdown") == selected_exchange)
+            available_exchange
+            .filter(pl.col("dropdown") == selected_exchange)
             .select("symbol")
             .item()
         )

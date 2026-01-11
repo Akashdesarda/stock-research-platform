@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 
 import polars as pl
@@ -14,7 +13,7 @@ from api.models import (
     PromptSearchInput,
 )
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 router = APIRouter(prefix="/api/operation", tags=[APITags.ops])
 

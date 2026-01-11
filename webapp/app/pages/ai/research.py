@@ -1,5 +1,3 @@
-import os
-
 import polars as pl
 import streamlit as st
 from stocksense.ai.agents import company_summary, company_summary_qa
@@ -19,7 +17,7 @@ from app.state.model import (
     ResearchPhase,
 )
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 state = StateManager.init(PageKey.research.value, ResearchPageAppSate)
 available_exchange = get_available_exchanges()
 available_tickers = get_available_tickers()
@@ -77,7 +75,8 @@ if selected_tool is ResearchPageAvailableTools.company_summary:
             ):
                 # get actual value & assign to state
                 exchange = (
-                    available_exchange.filter(pl.col("dropdown") == exchange_label)
+                    available_exchange
+                    .filter(pl.col("dropdown") == exchange_label)
                     .select("symbol")
                     .item()
                 )

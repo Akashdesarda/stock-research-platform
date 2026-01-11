@@ -1,4 +1,3 @@
-import os
 from datetime import date, datetime
 from enum import Enum
 
@@ -254,7 +253,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             from polars import scan_delta
             from stocksense.config import get_settings
 
-            settings = get_settings(os.getenv("CONFIG_FILE"))
+            settings = get_settings()
 
             self.ticker = (
                 scan_delta(settings.stockdb.data_base_path / "common/security")

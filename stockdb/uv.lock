@@ -1305,8 +1305,8 @@ wheels = [
 
 [[package]]
 name = "stocksense-core"
-version = "0.5.4"
-source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#a39ea219434f80d8ece4cd82ab2f68ebf5299462" }
+version = "0.5.5"
+source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#8d435c8516cd5b507117b7d35c1739fcd5203a16" }
 dependencies = [
     { name = "httpx" },
     { name = "numpy" },

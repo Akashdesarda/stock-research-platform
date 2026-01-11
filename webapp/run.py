@@ -7,7 +7,7 @@ from stocksense.config import get_settings
 
 if __name__ == "__main__":
     setup()
-    settings = get_settings(os.getenv("CONFIG_FILE"))
+    settings = get_settings()
     env = os.environ.copy()
     env["STREAMLIT_SERVER_PORT"] = str(settings.app.port)
     try:

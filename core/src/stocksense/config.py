@@ -159,6 +159,7 @@ class Common(BaseModel):
 # Model for the 'App' section
 class App(BaseModel):
     port: int
+    backend_port: int
     text_to_sql_model: str
     company_summary_model: str
     company_summary_qa_model: str

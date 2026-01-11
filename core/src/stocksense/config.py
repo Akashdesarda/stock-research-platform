@@ -1,7 +1,7 @@
 import os
 import platform
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Iterable
 
 from pydantic import AfterValidator, BaseModel
 from pydantic_settings import (
@@ -14,11 +14,22 @@ from pydantic_settings import (
 
 def _is_running_in_docker() -> bool:
     """Check if the application is running inside a Docker container."""
-    return (
-        os.path.exists("/.dockerenv")
-        or os.getenv("DOCKER_CONTAINER") == "true"
-        or os.getenv("CONFIG_FILE", "").startswith("/")
-    )
+    # NOTE: Do NOT use CONFIG_FILE.startswith("/") as a Docker signal.
+    # On Linux/macOS local machines, absolute paths also start with "/".
+    if os.path.exists("/.dockerenv") or os.getenv("DOCKER_CONTAINER") == "true":
+        return True
+
+    # Best-effort heuristic using cgroups (works in many Docker/K8s setups).
+    try:
+        cgroup = Path("/proc/1/cgroup")
+        if cgroup.exists():
+            txt = cgroup.read_text(errors="ignore")
+            if "docker" in txt or "kubepods" in txt or "containerd" in txt:
+                return True
+    except OSError:
+        pass
+
+    return False
 
 
 def _get_local_data_directory() -> Path:
@@ -67,6 +78,72 @@ def _resolve_data_path(config_path: Path) -> Path:
         return config_path
 
 
+def _iter_candidate_roots() -> Iterable[Path]:
+    """
+    Yield directories to search for config.toml, in priority order.
+    """
+    # 1) Current working directory (common in monorepos when running from subproject)
+    yield Path.cwd()
+
+    # 2) This module's directory (helps when running code via installed package or unusual CWD)
+    yield Path(__file__).resolve().parent
+
+
+def resolve_config_file(
+    config_path: str | Path | None = None,
+    *,
+    filename: str = "config.toml",
+) -> Path:
+    """
+    Resolve a usable config.toml path.
+
+    Resolution order:
+    1) explicit argument
+    2) env vars (CONFIG_FILE, STOCKSENSE_CONFIG_FILE)
+    3) search upwards from common roots (cwd, this module)
+    """
+    # 1) explicit argument
+    if config_path:
+        p = Path(config_path).expanduser()
+        if p.is_file():
+            return p.resolve()
+        raise FileNotFoundError(f"Config file not found at: {p}")
+
+    # 2) environment variables
+    for env_name in ("CONFIG_FILE", "STOCKSENSE_CONFIG_FILE"):
+        raw = os.getenv(env_name)
+        if not raw:
+            continue
+        p = Path(raw).expanduser()
+        if p.is_file():
+            return p.resolve()
+        # If env var is set but invalid, continue to fallback search.
+
+    # 3) upward search
+    for root in _iter_candidate_roots():
+        root = root.resolve()
+        for d in (root, *root.parents):
+            candidate = d / filename
+            if candidate.is_file():
+                return candidate.resolve()
+
+    raise ValueError(
+        "No configuration file path provided and config.toml was not found.\n"
+        "Tried: argument, env (CONFIG_FILE/STOCKSENSE_CONFIG_FILE), and searching parent dirs.\n"
+        "Fix: set CONFIG_FILE=/abs/path/to/config.toml (or run from repo so it can be discovered)."
+    )
+
+
+def ensure_config_env(config_path: str | Path | None = None) -> Path:
+    """
+    Ensure CONFIG_FILE is set to a valid, existing config.toml path.
+    Returns the resolved path.
+    """
+    resolved = resolve_config_file(config_path)
+    os.environ["CONFIG_FILE"] = resolved.as_posix()
+    return resolved
+
+
 # Model for the 'common' section
 class Common(BaseModel):
     base_url: str
@@ -82,6 +159,7 @@ class Common(BaseModel):
 # Model for the 'App' section
 class App(BaseModel):
     port: int
+    backend_port: int
     text_to_sql_model: str
     company_summary_model: str
     company_summary_qa_model: str
@@ -122,18 +200,11 @@ class Settings(BaseSettings):
 
 
 # the Settings model
-def get_settings(config_path: Path | None = None) -> Settings:
-    """Get the application settings."""
-    # Sequence to look for config file path
-    # 1. argument 2. env variable 3. raise error
-    if config_path is not None:
-        _file = Path(config_path)
-    elif _file := os.getenv("CONFIG_FILE"):
-        _file = Path(_file)
-    else:
-        raise ValueError("No configuration file path provided.")
+def get_settings(config_path: str | Path | None = None) -> Settings:
+    """Get the application settings (robust: does not require CONFIG_FILE pre-set)."""
+    resolved = ensure_config_env(config_path)
 
     # set toml file path for Settings before instantiation so BaseSettings reads it
-    Settings.model_config["toml_file"] = _file.resolve().as_posix()
+    Settings.model_config["toml_file"] = resolved.as_posix()
 
-    return Settings()  # pyright: ignore[reportCallIssue]
+    return Settings()  # pyright: ignore[reportCallIssue]  # ty:ignore[missing-argument]

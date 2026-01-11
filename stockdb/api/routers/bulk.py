@@ -1,5 +1,3 @@
-import os
-
 import polars as pl
 from fastapi import APIRouter
 from fastapi.responses import ORJSONResponse
@@ -12,7 +10,7 @@ from api.models import (
     StockExchange,
 )
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 router = APIRouter(prefix="/api/bulk", tags=[APITags.bulk])
 
@@ -28,7 +26,8 @@ async def list_exchange_wise_ticker() -> ORJSONResponse:
             all_exchanges[exch.value] = None
         else:
             result = await (
-                pl.scan_delta(table_path)
+                pl
+                .scan_delta(table_path)
                 .select(pl.col("symbol").alias("ticker"), "company")
                 .sort("ticker")
                 .collect_async()

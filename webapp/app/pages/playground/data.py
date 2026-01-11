@@ -1,5 +1,3 @@
-import os
-
 import polars as pl
 import streamlit as st
 from stocksense.ai.agents import StockDBContextDependency, text_to_sql
@@ -19,7 +17,7 @@ from app.pages.playground._helper import (
 from app.state.manager import StateManager
 from app.state.model import DataPageAppState, PageKey, TickerChoice
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 state = StateManager.init(PageKey.data.value, DataPageAppState)
 
 st.markdown("# Data Explorer")
@@ -55,7 +53,8 @@ with manual_query:
         )
         # updating state
         state.selected_exchange_data = (
-            available_exchange.filter(pl.col("dropdown") == selected_exchange)
+            available_exchange
+            .filter(pl.col("dropdown") == selected_exchange)
             .select("symbol")
             .item()
         )
@@ -268,7 +267,8 @@ with ai_query:
     )
     # updating state
     state.selected_exchange_data = (
-        available_exchange.filter(pl.col("dropdown") == selected_exchange)
+        available_exchange
+        .filter(pl.col("dropdown") == selected_exchange)
         .select("symbol")
         .item()
     )

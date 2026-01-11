@@ -1,5 +1,4 @@
 import logging
-import os
 
 import deltalake
 import polars as pl
@@ -11,7 +10,7 @@ from rich.table import Table
 from stocksense.config import get_settings
 
 logger = logging.getLogger("stockdb")
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 def create_ticker_history_table():

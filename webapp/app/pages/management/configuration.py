@@ -1,9 +1,7 @@
-import os
-
 import streamlit as st
 from stocksense.config import get_settings
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 st.title("Configuration management")
 st.markdown("Manage all configuration settings to run StockSense")
 

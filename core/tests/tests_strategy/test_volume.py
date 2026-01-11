@@ -1,12 +1,10 @@
-import os
-
 import polars as pl
 import pytest
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.strategy import TechnicalAnalysis
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 @pytest.fixture(scope="module")

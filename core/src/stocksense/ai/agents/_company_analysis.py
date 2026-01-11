@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 
 import mlflow
@@ -10,7 +9,7 @@ from pydantic_ai import Agent, AgentRunResult, RunContext
 from stocksense.ai.models import get_model
 from stocksense.config import get_settings
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 # mlflow setup
 mlflow.set_tracking_uri(f"{settings.common.base_url}:{settings.common.mlflow_port}")
 mlflow.set_experiment("stocksense")

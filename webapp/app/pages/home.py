@@ -1,11 +1,9 @@
-import os
-
 import streamlit as st
 from stocksense.config import get_settings
 
 from app.core.utils import rest_request_sync
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 
 # Adding service status check in sidebar

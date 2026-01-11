@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -18,7 +17,7 @@ from api.models import (
     TickerHistoryDownloadMode,
 )
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 router = APIRouter(prefix="/api/task", tags=[APITags.task])
 

@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -23,7 +22,7 @@ from api.models import (
     YahooTickerIdentifier,
 )
 
-settings = get_settings(os.getenv("CONFIG_FILE"))
+settings = get_settings()
 
 router = APIRouter(prefix="/api/per-security", tags=[APITags.per_security])
 

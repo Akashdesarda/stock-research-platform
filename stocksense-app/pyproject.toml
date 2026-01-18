@@ -1,0 +1,20 @@
+[project]
+name = "stocksense-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "reflex>=0.8.23",
+    "reflex-enterprise>=0.4.2",
+    "stocksense-core[ai]",
+]
+
+[tool.uv.sources]
+stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]

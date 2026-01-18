@@ -10,31 +10,39 @@
 			"snapshot",
 			"app",
 			"docs",
+			"core"
 		],
 		"python-envs.pythonProjects": [
 			{
 				"path": "stockdb",
 				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:uv",
+				"packageManager": "ms-python.python:pip",
 				"defaultInterpreterPath": "${cwd}/stockdb/.venv/Scripts/python.exe"
 			},
 			{
 				"path": "snapshot",
 				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:uv",
+				"packageManager": "ms-python.python:pip",
 				"defaultInterpreterPath": "${cwd}/snapshot/.venv/Scripts/python.exe"
 			},
 			{
 				"path": "webapp",
 				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:uv",
+				"packageManager": "ms-python.python:pip",
 				"defaultInterpreterPath": "${cwd}/webapp/.venv/Scripts/python.exe"
+			},
+			{
+				"path": "stocksense-app",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip",
+				"defaultInterpreterPath": "${cwd}/stocksense-app/.venv/Scripts/python.exe"
 			}
 		],
 		"python.defaultInterpreterPath": "python",
 		"testing.coverageToolbarEnabled": true,
 		"cSpell.words": [
 			"groq",
+			"mantine",
 			"stockdb",
 			"stocksense",
 			"talib",

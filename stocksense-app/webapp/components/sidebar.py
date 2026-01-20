@@ -3,6 +3,18 @@ from dataclasses import dataclass
 import reflex as rx
 
 
+ICON_SIZE = 18
+_ROW_LINE_HEIGHT_STYLE = {"lineHeight": "1"}
+_TOP_LEVEL_ROW_STYLE = {
+    "padding": "var(--space-3) var(--space-4)",
+    **_ROW_LINE_HEIGHT_STYLE,
+}
+_SUB_LINK_BUTTON_STYLE = {
+    "padding": "var(--space-2) var(--space-4)",
+    **_ROW_LINE_HEIGHT_STYLE,
+}
+
+
 @dataclass(frozen=True)
 class NavLink:
     label: str
@@ -58,7 +70,7 @@ APP_NAV: list[NavGroup] = [
 
 
 def _sidebar_link(link: NavLink) -> rx.Component:
-    icon = rx.icon(link.icon, size=18) if link.icon else rx.fragment()
+    icon = rx.icon(link.icon, size=ICON_SIZE) if link.icon else rx.fragment()
 
     return rx.link(
         rx.button(
@@ -72,10 +84,79 @@ def _sidebar_link(link: NavLink) -> rx.Component:
             variant="ghost",
             width="100%",
             justify_content="flex-start",
-            style={"padding": "var(--space-2) var(--space-4)", "lineHeight": "1"},
+            style=_SUB_LINK_BUTTON_STYLE,
         ),
         href=link.href,
         width="100%",
+    )
+
+
+def _top_level_link_row(
+    *,
+    label: str,
+    href: str,
+    icon: str | None,
+    right: rx.Component | None = None,
+) -> rx.Component:
+    """Non-collapsible (top-level) sidebar row.
+
+    This is intentionally separate from the accordion so we don't force
+    non-group links into accordion semantics.
+
+    Styling uses the same padding tokens as the AccordionTrigger so it
+    aligns visually with the group rows.
+    """
+
+    left_icon = rx.icon(icon, size=ICON_SIZE) if icon else rx.fragment()
+    right_slot = right or rx.box(width=f"{ICON_SIZE}px", height=f"{ICON_SIZE}px")
+
+    return rx.link(
+        rx.box(
+            rx.hstack(
+                rx.hstack(
+                    left_icon,
+                    rx.text(label, weight="medium"),
+                    align="center",
+                    spacing="2",
+                ),
+                # Placeholder matches the chevron space in accordion triggers.
+                right_slot,
+                justify="between",
+                align="center",
+                width="100%",
+            ),
+            width="100%",
+            style=_TOP_LEVEL_ROW_STYLE,
+        ),
+        href=href,
+        width="100%",
+    )
+
+
+def _home_row() -> rx.Component:
+    return _top_level_link_row(label="Home", href="/", icon="home")
+
+
+def _group_item(group: NavGroup) -> rx.Component:
+    return rx.accordion.item(
+        rx.accordion.trigger(
+            rx.hstack(
+                rx.icon(group.icon, size=ICON_SIZE),
+                rx.text(group.label, weight="medium"),
+                align="center",
+                spacing="2",
+            ),
+            rx.accordion.icon(size=ICON_SIZE),
+        ),
+        rx.accordion.content(
+            rx.vstack(
+                *[_sidebar_link(link) for link in group.links],
+                spacing="2",
+                width="100%",
+                align="stretch",
+            ),
+        ),
+        value=group.key,
     )
 
 
@@ -83,69 +164,24 @@ def nav_sidebar(
     *,
     default_open_group: str | None = None,
     groups: list[NavGroup] | None = None,
+    top_links: list[NavLink] | None = None,
 ) -> rx.Component:
-    """Grouped, collapsible sidebar navigation.
+    """Grouped, collapsible sidebar navigation."""
 
-    - Groups map to top navbar items (Playground/AI/Management)
-    - Each group expands/collapses
-    - Links are styled like vertical tabs
-    """
-
-    groups = groups or APP_NAV
-
+    groups = APP_NAV if groups is None else groups
     open_key = default_open_group or "playground"
 
-    accordion_items: list[rx.Component] = [
-        rx.accordion.item(
-            rx.accordion.trigger(
-                rx.hstack(
-                    rx.icon(group.icon, size=18),
-                    rx.text(group.label, weight="medium"),
-                    align="center",
-                    spacing="2",
-                ),
-                rx.accordion.icon(size=18),
-            ),
-            rx.accordion.content(
-                rx.vstack(
-                    *[_sidebar_link(link) for link in group.links],
-                    spacing="2",
-                    width="100%",
-                    align="stretch",
-                ),
-            ),
-            value=group.key,
-        )
-        for group in groups
-    ]
+    # Future-proofing: allow other non-group rows above the accordion.
+    top_links = [NavLink("Home", "/", "home")] if top_links is None else top_links
+
+    accordion_items: list[rx.Component] = [_group_item(group) for group in groups]
 
     return rx.card(
         rx.vstack(
-            rx.link(
-                rx.box(
-                    rx.hstack(
-                        rx.hstack(
-                            rx.icon("home", size=18),
-                            rx.text("Home", weight="medium"),
-                            align="center",
-                            spacing="2",
-                        ),
-                        # Placeholder to match the chevron space in accordion triggers.
-                        rx.box(width="18px", height="18px"),
-                        justify="between",
-                        align="center",
-                        width="100%",
-                    ),
-                    width="100%",
-                    style={
-                        # Match AccordionTrigger default spacing
-                        "padding": "var(--space-3) var(--space-4)",
-                        "lineHeight": "1",
-                    },
-                ),
-                href="/",
-                width="100%",
-            ),
+            *[
+                _top_level_link_row(label=link.label, href=link.href, icon=link.icon)
+                for link in top_links
+            ],
             rx.accordion.root(
                 *accordion_items,
                 type="single",

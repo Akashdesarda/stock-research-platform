@@ -75,7 +75,6 @@ def navbar() -> rx.Component:
             ),
             align="center",
             width="100%",
-            max_width="1400px",
             margin_x="auto",
             padding_x="1.5em",
         ),

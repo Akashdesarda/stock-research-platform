@@ -27,10 +27,10 @@ def page_layout_with_sidebar(
 
     return rx.box(
         navbar(),
-        rx.container(
+        rx.box(
             rx.box(content, padding_top="1.25rem"),
-            # Responsive container: expands on large screens, stays readable on small.
-            max_width="clamp(64rem, 92vw, 96rem)",
+            width="100%",
+            padding_x="1.5em",
         ),
         width="100%",
     )

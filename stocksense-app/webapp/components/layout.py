@@ -1,32 +1,8 @@
-"""Common app layout (navbar + container)."""
+from typing import Literal
 
 import reflex as rx
 
-
-def navbar() -> rx.Component:
-    def nav_link(label: str, href: str) -> rx.Component:
-        return rx.link(
-            rx.button(label, variant="ghost"),
-            href=href,
-        )
-
-    return rx.box(
-        rx.hstack(
-            rx.heading("StockSense", size="5"),
-            rx.spacer(),
-            nav_link("Home", "/"),
-            nav_link("Playground", "/playground"),
-            nav_link("AI", "/ai"),
-            nav_link("Management", "/management"),
-            rx.color_mode.button(),
-            align="center",
-            width="100%",
-        ),
-        width="100%",
-        padding_y="0.75rem",
-        padding_x="1rem",
-        border_bottom="1px solid var(--gray-6)",
-    )
+from webapp.components.navbar import navbar
 
 
 def page_layout(*children: rx.Component) -> rx.Component:
@@ -102,13 +78,16 @@ def bordered_container(
     background: str = "transparent",
     **props,
 ):
-    # Mapping alignment to margin logic
+    # Map alignment to margins. Use style dict to avoid passing unsupported kwargs.
     margin_map = {
-        "left": {"margin_left": "0", "margin_right": "auto"},
-        "center": {"margin_left": "auto", "margin_right": "auto"},
-        "right": {"margin_left": "auto", "margin_right": "0"},
+        "left": {"marginLeft": "0", "marginRight": "auto"},
+        "center": {"marginLeft": "auto", "marginRight": "auto"},
+        "right": {"marginLeft": "auto", "marginRight": "0"},
     }
-    alignment_styles = margin_map.get(align, margin_map["center"])
+    alignment_style = margin_map.get(align, margin_map["center"])
+
+    user_style = props.pop("style", {}) or {}
+    merged_style = {**user_style, **alignment_style}
 
     return rx.box(
         # We wrap children in a vstack to force vertical spacing (gap)
@@ -124,7 +103,7 @@ def bordered_container(
         background_color=background,
         border=f"1px solid {rx.color('gray', 5)}",
         border_radius="12px",
-        **alignment_styles,
+        style=merged_style,
         **props,
     )
 
@@ -173,17 +152,21 @@ def section_header(
     )
 
 
-def responsive_grid(*children, columns=None, spacing="4"):
+def responsive_grid(
+    *children,
+    columns=None,
+    spacing: Literal["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] = "4",
+):
     """A layout wrapper that adjusts columns based on screen size."""
     if columns is None:
         columns = [1, 2, 3]
     return rx.grid(
         *children,
-        columns={
-            "sm": str(columns[0]),
-            "md": str(columns[1] if len(columns) > 1 else columns[0]),
-            "lg": str(columns[2] if len(columns) > 2 else columns[1]),
-        },
+        columns=rx.breakpoints(
+            sm=str(columns[0]),
+            md=str(columns[1] if len(columns) > 1 else columns[0]),
+            lg=str(columns[2] if len(columns) > 2 else columns[1]),
+        ),
         spacing=spacing,
         width="100%",
     )

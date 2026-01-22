@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 import reflex as rx
 
-
 ICON_SIZE = 18
 _ROW_LINE_HEIGHT_STYLE = {"lineHeight": "1"}
 _TOP_LEVEL_ROW_STYLE = {
@@ -59,11 +58,6 @@ APP_NAV: list[NavGroup] = [
             NavLink("Overview", "/management", "layout_dashboard"),
             NavLink("Configuration", "/management/configuration", "settings"),
             NavLink("Task", "/management/task", "construction"),
-            NavLink(
-                "New Configuration",
-                "/management/task/new-configuration",
-                "plus",
-            ),
         ],
     ),
 ]

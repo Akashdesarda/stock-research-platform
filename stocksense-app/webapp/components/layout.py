@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 import reflex as rx
 
@@ -12,6 +12,7 @@ def page_layout(*children: rx.Component) -> rx.Component:
 def page_layout_with_sidebar(
     *children: rx.Component,
     sidebar: rx.Component | None,
+    **props,
 ) -> rx.Component:
     content = (
         rx.hstack(
@@ -31,8 +32,10 @@ def page_layout_with_sidebar(
             rx.box(content, padding_top="1.25rem"),
             width="100%",
             padding_x="1.5em",
+            padding_bottom="2em",
         ),
         width="100%",
+        **props,
     )
 
 
@@ -128,6 +131,40 @@ def stat_card(label: str, value: str, trend: str | None = None, icon: str = "act
             spacing="1",
         ),
         width="100%",
+    )
+
+
+def status_indicator(
+    label: str,
+    value: Any,
+    matchers: dict[Any, tuple[str, str]],
+    default: tuple[str, str] = ("Unknown", "gray"),
+) -> rx.Component:
+    """
+    Displays a label on the left and a conditional badge on the right.
+
+    Args:
+        label: The text label.
+        value: The state var to check.
+        matchers: Dict mapping value to (badge_text, badge_color).
+        default: Fallback (badge_text, badge_color) if no match.
+    """
+    badge_component = rx.badge(default[0], color_scheme=default[1], variant="surface")
+
+    # Build the nested rx.cond structure
+    for match_value, (badge_text, badge_color) in matchers.items():
+        badge_component = rx.cond(
+            value == match_value,
+            rx.badge(badge_text, color_scheme=badge_color, variant="surface"),
+            badge_component,
+        )
+
+    return rx.hstack(
+        rx.text(label, size="2", weight="medium"),
+        badge_component,
+        width="100%",
+        justify="between",
+        align="center",
     )
 
 

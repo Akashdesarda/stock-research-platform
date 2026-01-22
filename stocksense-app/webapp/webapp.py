@@ -13,10 +13,6 @@ from webapp.pages.management import configuration as management_configuration
 from webapp.pages.management import (
     management,
 )
-from webapp.pages.management import (
-    task as management_task,
-)
-from webapp.pages.management.task import new_configuration as nc
 from webapp.pages.playground import (
     data as playground_data,
 )
@@ -42,10 +38,4 @@ app.add_page(
     management_configuration,
     route="/management/configuration",
     title="Management: Configuration",
-)
-app.add_page(management_task, route="/management/task", title="Management: Task")
-app.add_page(
-    nc,
-    route="/management/task/new-configuration",
-    title="Management: New Configuration",
 )

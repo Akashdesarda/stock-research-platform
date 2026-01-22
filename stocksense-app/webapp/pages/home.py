@@ -1,113 +1,136 @@
 import reflex as rx
 
-from webapp.components.layout import page_layout
-from webapp.state import State
+from webapp.components.inputs import dropdown_select
+from webapp.components.layout import (
+    bordered_container,
+    page_layout_with_sidebar,
+    responsive_grid,
+    status_indicator,
+)
+from webapp.components.sidebar import nav_sidebar
+from webapp.state.home import HomeState
+
+
+def _data_health_card() -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("database", size=20),
+                rx.text("Data Health", size="3", weight="bold"),
+                spacing="2",
+                align="center",
+                margin_bottom="2",
+            ),
+            rx.text(
+                "Check the data availability for supported exchanges.",
+                size="1",
+                color_scheme="gray",
+            ),
+            rx.divider(),
+            rx.vstack(
+                dropdown_select(
+                    label="Exchange",
+                    options=HomeState.data_exchange_options,
+                    value=HomeState.selected_status_exchange,
+                    on_change=HomeState.set_selected_status_exchange,
+                    placeholder="Select Exchange",
+                    width="100%",
+                ),
+                status_indicator(
+                    label="Status",
+                    value=HomeState.selected_exchange_status,
+                    matchers={
+                        "OK": ("Up to Date", "green"),
+                        "OUTDATED": ("Outdated", "orange"),
+                    },
+                    default=("No Data", "red"),
+                ),
+                width="100%",
+                spacing="4",
+            ),
+            align="stretch",
+            width="100%",
+            spacing="3",
+        ),
+        size="2",
+    )
+
+
+def _services_health_card() -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("server", size=20),
+                rx.text("System Services", size="3", weight="bold"),
+                spacing="2",
+                align="center",
+                margin_bottom="2",
+            ),
+            rx.text(
+                "Operational status of core backend services.",
+                size="1",
+                color_scheme="gray",
+            ),
+            rx.divider(),
+            rx.vstack(
+                status_indicator(
+                    label="StockDB API",
+                    value=HomeState.stockdb_api,
+                    matchers={
+                        True: ("Available", "green"),
+                        False: ("Unavailable", "red"),
+                    },
+                ),
+                # Add more services here as they grow
+                width="100%",
+                spacing="3",
+            ),
+            align="stretch",
+            width="100%",
+            spacing="3",
+        ),
+        size="2",
+    )
 
 
 def home() -> rx.Component:
-    return page_layout(
+    return page_layout_with_sidebar(
         rx.vstack(
-            rx.markdown(
-                """
-StockSense is a comprehensive platform for stock market research and analysis. It provides
-tools and data to help investors make informed decisions.
-""".strip()
-            ),
-            rx.divider(margin_y="0.75rem"),
-            rx.heading("Demo: Central State", size="5"),
-            rx.text(State.greeting, color_scheme="gray"),
-            rx.hstack(
-                rx.button("-", on_click=State.decrement, variant="outline"),
-                rx.badge(State.counter, variant="soft"),
-                rx.button("+", on_click=State.increment),
-                rx.button("Reset", on_click=State.reset_counter, variant="ghost"),
-                spacing="3",
-                align="center",
-                wrap="wrap",
-            ),
-            rx.hstack(
+            # Main Content
+            bordered_container(
                 rx.vstack(
-                    rx.text("Your name"),
-                    rx.input(
-                        value=State.name,
-                        on_change=State.set_name,
-                        placeholder="Type your name",
-                        width="100%",
+                    rx.heading("Welcome to StockSense", size="5"),
+                    rx.markdown(
+                        """
+                        StockSense is your comprehensive platform for stock market research and analysis.
+
+                        **Getting Started:**
+                        - Check **Service Status** below to ensure all systems are operational.
+                        - Use the **Playground** to explore raw data.
+                        - Visit **AI Research** for automated insights.
+                        """
                     ),
-                    width="100%",
-                    spacing="2",
-                ),
-                rx.vstack(
-                    rx.text("Exchange"),
-                    rx.select(
-                        State.exchanges,
-                        value=State.selected_exchange,
-                        on_change=State.set_selected_exchange,
-                        placeholder="Select exchange",
-                        width="100%",
-                    ),
-                    width="100%",
-                    spacing="2",
+                    align="start",
+                    spacing="3",
                 ),
                 width="100%",
-                spacing="6",
-                align="end",
+                align="left",
             ),
-            rx.divider(margin_y="0.75rem"),
-            rx.heading("Demo: Async httpx call", size="5"),
-            rx.text(
-                "Clicks run an async Reflex event that fetches from https://httpbin.org using httpx.",
-                color_scheme="gray",
-            ),
-            rx.hstack(
-                rx.button(
-                    "Fetch httpbin (async)",
-                    on_click=State.fetch_httpbin,
-                ),
-                rx.cond(
-                    State.httpbin_is_loading,
-                    rx.badge("Loading...", variant="soft"),
-                    rx.badge("Idle", variant="soft"),
-                ),
-                spacing="3",
-                align="center",
-                wrap="wrap",
-                width="100%",
-            ),
-            rx.cond(
-                State.httpbin_error != "",
-                rx.callout(
-                    State.httpbin_error,
-                    icon="triangle_alert",
-                    color_scheme="red",
-                    width="100%",
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                State.has_httpbin_response,
-                rx.vstack(
-                    rx.hstack(
-                        rx.text("Status: ", State.httpbin_status_code),
-                        rx.text("Origin: ", State.httpbin_origin),
-                        spacing="6",
-                        wrap="wrap",
-                        width="100%",
-                    ),
-                    rx.text("URL: ", State.httpbin_url),
-                    rx.text("User-Agent: ", State.httpbin_user_agent),
-                    rx.text("Last fetched (UTC): ", State.httpbin_last_fetched_utc),
-                    rx.code_block(
-                        State.httpbin_response_json,
-                        language="json",
-                        width="100%",
-                    ),
-                    width="100%",
-                    spacing="2",
-                ),
-                rx.fragment(),
+            rx.divider(),
+            rx.heading("Status", size="5"),
+            # Status Dashboard Grid
+            # rx.grid(
+            responsive_grid(
+                _services_health_card(),
+                _data_health_card(),
+                # We can add more cards here easily
+                # columns=rx.breakpoints(initial="1", sm="2", lg="3"),
+                spacing="4",
+                # width="100%",
             ),
             width="100%",
-            spacing="4",
-        )
+            spacing="6",
+        ),
+        sidebar=nav_sidebar(),
+        on_mount=HomeState.check_input_status,
     )

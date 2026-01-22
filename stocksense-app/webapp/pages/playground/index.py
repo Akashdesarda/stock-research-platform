@@ -5,14 +5,7 @@ from webapp.components.sidebar import nav_sidebar
 
 
 def playground() -> rx.Component:
-    sidebar = nav_sidebar(
-        "Playground",
-        [
-            ("Overview", "/playground"),
-            ("Data", "/playground/data"),
-            ("Strategy", "/playground/strategy"),
-        ],
-    )
+    sidebar = nav_sidebar(default_open_group="playground")
 
     return page_layout_with_sidebar(
         rx.heading("Playground", size="7"),

@@ -630,14 +630,7 @@ def data() -> rx.Component:
             spacing="3",
             width="100%",
         ),
-        sidebar=nav_sidebar(
-            "Playground",
-            [
-                ("Overview", "/playground"),
-                ("Data", "/playground/data"),
-                ("Strategy", "/playground/strategy"),
-            ],
-        ),
+        sidebar=nav_sidebar(default_open_group="Playground"),
     )
 
 

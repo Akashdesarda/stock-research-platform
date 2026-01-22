@@ -5,14 +5,7 @@ from webapp.components.sidebar import nav_sidebar
 
 
 def management() -> rx.Component:
-    sidebar = nav_sidebar(
-        "Management",
-        [
-            ("Overview", "/management"),
-            ("Configuration", "/management/configuration"),
-            ("Task", "/management/task"),
-        ],
-    )
+    sidebar = nav_sidebar(default_open_group="Management")
 
     return page_layout_with_sidebar(
         rx.heading("Management", size="7"),

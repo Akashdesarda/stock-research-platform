@@ -17,14 +17,7 @@ from webapp.state.management import ConfigurationState
 
 
 def configuration() -> rx.Component:
-    sidebar = nav_sidebar(
-        "Management",
-        [
-            ("Overview", "/management"),
-            ("Configuration", "/management/configuration"),
-            ("Task", "/management/task"),
-        ],
-    )
+    sidebar = nav_sidebar(default_open_group="Management")
 
     # SECTION - Configuration Tabs
     config_tabs_list = rx.tabs.list(
@@ -194,46 +187,50 @@ def configuration() -> rx.Component:
     )
 
     return page_layout_with_sidebar(
-        section_header(
-            "Configuration",
-            "Manage all configuration settings to run StockSense.",
-        ),
-        rx.spacer(),
-        bordered_container(
-            config_tabs,
-            rx.hstack(
-                save_button(on_click=ConfigurationState.update_config),
-                action_button(
-                    "Reload from disk",
-                    kind="secondary",
-                    left_icon="redo_2",
-                    on_click=ConfigurationState.reload_from_disk,
+        rx.vstack(
+            section_header(
+                "Configuration",
+                "Manage all configuration settings to run StockSense.",
+            ),
+            bordered_container(
+                config_tabs,
+                rx.hstack(
+                    save_button(on_click=ConfigurationState.update_config),
+                    action_button(
+                        "Reload from disk",
+                        kind="secondary",
+                        left_icon="redo_2",
+                        on_click=ConfigurationState.reload_from_disk,
+                    ),
+                    rx.spacer(),
+                    rx.cond(
+                        ConfigurationState.last_saved != "",
+                        rx.badge(
+                            rx.text("Saved: ", ConfigurationState.last_saved),
+                            variant="soft",
+                        ),
+                        rx.fragment(),
+                    ),
+                    width="100%",
+                    align="center",
+                    wrap="wrap",
                 ),
-                rx.spacer(),
                 rx.cond(
-                    ConfigurationState.last_saved != "",
-                    rx.badge(
-                        rx.text("Saved: ", ConfigurationState.last_saved),
-                        variant="soft",
+                    ConfigurationState.save_error != "",
+                    rx.callout(
+                        ConfigurationState.save_error,
+                        icon="triangle_alert",
+                        color_scheme="red",
+                        width="100%",
                     ),
                     rx.fragment(),
                 ),
                 width="100%",
-                align="center",
-                wrap="wrap",
+                max_width="900px",
+                align="left",
             ),
-            rx.cond(
-                ConfigurationState.save_error != "",
-                rx.callout(
-                    ConfigurationState.save_error,
-                    icon="triangle_alert",
-                    color_scheme="red",
-                    width="100%",
-                ),
-                rx.fragment(),
-            ),
-            width="80%",
-            max_width="800px",
+            width="100%",
+            spacing="5",
         ),
         sidebar=sidebar,
     )

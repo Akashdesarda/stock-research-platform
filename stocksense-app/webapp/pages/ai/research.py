@@ -5,14 +5,7 @@ from webapp.components.sidebar import nav_sidebar
 
 
 def research() -> rx.Component:
-    sidebar = nav_sidebar(
-        "AI",
-        [
-            ("Overview", "/ai"),
-            ("Chat", "/ai/chat"),
-            ("Research", "/ai/research"),
-        ],
-    )
+    sidebar = nav_sidebar(default_open_group="AI")
 
     return page_layout_with_sidebar(
         rx.heading("AI Research", size="7"),

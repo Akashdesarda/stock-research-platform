@@ -1,7 +1,10 @@
 from datetime import datetime
 
 import reflex as rx
+from httpx import AsyncClient
 from stocksense.config import get_settings
+
+from webapp.state.shared import CommonMixin
 
 settings = get_settings()
 
@@ -165,3 +168,99 @@ class ConfigurationState(rx.State):
         except Exception as exc:  # pragma: no cover
             self.save_error = str(exc)
             self.last_saved = ""
+
+
+class TaskState(CommonMixin, rx.State):
+    """State for management task execution."""
+
+    task_mode: str = "auto"
+    download_mode: str = "incremental"
+    selected_exchange_dropdown: str = ""
+    selected_ticker_dropdowns: list[str] = []
+    start_date: str = ""
+    end_date: str = ""
+
+    is_submitting: bool = False
+    submit_success: str = ""
+    submit_error: str = ""
+
+    @rx.event
+    def set_task_mode(self, value: str):
+        self.task_mode = value
+        self.submit_success = ""
+        self.submit_error = ""
+
+        if value == "auto":
+            self.selected_ticker_dropdowns = []
+            self.selected_ticker = []
+            self.start_date = ""
+            self.end_date = ""
+
+    @rx.event
+    def set_download_mode(self, value: str):
+        self.download_mode = value
+        self.submit_success = ""
+        self.submit_error = ""
+
+    @rx.event
+    async def set_exchange_dropdown(self, value: str):
+        self.selected_exchange_dropdown = value
+        await self.get_exchange_symbol(value)
+        self.selected_ticker_dropdowns = []
+        self.selected_ticker = []
+
+    @rx.event
+    async def set_ticker_dropdowns(self, values: list[str]):
+        self.selected_ticker_dropdowns = values
+        await self.get_ticker_symbols(values)
+
+    @rx.event
+    def set_start_date(self, value: str):
+        self.start_date = value
+
+    @rx.event
+    def set_end_date(self, value: str):
+        self.end_date = value
+
+    @rx.event(background=True)
+    async def submit_task(self):
+        async with self:
+            self.is_submitting = True
+            self.submit_error = ""
+            self.submit_success = ""
+
+        try:
+            payload = {
+                "task_mode": self.task_mode,
+                "download_mode": self.download_mode,
+                "exchange": self.selected_exchange,
+                "ticker": self.selected_ticker if self.task_mode == "manual" else None,
+                "start_date": self.start_date if self.task_mode == "manual" else None,
+                "end_date": self.end_date if self.task_mode == "manual" else None,
+            }
+
+            url = (
+                f"{settings.common.base_url}:{settings.stockdb.port}"
+                "/api/task/ticker/history"
+            )
+
+            async with AsyncClient(follow_redirects=True, timeout=300) as client:
+                response = await client.post(url, json=payload)
+
+            async with self:
+                if response.status_code == 200:
+                    self.submit_success = "Data update task successfully completed!"
+                else:
+                    detail = "Request failed."
+                    try:
+                        payload = response.json()
+                        detail = str(payload.get("detail", detail))
+                    except Exception:  # pragma: no cover
+                        detail = response.text or detail
+                    self.submit_error = detail
+        except Exception as exc:  # pragma: no cover
+            async with self:
+                self.submit_error = str(exc)
+        finally:
+            async with self:
+                self.is_submitting = False

@@ -1,8 +1,3 @@
-"""Reflex app entrypoint for StockSense (migrating from Streamlit).
-
-Pages live under the `webapp.pages` package.
-"""
-
 import reflex_enterprise as rx
 
 from webapp.pages import home
@@ -13,6 +8,7 @@ from webapp.pages.management import configuration as management_configuration
 from webapp.pages.management import (
     management,
 )
+from webapp.pages.management import task as management_task
 from webapp.pages.playground import (
     data as playground_data,
 )
@@ -38,4 +34,9 @@ app.add_page(
     management_configuration,
     route="/management/configuration",
     title="Management: Configuration",
+)
+app.add_page(
+    management_task,
+    route="/management/task",
+    title="Management: Task",
 )

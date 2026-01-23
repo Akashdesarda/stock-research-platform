@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 import reflex as rx
 import reflex_enterprise as rxe
 from reflex.event import EventType
+from reflex.vars import ArrayVar
 from reflex.vars.base import AsyncComputedVar
 
 
@@ -141,10 +142,12 @@ def delete_button(**props) -> rx.Component:
 
 def dropdown_select(
     label: str,
-    options: Sequence[str] | AsyncComputedVar[Sequence[str]],
+    options: Sequence[str | Any]
+    | ArrayVar[list[str]]
+    | AsyncComputedVar[Sequence[str]],
     placeholder: str = "Select an option",
     value: str | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     disabled: bool = False,
     **props,
 ) -> rx.Component:
@@ -173,7 +176,7 @@ def dropdown_select(
 def radio_select(
     options: Sequence,
     value: str | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     direction: Literal["row", "column"] = "row",
     **props,
 ) -> rx.Component:
@@ -194,78 +197,11 @@ def radio_select(
         **props,
     )
 
-
-def pill_select_single(
-    options: Sequence[str | Option],
-    *,
-    value: str | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
-    color_scheme: str = "blue",
-    size: str = "2",
-    wrap: bool = True,
-) -> rx.Component:
-    """Pill-style single select using ToggleGroup."""
-
-    opts = _normalize_options(options)
-
-    return rx.toggle_group.root(
-        *[
-            rx.toggle_group.item(
-                opt.label, value=opt.value, variant="soft", radius="full"
-            )
-            for opt in opts
-        ],
-        type="single",
-        value=value,
-        on_value_change=on_change,
-        color_scheme=color_scheme,
-        size=size,
-        style={
-            "display": "flex",
-            "gap": "0.5rem",
-            "flexWrap": "wrap" if wrap else "nowrap",
-        },
-    )
-
-
-def pill_select_multi(
-    options: Sequence[str | Option],
-    *,
-    values: Iterable[str] | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
-    color_scheme: str = "blue",
-    size: str = "2",
-    wrap: bool = True,
-) -> rx.Component:
-    """Multi-select pills using ToggleGroup with `type="multiple"`."""
-
-    opts = _normalize_options(options)
-
-    return rx.toggle_group.root(
-        *[
-            rx.toggle_group.item(
-                opt.label, value=opt.value, variant="soft", radius="full"
-            )
-            for opt in opts
-        ],
-        type="multiple",
-        value=list(values) if values is not None else None,
-        on_value_change=on_change,
-        color_scheme=color_scheme,
-        size=size,
-        style={
-            "display": "flex",
-            "gap": "0.5rem",
-            "flexWrap": "wrap" if wrap else "nowrap",
-        },
-    )
-
-
 def multi_select_dropdown(
     label: str | None,
-    options: list,
+    options: list | ArrayVar[list[str]],
     value: list[str] | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | Callable | None = None,
     **props,
 ):
     """Multi-select dropdown using Reflex Enterprise MultiSelect component."""
@@ -285,7 +221,7 @@ def multi_select_dropdown(
 
 def checkbox_input(
     label: str | None = None,
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     **props,
 ) -> rx.Component:
     """Simple checkbox group useful as a multi-select list."""
@@ -308,7 +244,7 @@ def checkbox_input(
 
 def text_input(
     placeholder: str = "",
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     type: str = "text",
     **props,
 ) -> rx.Component:
@@ -332,7 +268,7 @@ def text_input(
 def text_area(
     *,
     value: str | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     placeholder: str = "",
     rows: int = 4,
     width: str = "100%",
@@ -406,7 +342,7 @@ def number_input(
 
 def switch_input(
     checked: bool | rx.Var | None = None,
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     label: str | None = None,
     size: str = "2",
     **props,
@@ -433,7 +369,7 @@ def switch_input(
 def slider_input(
     default_value: int | float | rx.Var | None = None,
     orientation: Literal["horizontal", "vertical"] = "horizontal",
-    on_change: rx.EventHandler[None] | None = None,
+    on_change: EventType[Any] | None = None,
     min_value: float = 0,
     max_value: float = 100,
     step: float = 1,

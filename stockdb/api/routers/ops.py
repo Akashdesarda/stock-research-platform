@@ -25,7 +25,7 @@ settings = get_settings()
 router = APIRouter(prefix="/api/operation", tags=[APITags.ops])
 
 
-@router.put("/{exchange}/ticker/history")
+@router.put("/optimize/{exchange}/ticker/history")
 async def table_optimize_ticker_history(
     exchange: Annotated[
         StockExchange,
@@ -56,7 +56,7 @@ async def table_optimize_ticker_history(
     return ORJSONResponse(result)
 
 
-@router.post("/ticker/history")
+@router.post("/download/ticker/history")
 async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInput):
     """Trigger daily ticker history download for all tickers in given exchange"""
     # SECTION 1- Auto mode

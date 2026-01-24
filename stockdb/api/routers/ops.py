@@ -50,8 +50,8 @@ async def table_optimize_ticker_history(
         compact_result = dt_table.optimize.compact()
         result["compaction"] = compact_result
     if vacuum:
-        vaccum_result = dt_table.vacuum(dry_run=False)
-        result["vacuum"] = vaccum_result
+        vacuum_result = dt_table.vacuum(dry_run=False)
+        result["vacuum"] = vacuum_result
 
     return ORJSONResponse(result)
 

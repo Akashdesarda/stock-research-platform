@@ -36,6 +36,11 @@
 				"envManager": "ms-python.python:venv",
 				"packageManager": "ms-python.python:pip",
 				"defaultInterpreterPath": "${cwd}/stocksense-app/.venv/Scripts/python.exe"
+			},
+			{
+				"path": "",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip"
 			}
 		],
 		"python.defaultInterpreterPath": "python",
@@ -67,6 +72,22 @@
 				"label": "streamlit app",
 				"type": "shell",
 				"command": "cd ${cwd}/webapp && uv run run.py",
+				"problemMatcher": [
+					"$python"
+				]
+			},
+			{
+				"label": "Reflex compile",
+				"type": "shell",
+				"command": "cd ${cwd}/stocksense-app && uv run reflex compile",
+				"problemMatcher": [
+					"$python"
+				]
+			},
+			{
+				"label": "Reflex run",
+				"type": "shell",
+				"command": "cd ${cwd}/stocksense-app && uv run reflex run",
 				"problemMatcher": [
 					"$python"
 				]

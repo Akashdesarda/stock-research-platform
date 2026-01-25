@@ -244,9 +244,22 @@ def number_input(
     step: float | int | None = None,
     width: str = "100%",
 ) -> rx.Component:
-    """Numeric input wrapper so we avoid retyping common props."""
+    """Numeric input wrapper so we avoid retyping common props.
+    
+    Note: Step buttons are only displayed when value is a plain int/float,
+    not when it's a reactive Var, to avoid runtime errors with reactive
+    variable arithmetic.
+    """
 
-    if step is None:
+    # Only show step buttons if value is a plain Python value (not a reactive Var)
+    # to avoid issues with arithmetic operations on reactive variables
+    show_step_buttons = (
+        step is not None
+        and isinstance(value, (int, float))
+        and on_change is not None
+    )
+
+    if not show_step_buttons:
         return rx.input(
             value=value,
             on_change=on_change,
@@ -256,16 +269,8 @@ def number_input(
             step=step,
             width=width,
         )
-    can_compute = isinstance(value, (int, float)) and isinstance(step, (int, float))
-    dec_disabled = value is None
-    inc_disabled = value is None
-    if can_compute:
-        dec_disabled = False if min_value is None else (value - step) < min_value
-        inc_disabled = False if max_value is None else (value + step) > max_value
 
     def _step_click(delta: float | int):
-        if on_change is None or value is None:
-            return None
         return lambda: on_change(value + delta)
 
     return rx.hstack(
@@ -284,14 +289,12 @@ def number_input(
             on_click=_step_click(-step),
             size="1",
             variant="soft",
-            is_disabled=dec_disabled,
         ),
         rx.button(
             "+",
             on_click=_step_click(step),
             size="1",
             variant="soft",
-            is_disabled=inc_disabled,
         ),
         align="center",
         spacing="2",

@@ -64,12 +64,9 @@ APP_NAV: list[NavGroup] = [
 
 
 def _sidebar_link(link: NavLink) -> rx.Component:
-    icon = rx.icon(link.icon, size=ICON_SIZE) if link.icon else rx.fragment()
-
     return rx.link(
         rx.button(
             rx.hstack(
-                icon,
                 rx.text(link.label, size="3", weight="medium"),
                 spacing="2",
                 align="center",
@@ -101,14 +98,12 @@ def _top_level_link_row(
     aligns visually with the group rows.
     """
 
-    left_icon = rx.icon(icon, size=ICON_SIZE) if icon else rx.fragment()
     right_slot = right or rx.box(width=f"{ICON_SIZE}px", height=f"{ICON_SIZE}px")
 
     return rx.link(
         rx.box(
             rx.hstack(
                 rx.hstack(
-                    left_icon,
                     rx.text(label, weight="medium"),
                     align="center",
                     spacing="2",
@@ -135,7 +130,6 @@ def _group_item(group: NavGroup) -> rx.Component:
     return rx.accordion.item(
         rx.accordion.trigger(
             rx.hstack(
-                rx.icon(group.icon, size=ICON_SIZE),
                 rx.text(group.label, weight="medium"),
                 align="center",
                 spacing="2",

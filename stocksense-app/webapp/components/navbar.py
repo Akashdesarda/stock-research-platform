@@ -19,11 +19,10 @@ def _brand() -> rx.Component:
     )
 
 
-def _navbar_center_item(label: str, icon: str, href: str) -> rx.Component:
+def _navbar_center_item(label: str, href: str) -> rx.Component:
     active = rx.State.router.page.path == href
     return rx.link(
         rx.hstack(
-            rx.icon(icon, size=18),
             rx.text(label, size="3", weight="medium"),
             spacing="2",
             align="center",
@@ -51,10 +50,10 @@ def navbar() -> rx.Component:
     - Utility actions on the right
     """
     center_nav = rx.hstack(
-        _navbar_center_item("Home", "home", "/"),
-        _navbar_center_item("Playground", "joystick", "/playground"),
-        _navbar_center_item("AI", "brain", "/ai"),
-        _navbar_center_item("Management", "settings_2", "/management"),
+        _navbar_center_item("Home", "/"),
+        _navbar_center_item("Playground", "/playground"),
+        _navbar_center_item("AI", "/ai"),
+        _navbar_center_item("Management", "/management"),
         spacing="1",
         align="center",
         display={"base": "none", "md": "flex"},

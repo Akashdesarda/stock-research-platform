@@ -42,10 +42,6 @@ class ConfigurationState(rx.State):
     last_saved: str = ""
     save_error: str = ""
 
-    # Setters (explicit for type checking + coercion)
-    def set_common_base_url(self, value: str) -> None:
-        self.common_base_url = value
-
     @rx.event
     def update_base_url(self, value: str):
         self.common_base_url = value

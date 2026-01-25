@@ -260,12 +260,6 @@ def number_input(
             step=step,
             width=width,
         )
-    can_compute = isinstance(value, (int, float)) and isinstance(step, (int, float))
-    dec_disabled = value is None
-    inc_disabled = value is None
-    if can_compute:
-        dec_disabled = False if min_value is None else (value - step) < min_value
-        inc_disabled = False if max_value is None else (value + step) > max_value
 
     def _step_click(delta: float | int):
         if on_change is None or value is None:
@@ -288,14 +282,12 @@ def number_input(
             on_click=_step_click(-step),
             size="1",
             variant="soft",
-            is_disabled=dec_disabled,
         ),
         rx.button(
             "+",
             on_click=_step_click(step),
             size="1",
             variant="soft",
-            is_disabled=inc_disabled,
         ),
         align="center",
         spacing="2",

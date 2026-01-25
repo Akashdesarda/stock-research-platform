@@ -128,12 +128,12 @@ class CommonMixin(rx.State, mixin=True):
                     dropdown=pl.col("name") + " (" + pl.col("symbol") + ")"
                 )
                 self._exchanges_cache_time = time.time()
-        except HTTPError as e:
+        except HTTPError:
             self.exchanges_error = "Unable to load exchanges. Please check your connection and try again."
             # Keep existing cache if available
             if self._cached_exchanges is None:
                 self._cached_exchanges = self._create_empty_exchanges_df()
-        except Exception as e:
+        except Exception:
             self.exchanges_error = "An unexpected error occurred while loading exchanges."
             if self._cached_exchanges is None:
                 self._cached_exchanges = self._create_empty_exchanges_df()
@@ -169,7 +169,7 @@ class CommonMixin(rx.State, mixin=True):
                 tickers_wrt_exchange = response.json()
                 available_tickers = {}
 
-                for exch in tickers_wrt_exchange.keys():
+                for exch in tickers_wrt_exchange:
                     if not tickers_wrt_exchange[exch]:
                         available_tickers[exch] = pl.DataFrame({
                             "ticker": [],
@@ -184,12 +184,12 @@ class CommonMixin(rx.State, mixin=True):
                 # NOTE - available_tickers --> {exchange_symbol: df(ticker, company, ticker - company)}
                 self._cached_tickers = available_tickers
                 self._tickers_cache_time = time.time()
-        except HTTPError as e:
+        except HTTPError:
             self.tickers_error = "Unable to load tickers. Please check your connection and try again."
             # Keep existing cache if available
             if self._cached_tickers is None:
                 self._cached_tickers = {}
-        except Exception as e:
+        except Exception:
             self.tickers_error = "An unexpected error occurred while loading tickers."
             if self._cached_tickers is None:
                 self._cached_tickers = {}

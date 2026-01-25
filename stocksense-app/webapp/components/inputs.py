@@ -212,6 +212,11 @@ def checkbox_input(
     size = props.pop("size", "2")
     variant = props.pop("variant", "soft")
     high_contrast = props.pop("high_contrast", True)
+    checked = props.pop("value", None)
+
+    # to accept boolean value for checked state
+    if checked is not None and "checked" not in props:
+        props["checked"] = checked
 
     return rx.checkbox(
         text=label,
@@ -248,12 +253,12 @@ def text_input(
 
 
 def text_area(
-    *,
     value: str | rx.Var | None = None,
     on_change: EventType[Any] | None = None,
     placeholder: str = "",
     rows: int = 4,
     width: str = "100%",
+    **props,
 ) -> rx.Component:
     """Textarea with consistent sizing."""
 
@@ -263,6 +268,7 @@ def text_area(
         placeholder=placeholder,
         height=f"{rows * 1.5}rem",
         width=width,
+        **props,
     )
 
 

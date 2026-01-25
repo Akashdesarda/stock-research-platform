@@ -1,13 +1,13 @@
 import reflex as rx
 
 from webapp.components.inputs import (
+    checkbox_input,
     dropdown_select,
     multi_select_dropdown,
     radio_select,
     submit_button,
 )
 from webapp.components.layout import (
-    bordered_container,
     form_field,
     page_layout_with_sidebar,
     section_header,
@@ -80,10 +80,19 @@ def task() -> rx.Component:
     sidebar = nav_sidebar(default_open_group="Management")
 
     tasks_tab_list = rx.tabs.list(
-        rx.tabs.trigger("📊 Update Data", value="update_data")
+        rx.tabs.trigger(
+            rx.hstack(rx.icon("database", size=20), rx.text("Update Data", size="3")),
+            value="update_data",
+        ),
+        rx.tabs.trigger(
+            rx.hstack(
+                rx.icon("smile_plus", size=20), rx.text("Optimize Table", size="3")
+            ),
+            value="optimize_table",
+        ),
     )
 
-    tasks_tab = rx.tabs.content(
+    update_data_tab = rx.tabs.content(
         rx.vstack(
             rx.hstack(
                 form_field(
@@ -182,9 +191,36 @@ def task() -> rx.Component:
         width="100%",
     )
 
+    optimize_table_tab = rx.tabs.content(
+        rx.vstack(
+            form_field(
+                label="Select Exchange",
+                control=dropdown_select(
+                    label="",
+                    options=TaskState.exchange_dropdown_list,
+                    value=TaskState.selected_exchange_dropdown,
+                    on_change=TaskState.set_exchange_dropdown,
+                    placeholder="Select the exchange",
+                ),
+            ),
+            rx.hstack(
+                checkbox_input(
+                    "compact", value=TaskState.compact, on_change=TaskState.set_compact
+                ),
+                checkbox_input(
+                    "vacuum", value=TaskState.vacuum, on_change=TaskState.set_vacuum
+                ),
+                spacing="4",
+                align="start",
+            ),
+        ),
+        value="optimize_table",
+    )
+
     tasks_tabs = rx.tabs.root(
         tasks_tab_list,
-        tasks_tab,
+        update_data_tab,
+        optimize_table_tab,
         default_value="update_data",
         width="100%",
         justify="between",
@@ -196,12 +232,12 @@ def task() -> rx.Component:
                 "Tasks",
                 "Run variety of workflows for StockSense.",
             ),
-            bordered_container(
-                tasks_tabs,
-                width="100%",
-                max_width="900px",
-                align="left",
-            ),
+            # bordered_container(
+            tasks_tabs,
+            #     width="100%",
+            #     max_width="900px",
+            #     align="left",
+            # ),
             width="100%",
             spacing="5",
         ),

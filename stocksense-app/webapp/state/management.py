@@ -179,6 +179,8 @@ class TaskState(CommonMixin, rx.State):
     selected_ticker_dropdowns: list[str] = []
     start_date: str = ""
     end_date: str = ""
+    compact: bool = True
+    vacuum: bool = True
 
     is_submitting: bool = False
     submit_success: str = ""
@@ -250,6 +252,55 @@ class TaskState(CommonMixin, rx.State):
             async with self:
                 if response.status_code == 200:
                     self.submit_success = "Data update task successfully completed!"
+                else:
+                    detail = "Request failed."
+                    try:
+                        payload = response.json()
+                        detail = str(payload.get("detail", detail))
+                    except Exception:  # pragma: no cover
+                        detail = response.text or detail
+                    self.submit_error = detail
+        except Exception as exc:  # pragma: no cover
+            async with self:
+                self.submit_error = str(exc)
+        finally:
+            async with self:
+                self.is_submitting = False
+
+    @rx.event
+    def set_compact(self, value: bool):
+        self.compact = value
+
+    @rx.event
+    def set_vacuum(self, value: bool):
+        self.vacuum = value
+
+    @rx.event(background=True)
+    async def optimize_table(self):
+        async with self:
+            self.is_submitting = True
+            self.submit_error = ""
+            self.submit_success = ""
+
+        try:
+            payload = {
+                "compact": self.compact,
+                "vacuum": self.vacuum,
+            }
+
+            url = (
+                f"{settings.common.base_url}:{settings.stockdb.port}"
+                "/api/task/optimize/table"
+            )
+
+            async with AsyncClient(follow_redirects=True, timeout=300) as client:
+                response = await client.post(url, json=payload)
+
+            async with self:
+                if response.status_code == 200:
+                    self.submit_success = (
+                        "Table optimization task successfully completed!"
+                    )
                 else:
                     detail = "Request failed."
                     try:

@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, Callable, Literal, Sequence
 
 import reflex as rx
@@ -6,24 +5,6 @@ import reflex_enterprise as rxe
 from reflex.event import EventType
 from reflex.vars import ArrayVar
 from reflex.vars.base import AsyncComputedVar
-
-
-@dataclass(frozen=True)
-class Option:
-    """Simple label/value option tuple for form controls."""
-
-    label: str
-    value: str
-
-
-def _as_option(option: str | Option) -> Option:
-    if isinstance(option, Option):
-        return option
-    return Option(label=str(option), value=str(option))
-
-
-def _normalize_options(options: Sequence[str | Option]) -> list[Option]:
-    return [_as_option(option) for option in options]
 
 
 def form_field(
@@ -196,6 +177,7 @@ def radio_select(
         variant=variant,
         **props,
     )
+
 
 def multi_select_dropdown(
     label: str | None,

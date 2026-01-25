@@ -17,6 +17,7 @@ class HomeState(CommonMixin, rx.State):
     stockdb_api: bool = False
     stockdb_data_status: dict[str, str] = {}
 
+    @rx.event
     def set_selected_status_exchange(self, value: str):
         self.selected_status_exchange = value
 

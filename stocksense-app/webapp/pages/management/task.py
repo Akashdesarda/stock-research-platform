@@ -384,8 +384,30 @@ def task() -> rx.Component:
                 "Tasks",
                 "Run variety of workflows for StockSense.",
             ),
+            # Error callouts for data loading
+            rx.cond(
+                TaskState.exchanges_error != "",
+                rx.callout(
+                    TaskState.exchanges_error,
+                    icon="triangle_alert",
+                    color_scheme="red",
+                    width="100%",
+                ),
+                rx.fragment(),
+            ),
+            rx.cond(
+                TaskState.tickers_error != "",
+                rx.callout(
+                    TaskState.tickers_error,
+                    icon="triangle_alert",
+                    color_scheme="red",
+                    width="100%",
+                ),
+                rx.fragment(),
+            ),
             tasks_tabs,
             width="100%",
             spacing="5",
         ),
+        on_mount=[TaskState.load_exchanges, TaskState.load_tickers],
     )

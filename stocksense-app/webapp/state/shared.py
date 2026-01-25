@@ -30,6 +30,14 @@ class CommonMixin(rx.State, mixin=True):
     is_loading_exchanges: bool = False
     is_loading_tickers: bool = False
 
+    def _create_empty_exchanges_df(self) -> pl.DataFrame:
+        """Create an empty DataFrame for exchanges.
+
+        Returns:
+            An empty DataFrame with the expected schema for exchanges.
+        """
+        return pl.DataFrame({"symbol": [], "name": [], "dropdown": []})
+
     @rx.var
     def available_exchanges(self) -> pl.DataFrame:
         """Get the cached available stock exchanges.
@@ -40,7 +48,7 @@ class CommonMixin(rx.State, mixin=True):
         if self._cached_exchanges is not None:
             return self._cached_exchanges
         # Return empty DataFrame if no cache available
-        return pl.DataFrame({"symbol": [], "name": [], "dropdown": []})
+        return self._create_empty_exchanges_df()
 
     @rx.var
     def exchange_dropdown_list(self) -> list[str]:
@@ -121,22 +129,14 @@ class CommonMixin(rx.State, mixin=True):
                 )
                 self._exchanges_cache_time = time.time()
         except HTTPError as e:
-            self.exchanges_error = f"Failed to load exchanges: {str(e)}"
+            self.exchanges_error = "Unable to load exchanges. Please check your connection and try again."
             # Keep existing cache if available
             if self._cached_exchanges is None:
-                self._cached_exchanges = pl.DataFrame({
-                    "symbol": [],
-                    "name": [],
-                    "dropdown": [],
-                })
+                self._cached_exchanges = self._create_empty_exchanges_df()
         except Exception as e:
-            self.exchanges_error = f"Unexpected error loading exchanges: {str(e)}"
+            self.exchanges_error = "An unexpected error occurred while loading exchanges."
             if self._cached_exchanges is None:
-                self._cached_exchanges = pl.DataFrame({
-                    "symbol": [],
-                    "name": [],
-                    "dropdown": [],
-                })
+                self._cached_exchanges = self._create_empty_exchanges_df()
         finally:
             self.is_loading_exchanges = False
 
@@ -167,11 +167,9 @@ class CommonMixin(rx.State, mixin=True):
                 response.raise_for_status()
                 # NOTE - response --> {exchange_symbol: [{ticker, company},...]}
                 tickers_wrt_exchange = response.json()
-                available_tickers = dict.fromkeys(
-                    tickers_wrt_exchange.keys(), pl.DataFrame()
-                )
+                available_tickers = {}
 
-                for exch in available_tickers:
+                for exch in tickers_wrt_exchange.keys():
                     if not tickers_wrt_exchange[exch]:
                         available_tickers[exch] = pl.DataFrame({
                             "ticker": [],
@@ -180,20 +178,19 @@ class CommonMixin(rx.State, mixin=True):
                     else:
                         available_tickers[exch] = pl.DataFrame(
                             tickers_wrt_exchange[exch]
-                        )
-                        available_tickers[exch] = available_tickers[exch].with_columns(
+                        ).with_columns(
                             dropdown=pl.col("ticker") + " - " + pl.col("company")
                         )
                 # NOTE - available_tickers --> {exchange_symbol: df(ticker, company, ticker - company)}
                 self._cached_tickers = available_tickers
                 self._tickers_cache_time = time.time()
         except HTTPError as e:
-            self.tickers_error = f"Failed to load tickers: {str(e)}"
+            self.tickers_error = "Unable to load tickers. Please check your connection and try again."
             # Keep existing cache if available
             if self._cached_tickers is None:
                 self._cached_tickers = {}
         except Exception as e:
-            self.tickers_error = f"Unexpected error loading tickers: {str(e)}"
+            self.tickers_error = "An unexpected error occurred while loading tickers."
             if self._cached_tickers is None:
                 self._cached_tickers = {}
         finally:

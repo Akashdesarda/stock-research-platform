@@ -9,7 +9,13 @@ def page_layout(*children: rx.Component, **props) -> rx.Component:
     return rx.box(
         navbar(),
         rx.box(
-            rx.box(*children, padding_top="1.25rem"),
+            rx.box(
+                *children,
+                width="100%",
+                max_width="1200px",
+                margin_x="auto",
+                padding_top="1.25rem",
+            ),
             width="100%",
             padding_x="1.5em",
             padding_bottom="2em",

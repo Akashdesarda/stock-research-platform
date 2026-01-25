@@ -92,7 +92,7 @@ def navbar() -> rx.Component:
     center_nav = rx.hstack(
         _navbar_center_item("Home", "/"),
         *[_navbar_group_item(group) for group in APP_NAV],
-        spacing="1",
+        spacing="5",
         align="center",
         display={"base": "none", "md": "flex"},
     )

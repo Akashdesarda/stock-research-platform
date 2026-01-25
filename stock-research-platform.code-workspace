@@ -77,7 +77,7 @@
 				]
 			},
 			{
-				"label": "Reflex compile",
+				"label": "reflex compile",
 				"type": "shell",
 				"command": "cd ${cwd}/stocksense-app && uv run reflex compile",
 				"problemMatcher": [
@@ -85,7 +85,7 @@
 				]
 			},
 			{
-				"label": "Reflex run",
+				"label": "reflex run",
 				"type": "shell",
 				"command": "cd ${cwd}/stocksense-app && uv run reflex run",
 				"problemMatcher": [

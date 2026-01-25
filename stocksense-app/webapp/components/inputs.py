@@ -27,10 +27,6 @@ def action_button(
     """One stop helper for consistent buttons across the app."""
 
     style = _BUTTON_KINDS.get(kind, _BUTTON_KINDS["primary"]).copy()
-    # if icon is not None:
-    #     style["left_icon"] = icon
-    # if right_icon is not None:
-    #     style["right_icon"] = right_icon
     style.setdefault("size", size)
     if left_icon is not None:
         return rx.button(

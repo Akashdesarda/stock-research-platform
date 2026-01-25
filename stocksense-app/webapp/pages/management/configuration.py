@@ -9,15 +9,13 @@ from webapp.components.inputs import (
 from webapp.components.layout import (
     bordered_container,
     form_field,
-    page_layout_with_sidebar,
+    page_layout,
     section_header,
 )
-from webapp.components.sidebar import nav_sidebar
 from webapp.state.management import ConfigurationState
 
 
 def configuration() -> rx.Component:
-    sidebar = nav_sidebar(default_open_group="Management")
 
     # SECTION - Configuration Tabs
     config_tabs_list = rx.tabs.list(
@@ -186,7 +184,7 @@ def configuration() -> rx.Component:
         justify="between",
     )
 
-    return page_layout_with_sidebar(
+    return page_layout(
         rx.vstack(
             section_header(
                 "Configuration",
@@ -232,5 +230,4 @@ def configuration() -> rx.Component:
             width="100%",
             spacing="5",
         ),
-        sidebar=sidebar,
     )

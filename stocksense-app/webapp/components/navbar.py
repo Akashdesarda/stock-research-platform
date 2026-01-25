@@ -1,5 +1,7 @@
 import reflex as rx
 
+from webapp.components.nav_config import APP_NAV, NavGroup
+
 
 def _brand() -> rx.Component:
     return rx.link(
@@ -42,6 +44,44 @@ def _navbar_center_item(label: str, href: str) -> rx.Component:
     )
 
 
+def _navbar_group_item(group: NavGroup) -> rx.Component:
+    active = rx.State.router.page.path.contains(group.key)
+    return rx.menu.root(
+        rx.menu.trigger(
+            rx.button(
+                rx.hstack(
+                    rx.text(group.label, size="3", weight="medium"),
+                    rx.icon("chevron-down", size=16),
+                    spacing="2",
+                    align="center",
+                ),
+                variant="ghost",
+                radius="full",
+                color=rx.cond(active, rx.color("accent", 11), rx.color("gray", 11)),
+                background_color=rx.cond(active, rx.color("accent", 3), "transparent"),
+                _hover={
+                    "background_color": rx.cond(
+                        active, rx.color("accent", 4), rx.color("gray", 3)
+                    ),
+                },
+                cursor="pointer",
+            ),
+        ),
+        rx.menu.content(*[
+            rx.menu.item(
+                rx.hstack(
+                    rx.icon(link.icon, size=16) if link.icon else rx.fragment(),
+                    rx.text(link.label),
+                    align="center",
+                    spacing="2",
+                ),
+                on_click=rx.redirect(link.href),
+            )
+            for link in group.links
+        ]),
+    )
+
+
 def navbar() -> rx.Component:
     """Modern top navbar.
 
@@ -51,9 +91,7 @@ def navbar() -> rx.Component:
     """
     center_nav = rx.hstack(
         _navbar_center_item("Home", "/"),
-        _navbar_center_item("Playground", "/playground"),
-        _navbar_center_item("AI", "/ai"),
-        _navbar_center_item("Management", "/management"),
+        *[_navbar_group_item(group) for group in APP_NAV],
         spacing="1",
         align="center",
         display={"base": "none", "md": "flex"},

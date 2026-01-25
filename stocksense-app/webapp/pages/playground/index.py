@@ -1,14 +1,10 @@
 import reflex as rx
 
-from webapp.components.layout import page_layout_with_sidebar
-from webapp.components.sidebar import nav_sidebar
+from webapp.components.layout import page_layout
 
 
 def playground() -> rx.Component:
-    sidebar = nav_sidebar(default_open_group="playground")
-
-    return page_layout_with_sidebar(
+    return page_layout(
         rx.heading("Playground", size="7"),
-        rx.text("Choose a tool from the sidebar."),
-        sidebar=sidebar,
+        rx.text("Choose a tool from the menu."),
     )

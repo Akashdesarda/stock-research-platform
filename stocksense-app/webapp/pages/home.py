@@ -3,11 +3,10 @@ import reflex as rx
 from webapp.components.inputs import dropdown_select
 from webapp.components.layout import (
     bordered_container,
-    page_layout_with_sidebar,
+    page_layout,
     responsive_grid,
     status_indicator,
 )
-from webapp.components.sidebar import nav_sidebar
 from webapp.state.home import HomeState
 
 
@@ -94,7 +93,7 @@ def _services_health_card() -> rx.Component:
 
 
 def home() -> rx.Component:
-    return page_layout_with_sidebar(
+    return page_layout(
         rx.vstack(
             # Main Content
             bordered_container(
@@ -131,6 +130,5 @@ def home() -> rx.Component:
             width="100%",
             spacing="6",
         ),
-        sidebar=nav_sidebar(),
         on_mount=HomeState.check_input_status,
     )

@@ -1,14 +1,10 @@
 import reflex as rx
 
-from webapp.components.layout import page_layout_with_sidebar
-from webapp.components.sidebar import nav_sidebar
+from webapp.components.layout import page_layout
 
 
 def chat() -> rx.Component:
-    sidebar = nav_sidebar(default_open_group="AI")
-
-    return page_layout_with_sidebar(
+    return page_layout(
         rx.heading("AI Chat", size="7"),
         rx.text("(Placeholder) Chat UI will be migrated next."),
-        sidebar=sidebar,
     )

@@ -5,31 +5,11 @@ import reflex as rx
 from webapp.components.navbar import navbar
 
 
-def page_layout(*children: rx.Component) -> rx.Component:
-    return page_layout_with_sidebar(*children, sidebar=None)
-
-
-def page_layout_with_sidebar(
-    *children: rx.Component,
-    sidebar: rx.Component | None,
-    **props,
-) -> rx.Component:
-    content = (
-        rx.hstack(
-            rx.box(sidebar, min_width="14rem", max_width="14rem"),
-            rx.box(*children, width="100%"),
-            align="start",
-            width="100%",
-            spacing="6",
-        )
-        if sidebar is not None
-        else rx.box(*children)
-    )
-
+def page_layout(*children: rx.Component, **props) -> rx.Component:
     return rx.box(
         navbar(),
         rx.box(
-            rx.box(content, padding_top="1.25rem"),
+            rx.box(*children, padding_top="1.25rem"),
             width="100%",
             padding_x="1.5em",
             padding_bottom="2em",

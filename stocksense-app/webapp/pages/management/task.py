@@ -13,10 +13,9 @@ from webapp.components.inputs import (
 from webapp.components.layout import (
     bordered_container,
     form_field,
-    page_layout_with_sidebar,
+    page_layout,
     section_header,
 )
-from webapp.components.sidebar import nav_sidebar
 from webapp.state.management import TaskState
 
 
@@ -140,7 +139,6 @@ def _submit_workflow(
 
 
 def task() -> rx.Component:
-    sidebar = nav_sidebar(default_open_group="Management")
 
     tasks_tab_list = rx.tabs.list(
         rx.tabs.trigger(
@@ -380,7 +378,7 @@ def task() -> rx.Component:
         justify="between",
     )
 
-    return page_layout_with_sidebar(
+    return page_layout(
         rx.vstack(
             section_header(
                 "Tasks",
@@ -390,5 +388,4 @@ def task() -> rx.Component:
             width="100%",
             spacing="5",
         ),
-        sidebar=sidebar,
     )

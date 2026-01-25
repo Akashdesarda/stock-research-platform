@@ -173,24 +173,39 @@ class ConfigurationState(rx.State):
 class TaskState(CommonMixin, rx.State):
     """State for management task execution."""
 
+    # SECTION -  Update Data Task Settings
     task_mode: str = "auto"
     download_mode: str = "incremental"
     selected_exchange_dropdown: str = ""
     selected_ticker_dropdowns: list[str] = []
     start_date: str = ""
     end_date: str = ""
+    update_is_submitting: bool = False
+    update_submit_success: str = ""
+    update_submit_error: str = ""
+
+    # SECTION - Optimize Table Task Settings
     compact: bool = True
     vacuum: bool = True
+    optimize_is_submitting: bool = False
+    optimize_submit_success: str = ""
+    optimize_submit_error: str = ""
 
-    is_submitting: bool = False
-    submit_success: str = ""
-    submit_error: str = ""
+    # SECTION - LLM response cache management
+    prompt: str
+    agent: str
+    cache_tier: str = "auto"
+    prompt_search_is_submitting: bool = False
+    prompt_response: str = ""
+    prompt_thinking: str = ""
+    prompt_search_error: str = ""
 
+    # SECTION -  Update Data Task Settings Events
     @rx.event
     def set_task_mode(self, value: str):
         self.task_mode = value
-        self.submit_success = ""
-        self.submit_error = ""
+        self.update_submit_success = ""
+        self.update_submit_error = ""
 
         if value == "auto":
             self.selected_ticker_dropdowns = []
@@ -201,8 +216,8 @@ class TaskState(CommonMixin, rx.State):
     @rx.event
     def set_download_mode(self, value: str):
         self.download_mode = value
-        self.submit_success = ""
-        self.submit_error = ""
+        self.update_submit_success = ""
+        self.update_submit_error = ""
 
     @rx.event
     async def set_exchange_dropdown(self, value: str):
@@ -225,11 +240,11 @@ class TaskState(CommonMixin, rx.State):
         self.end_date = value
 
     @rx.event(background=True)
-    async def submit_task(self):
+    async def submit_update_data_task(self):
         async with self:
-            self.is_submitting = True
-            self.submit_error = ""
-            self.submit_success = ""
+            self.update_is_submitting = True
+            self.update_submit_error = ""
+            self.update_submit_success = ""
 
         try:
             payload = {
@@ -246,12 +261,14 @@ class TaskState(CommonMixin, rx.State):
                 "/api/task/ticker/history"
             )
 
-            async with AsyncClient(follow_redirects=True, timeout=300) as client:
+            async with AsyncClient(follow_redirects=True) as client:
                 response = await client.post(url, json=payload)
 
             async with self:
                 if response.status_code == 200:
-                    self.submit_success = "Data update task successfully completed!"
+                    self.update_submit_success = (
+                        "Data update task successfully completed!"
+                    )
                 else:
                     detail = "Request failed."
                     try:
@@ -259,14 +276,15 @@ class TaskState(CommonMixin, rx.State):
                         detail = str(payload.get("detail", detail))
                     except Exception:  # pragma: no cover
                         detail = response.text or detail
-                    self.submit_error = detail
+                    self.update_submit_error = detail
         except Exception as exc:  # pragma: no cover
             async with self:
-                self.submit_error = str(exc)
+                self.update_submit_error = str(exc)
         finally:
             async with self:
-                self.is_submitting = False
+                self.update_is_submitting = False
 
+    # SECTION - Optimize Table Task Settings Events
     @rx.event
     def set_compact(self, value: bool):
         self.compact = value
@@ -276,11 +294,11 @@ class TaskState(CommonMixin, rx.State):
         self.vacuum = value
 
     @rx.event(background=True)
-    async def optimize_table(self):
+    async def submit_optimize_table_task(self):
         async with self:
-            self.is_submitting = True
-            self.submit_error = ""
-            self.submit_success = ""
+            self.optimize_is_submitting = True
+            self.optimize_submit_error = ""
+            self.optimize_submit_success = ""
 
         try:
             payload = {
@@ -290,28 +308,79 @@ class TaskState(CommonMixin, rx.State):
 
             url = (
                 f"{settings.common.base_url}:{settings.stockdb.port}"
-                "/api/task/optimize/table"
+                f"/api/operation/optimize/{self.selected_exchange}/ticker/history"
             )
 
-            async with AsyncClient(follow_redirects=True, timeout=300) as client:
-                response = await client.post(url, json=payload)
+            async with AsyncClient(follow_redirects=True) as client:
+                response = await client.put(
+                    url,
+                    params=payload,
+                )
 
             async with self:
                 if response.status_code == 200:
-                    self.submit_success = (
-                        "Table optimization task successfully completed!"
+                    self.optimize_submit_success = (
+                        "Table optimization task successfully completed with below stats:\n"
+                        f"{response.text}"
                     )
                 else:
                     detail = "Request failed."
                     try:
                         payload = response.json()
-                        detail = str(payload.get("detail", detail))
+                        detail = response.text  # str(payload.get("detail", detail))
                     except Exception:  # pragma: no cover
                         detail = response.text or detail
-                    self.submit_error = detail
+                    self.optimize_submit_error = detail
         except Exception as exc:  # pragma: no cover
             async with self:
-                self.submit_error = str(exc)
+                self.optimize_submit_error = str(exc)
         finally:
             async with self:
-                self.is_submitting = False
+                self.optimize_is_submitting = False
+
+    # SECTION - LLM Response Cache Management Events
+    @rx.event
+    def set_prompt(self, value: str):
+        self.prompt = value
+
+    @rx.event
+    def set_agent(self, value: str):
+        self.agent = value
+
+    @rx.event
+    def set_cache_tier(self, value: str):
+        self.cache_tier = value
+
+    @rx.event(background=True)
+    async def prompt_search(self):
+        async with self:
+            self.prompt_search_is_submitting = True
+            self.prompt_response = ""
+            self.prompt_thinking = ""
+            self.prompt_search_error = ""
+
+        try:
+            async with AsyncClient() as client:
+                response = await client.post(
+                    url=f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/prompt/search",
+                    json={
+                        "agent": self.agent,
+                        "prompt": self.prompt,
+                        "cache_tier": self.cache_tier,
+                    },
+                    timeout=60.0,
+                )
+
+            async with self:
+                if response.status_code == 200:
+                    data = response.json()
+                    self.prompt_response = data.get("response")
+                    self.prompt_thinking = data.get("thinking")
+                else:
+                    self.prompt_search_error = f"Error: {response.text}"
+        except Exception as e:
+            async with self:
+                self.prompt_search_error = str(e)
+        finally:
+            async with self:
+                self.prompt_search_is_submitting = False

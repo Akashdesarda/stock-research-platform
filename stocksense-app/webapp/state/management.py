@@ -15,6 +15,7 @@ class ConfigurationState(rx.State):
     # Common settings
     common_base_url: str = settings.common.base_url
     common_available_llm_providers: list[str] = settings.common.available_llm_providers
+    # TODO - it doesn't proper use as of now. Fix it later.
     llm_providers_to_use: list[str] = settings.common.available_llm_providers
     common_available_llm_providers_csv: str = ", ".join(
         settings.common.available_llm_providers
@@ -105,6 +106,7 @@ class ConfigurationState(rx.State):
     def update_app_company_summary_qa_model(self, value: str):
         self.app_company_summary_qa_model = value
 
+    @rx.event
     def reload_from_disk(self) -> None:
         """Reload config.toml from disk and refresh state values."""
         global settings
@@ -141,9 +143,7 @@ class ConfigurationState(rx.State):
         try:
             # Update settings for runtime usage
             settings.common.base_url = self.common_base_url
-            settings.common.available_llm_providers = (
-                self.common_available_llm_providers
-            )
+            settings.common.available_llm_providers = self.llm_providers_to_use
             settings.common.GROQ_API_KEY = self.common_GROQ_API_KEY
             settings.common.OPENAI_API_KEY = self.common_OPENAI_API_KEY
             settings.common.ANTHROPIC_API_KEY = self.common_ANTHROPIC_API_KEY

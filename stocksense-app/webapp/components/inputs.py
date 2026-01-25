@@ -6,39 +6,6 @@ from reflex.event import EventType
 from reflex.vars import ArrayVar
 from reflex.vars.base import AsyncComputedVar
 
-
-def form_field(
-    label: str,
-    control: rx.Component,
-    help_text: str | None = None,
-    error_text: str | None = None,
-) -> rx.Component:
-    """Shared label + control + helper layout for consistency."""
-
-    return rx.vstack(
-        rx.hstack(
-            rx.text(label, weight="medium"),
-            rx.cond(
-                help_text is None,
-                rx.fragment(),
-                rx.text(help_text, color_scheme="gray", size="2"),
-            ),
-            width="100%",
-            justify="between",
-            align="center",
-            wrap="wrap",
-        ),
-        control,
-        rx.cond(
-            error_text is None or error_text == "",
-            rx.fragment(),
-            rx.text(error_text, color_scheme="red", size="2"),
-        ),
-        width="100%",
-        spacing="2",
-    )
-
-
 _BUTTON_KINDS: dict[str, dict[str, str]] = {
     "primary": {"color_scheme": "blue"},
     "secondary": {"variant": "soft"},
@@ -283,47 +250,55 @@ def number_input(
 ) -> rx.Component:
     """Numeric input wrapper so we avoid retyping common props."""
 
-    if step is not None:
+    if step is None:
+        return rx.input(
+            value=value,
+            on_change=on_change,
+            type="number",
+            min=min_value,
+            max=max_value,
+            step=step,
+            width=width,
+        )
+    can_compute = isinstance(value, (int, float)) and isinstance(step, (int, float))
+    dec_disabled = value is None
+    inc_disabled = value is None
+    if can_compute:
         dec_disabled = False if min_value is None else (value - step) < min_value
         inc_disabled = False if max_value is None else (value + step) > max_value
 
-        return rx.hstack(
-            rx.input(
-                value=value,
-                on_change=on_change,
-                type="number",
-                min=min_value,
-                max=max_value,
-                step=step,
-                width="100%",
-                flex="1",
-            ),
-            rx.button(
-                "-",
-                on_click=None if on_change is None else on_change(value - step),
-                size="1",
-                variant="soft",
-                is_disabled=dec_disabled,
-            ),
-            rx.button(
-                "+",
-                on_click=None if on_change is None else on_change(value + step),
-                size="1",
-                variant="soft",
-                is_disabled=inc_disabled,
-            ),
-            align="center",
-            spacing="2",
-            width=width,
-        )
+    def _step_click(delta: float | int):
+        if on_change is None or value is None:
+            return None
+        return lambda: on_change(value + delta)
 
-    return rx.input(
-        value=value,
-        on_change=on_change,
-        type="number",
-        min=min_value,
-        max=max_value,
-        step=step,
+    return rx.hstack(
+        rx.input(
+            value=value,
+            on_change=on_change,
+            type="number",
+            min=min_value,
+            max=max_value,
+            step=step,
+            width="100%",
+            flex="1",
+        ),
+        rx.button(
+            "-",
+            on_click=_step_click(-step),
+            size="1",
+            variant="soft",
+            is_disabled=dec_disabled,
+        ),
+        rx.button(
+            "+",
+            on_click=_step_click(step),
+            size="1",
+            variant="soft",
+            is_disabled=inc_disabled,
+        ),
+        align="center",
+        spacing="2",
         width=width,
     )
 

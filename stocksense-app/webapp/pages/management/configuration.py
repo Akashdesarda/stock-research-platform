@@ -40,6 +40,7 @@ def configuration() -> rx.Component:
                     label=None,
                     options=ConfigurationState.common_available_llm_providers,
                     value=ConfigurationState.llm_providers_to_use,
+                    on_change=ConfigurationState.update_llm_providers,
                     placeholder="Select LLM Providers",
                 ),
                 help_text="Select the LLM providers that you want to enable.",

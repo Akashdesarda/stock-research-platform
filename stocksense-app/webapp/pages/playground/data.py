@@ -1,4 +1,23 @@
-# import os
+import reflex as rx
+
+from webapp.components.layout import page_layout
+
+
+def data() -> rx.Component:
+    """Playground → Data page.
+
+    Placeholder while the Streamlit → Reflex migration is in progress.
+    """
+
+    return page_layout(
+        rx.vstack(
+            rx.heading("Data Explorer", size="7"),
+            rx.text("This page is being migrated from Streamlit."),
+            rx.text("For now, use Home to see central state demo."),
+            spacing="3",
+            width="100%",
+        ),
+    )# import os
 # import random
 # from typing import Any
 

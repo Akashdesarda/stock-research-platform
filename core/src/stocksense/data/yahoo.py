@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import polars as pl
 import yfinance as yf
 
-from stocksense.data import Interval, Period, StockExchangeYahooIdentifier
+from ._models import Interval, Period, StockExchangeYahooIdentifier
 
 logger = logging.getLogger("stocksense")
 

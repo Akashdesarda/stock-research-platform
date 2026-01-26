@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class Period(Enum):
+class DataPeriod(Enum):
     ONE_DAY = "1d"
     FIVE_DAYS = "5d"
     ONE_MONTH = "1mo"
@@ -15,7 +15,7 @@ class Period(Enum):
     MAX = "max"
 
 
-class Interval(Enum):
+class DataInterval(Enum):
     ONE_MINUTE = "1m"
     TWO_MINUTES = "2m"
     FIVE_MINUTES = "5m"

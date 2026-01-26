@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import polars as pl
 import yfinance as yf
 
-from .types import Interval, Period, StockExchangeYahooIdentifier
+from stocksense.types import DataInterval, DataPeriod, StockExchangeYahooIdentifier
 
 logger = logging.getLogger("stocksense")
 
@@ -66,8 +66,8 @@ class YFStockData:
 
     def get_ticker_history(
         self,
-        period: Period | None = Period.FIVE_DAYS,
-        interval: Interval = Interval.ONE_DAY,
+        period: DataPeriod | None = DataPeriod.FIVE_DAYS,
+        interval: DataInterval = DataInterval.ONE_DAY,
         start: date | None = None,
         end: date | None = None,
     ) -> dict[str, pl.DataFrame]:

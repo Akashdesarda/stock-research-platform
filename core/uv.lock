@@ -3184,7 +3184,7 @@ wheels = [
 
 [[package]]
 name = "stocksense-core"
-version = "0.5.5"
+version = "0.5.8"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

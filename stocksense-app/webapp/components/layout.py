@@ -1,6 +1,8 @@
 from typing import Any, Literal
 
+import polars as pl
 import reflex as rx
+import reflex_enterprise as rxe
 
 from webapp.components.navbar import navbar
 
@@ -192,4 +194,42 @@ def responsive_grid(
         ),
         spacing=spacing,
         width="100%",
+    )
+
+
+def data_preview(data: pl.DataFrame, **props) -> rx.Component:
+    # Setting appropriate defaults for props
+    width = props.pop("width", "100%")
+    max_width = props.pop("max_width", "1200px")
+    height = props.pop("height", "400px")
+
+    polars_to_ag_grid_filter_type_map = {
+        pl.Int64: rxe.ag_grid.filters.number,
+        pl.Float64: rxe.ag_grid.filters.number,
+        pl.String: rxe.ag_grid.filters.text,
+        pl.Boolean: rxe.ag_grid.filters.text,
+        pl.Date: rxe.ag_grid.filters.date,
+        pl.Datetime: rxe.ag_grid.filters.date,
+    }
+    schema = data.schema
+
+    column_def = [
+        {
+            "field": col,
+            "filter": polars_to_ag_grid_filter_type_map[schema[col]],
+            "sortable": True,
+        }
+        for col in schema
+    ]
+    return rxe.ag_grid(
+        id="change with uuid",
+        row_data=data.to_dicts(),
+        column_defs=column_def,
+        pagination=True,
+        pagination_page_size=10,
+        pagination_page_size_selector=[10, 40, 100],
+        width=width,
+        max_width=max_width,
+        height=height,
+        **props,
     )

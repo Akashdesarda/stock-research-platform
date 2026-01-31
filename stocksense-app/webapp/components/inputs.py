@@ -2,9 +2,12 @@ from typing import Any, Callable, Literal, Sequence
 
 import reflex as rx
 import reflex_enterprise as rxe
+from reflex.components.radix.themes.layout.stack import HStack
 from reflex.event import EventType
 from reflex.vars import ArrayVar
 from reflex.vars.base import AsyncComputedVar
+
+from webapp.components.layout import form_field
 
 _BUTTON_KINDS: dict[str, dict[str, str]] = {
     "primary": {"color_scheme": "blue"},
@@ -69,7 +72,7 @@ def proceed_button(**props) -> rx.Component:
 
 
 def cancel_button(**props) -> rx.Component:
-    return action_button("Cancel", left_icon="x", kind="ghost", **props)
+    return action_button("Cancel", left_icon="x", kind="danger", **props)
 
 
 def save_button(**props) -> rx.Component:
@@ -245,7 +248,7 @@ def number_input(
     width: str = "100%",
 ) -> rx.Component:
     """Numeric input wrapper so we avoid retyping common props.
-    
+
     Note: Step buttons are only displayed when value is a plain int/float,
     not when it's a reactive Var, to avoid runtime errors with reactive
     variable arithmetic.
@@ -254,9 +257,7 @@ def number_input(
     # Only show step buttons if value is a plain Python value (not a reactive Var)
     # to avoid issues with arithmetic operations on reactive variables
     show_step_buttons = (
-        step is not None
-        and isinstance(value, (int, float))
-        and on_change is not None
+        step is not None and isinstance(value, (int, float)) and on_change is not None
     )
 
     if not show_step_buttons:
@@ -352,4 +353,42 @@ def slider_input(
         orientation=orientation,
         variant=variant,
         **props,
+    )
+
+
+def date_range_picker(
+    on_change_start: EventType[Any] | None = None,
+    value_start: str | None = None,
+    on_change_end: EventType[Any] | None = None,
+    value_end: str | None = None,
+    help_text: str | None = None,
+    width="45%",
+    **props,
+) -> tuple[HStack]:
+    return (
+        rx.hstack(
+            form_field(
+                label="Date Range Start",
+                control=rx.input(
+                    type="date",
+                    value=value_start,
+                    on_change=on_change_start,
+                    width="100%",
+                    **props,
+                ),
+            ),
+            form_field(
+                label="Date Range End",
+                help_text=help_text,
+                control=rx.input(
+                    type="date",
+                    value=value_end,
+                    on_change=on_change_end,
+                    width="100%",
+                    **props,
+                ),
+            ),
+            width=width,
+            spacing="2",
+        ),
     )

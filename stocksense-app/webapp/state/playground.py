@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from stocksense.config import get_settings
 from stocksense.types import DataInterval, DataPeriod
 
-from webapp.state.shared import CommonMixin
+from webapp.state.shared import TickerSelectionMixin
 
 settings = get_settings()
 
@@ -21,15 +21,11 @@ POLARS_TO_AG_GRID_FILTER_TYPE_MAP = {
 }
 
 
-class DataState(CommonMixin, rx.State):
+class DataState(TickerSelectionMixin, rx.State):
     """State for the Playground → Data page (manual form only)."""
 
     # Manual form fields
-    selected_exchange_dropdown: str = ""
-    ticker_choice: str = "Index Based"
-    selected_ticker_dropdowns: list[str] = []
-    index_choice: str = ""
-    selected_ticker: list[str] = []
+    # Ticker selection fields are now in TickerSelectionMixin
     interval: str = DataInterval.ONE_DAY.value
     period: str = DataPeriod.SIX_MONTHS.value
     date_start: str = ""
@@ -44,54 +40,6 @@ class DataState(CommonMixin, rx.State):
     _cancel_event: asyncio.Event = asyncio.Event()
     data: list[dict] = []
     columns_def: list[dict] = []
-
-    @rx.var
-    async def exchange_wise_index(self) -> dict:
-        async with AsyncClient() as client:
-            response = await client.get(
-                f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/list-indexes"
-            )
-            return response.json()
-
-    @rx.var
-    async def available_index(self) -> list[str]:
-        _ = await self.exchange_wise_index
-        return _.get(self.selected_exchange, [])
-
-    @rx.event
-    async def set_exchange_dropdown(self, value: str):
-        self.selected_exchange_dropdown = value
-        self.selected_ticker_dropdowns = []
-        await self.get_exchange_symbol(value)
-
-    @rx.event
-    async def set_ticker_choice(self, value: str):
-        self.ticker_choice = value
-
-        # NOTE - for "All" committing right away
-        if value == "All":
-            _ = await self.available_tickers
-            df = _[self.selected_exchange]
-            self.selected_ticker = df.select("ticker").to_series().to_list()
-
-    @rx.event
-    async def set_index_choice(self, value: str):
-        self.index_choice = value
-        await self.get_tickers_for_index()
-
-    @rx.event
-    async def get_tickers_for_index(self):
-        async with AsyncClient() as client:
-            # NOTE - response --> [{ticker, company},...]
-            response = await client.get(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{self.selected_exchange}/{self.index_choice}"
-            )
-        self.selected_ticker = [i["ticker"] for i in response.json()]
-
-    @rx.event
-    async def get_tickers_for_desired(self, values: list[str]):
-        self.selected_ticker_dropdowns = values
-        await self.get_ticker_symbols(values)
 
     @rx.event
     def set_interval(self, value: str):

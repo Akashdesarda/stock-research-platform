@@ -102,8 +102,73 @@ class CommonMixin(rx.State, mixin=True):
         _ = await self.available_tickers
         df = _[self.selected_exchange]
         self.selected_ticker = (
-            df.filter(pl.col("dropdown").is_in(dropdown_values))
+            df
+            .filter(pl.col("dropdown").is_in(dropdown_values))
             .select("ticker")
             .to_series()
             .to_list()
         )
+
+
+class TickerSelectionMixin(CommonMixin, mixin=True):
+    """Mixin for interactive ticker selection state logic."""
+
+    # Form fields
+    selected_exchange_dropdown: str = ""
+    ticker_choice: str = "Index Based"
+    selected_ticker_dropdowns: list[str] = []
+    index_choice: str = ""
+
+    @rx.var
+    async def exchange_wise_index(self) -> dict:
+        async with AsyncClient() as client:
+            response = await client.get(
+                f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/list-indexes"
+            )
+            return response.json()
+
+    @rx.var
+    async def available_index(self) -> list[str]:
+        _ = await self.exchange_wise_index
+        # NOTE: self.selected_exchange comes from CommonMixin
+        return _.get(self.selected_exchange, [])
+
+    @rx.event
+    async def set_exchange_dropdown(self, value: str):
+        self.selected_exchange_dropdown = value
+        self.selected_ticker_dropdowns = []
+        # NOTE: get_exchange_symbol comes from CommonMixin
+        await self.get_exchange_symbol(value)
+
+    @rx.event
+    async def set_ticker_choice(self, value: str):
+        self.ticker_choice = value
+
+        # NOTE - for "All" committing right away
+        if value == "All":
+            # NOTE: available_tickers comes from CommonMixin
+            _ = await self.available_tickers
+            df = _[self.selected_exchange]
+            self.selected_ticker = df.select("ticker").to_series().to_list()
+        else:
+            self.selected_ticker = []
+
+    @rx.event
+    async def set_index_choice(self, value: str):
+        self.index_choice = value
+        await self.get_tickers_for_index()
+
+    @rx.event
+    async def get_tickers_for_index(self):
+        async with AsyncClient() as client:
+            # NOTE - response --> [{ticker, company},...]
+            response = await client.get(
+                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{self.selected_exchange}/{self.index_choice}"
+            )
+        self.selected_ticker = [i["ticker"] for i in response.json()]
+
+    @rx.event
+    async def get_tickers_for_desired(self, values: list[str]):
+        self.selected_ticker_dropdowns = values
+        # NOTE: get_ticker_symbols comes from CommonMixin
+        await self.get_ticker_symbols(values)

@@ -109,11 +109,13 @@ class DataState(TickerSelectionMixin, rx.State):
 
     async def _fetch_via_sql_api(self):
         """Fetch data using the SQL API (Dummy implementation)."""
-        # TODO: Implement actual SQL API call
-        dummy_df = pl.LazyFrame({
-            "sql_result": ["Dummy Row 1", "Dummy Row 2"],
-            "value": [100, 200],
-        })
+        async with AsyncClient(timeout=None, follow_redirects=True) as client:
+            response = await client.post(
+                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/{self.selected_exchange}/query",
+                json={"sql_query": self.sql_query},
+            )
+            result = response.json()
+            dummy_df = pl.LazyFrame(result)
         await self._process_results(dummy_df)
 
     async def _fetch_via_ticker_api(self, tickers: list[str]):

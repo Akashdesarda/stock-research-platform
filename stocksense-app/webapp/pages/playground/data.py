@@ -44,8 +44,37 @@ def _results_view() -> rx.Component:
     )
 
 
+def _submit_workflow() -> rx.Component:
+    """Controls for submitting data fetch request or cancelling."""
+    return rx.hstack(
+        submit_button(
+            on_click=DataState.fetch_data,
+            disabled=DataState.is_loading,
+        ),
+        rx.cond(
+            DataState.is_loading,
+            rx.hstack(
+                rx.spinner(size="3"),
+                rx.text(
+                    "Fetching Data...",
+                    size="3",
+                    color=rx.color("blue", 11),
+                ),
+                cancel_button(on_click=DataState.cancel_fetching),
+                spacing="3",
+                align="center",
+            ),
+            rx.fragment(),
+        ),
+        spacing="4",
+        align="center",
+        width="100%",
+    )
+
+
 def data() -> rx.Component:
     """Playground --> Data page"""
+    # all the tasks are below here
     tabs_list = (
         rx.tabs.list(
             rx.tabs.trigger(
@@ -68,12 +97,12 @@ def data() -> rx.Component:
     manual_tab = rx.tabs.content(
         bordered_container(
             rx.vstack(
-                # exch, tkr selection --> query params --> OR --> sql query --> submit
+                # exch, tkr selection --> query params --> OR --> sql query --> callout --> submit
                 # SECTION - Exchange and Ticker
                 ticker_selector(DataState),
                 rx.separator(size="4", width="100%"),
                 # SECTION - Time Range
-                rx.vstack(  # interval --> period/date range
+                rx.vstack(  # interval --> period/date range --> callout with conditions
                     rx.spacer(),
                     rx.text(
                         "Time Range Selection",
@@ -135,6 +164,17 @@ def data() -> rx.Component:
                         spacing="4",
                         align="start",
                     ),
+                    rx.cond(  # callout for period + date range both set
+                        (DataState.period != "")
+                        & (DataState.date_start != "")
+                        & (DataState.date_end != ""),
+                        rx.callout(
+                            "Data Period selection will be prioritized over the Date Range.",
+                            icon="info",
+                            color_scheme="yellow",
+                            width="100%",
+                        ),
+                    ),
                     width="100%",
                     spacing="4",
                 ),
@@ -156,36 +196,22 @@ def data() -> rx.Component:
                         rows=4,
                     ),
                 ),
+                rx.cond(  # callout for sql query + other params both set
+                    (DataState.sql_query != "") & (DataState.selected_ticker != []),
+                    rx.callout(
+                        "SQL Query will be prioritized over other selection parameters.",
+                        icon="info",
+                        color_scheme="yellow",
+                        width="100%",
+                    ),
+                ),
                 rx.spacer(),
                 checkbox_input(
                     label="Enable data preview",
                     value=DataState.preview_enabled,
                     on_change=DataState.set_preview_enabled,
                 ),
-                rx.hstack(
-                    submit_button(
-                        on_click=DataState.fetch_data,
-                        disabled=DataState.is_loading,
-                    ),
-                    rx.cond(
-                        DataState.is_loading,
-                        rx.hstack(
-                            rx.spinner(size="3"),
-                            rx.text(
-                                "Fetching Data...",
-                                size="3",
-                                color=rx.color("blue", 11),
-                            ),
-                            cancel_button(on_click=DataState.cancel_fetching),
-                            spacing="3",
-                            align="center",
-                        ),
-                        rx.fragment(),
-                    ),
-                    spacing="4",
-                    align="center",
-                    width="100%",
-                ),
+                _submit_workflow(),
                 width="100%",
                 spacing="4",
             ),

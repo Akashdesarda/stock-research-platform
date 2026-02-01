@@ -22,7 +22,7 @@ settings = get_settings()
 STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
-    debug=True, title="StockDB API", version="1.1.4", docs_url=None, redoc_url=None
+    debug=True, title="StockDB API", version="1.2.4", docs_url=None, redoc_url=None
 )
 
 

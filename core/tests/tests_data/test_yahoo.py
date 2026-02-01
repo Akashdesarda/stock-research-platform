@@ -2,7 +2,12 @@ from datetime import date
 
 import polars as pl
 import pytest
-from stocksense.data import Interval, Period, StockExchangeYahooIdentifier, YFStockData
+from stocksense.data import YFStockData
+from stocksense.types import (
+    DataInterval,
+    DataPeriod,
+    StockExchangeYahooIdentifier,
+)
 
 
 # SECTION- NSE
@@ -46,8 +51,9 @@ def nasdaq_tickers_data(nasdaq_tickers) -> YFStockData:
 
 def test_nse_ticker_data(nse_tickers, nse_ticker_data):
     assert (
-        not nse_ticker_data.get_ticker_history(
-            period=Period.FIVE_DAYS, interval=Interval.NINETY_MINUTES
+        not nse_ticker_data
+        .get_ticker_history(
+            period=DataPeriod.FIVE_DAYS, interval=DataInterval.NINETY_MINUTES
         )[nse_tickers[0]]
         .select("close")
         .is_empty()
@@ -56,7 +62,7 @@ def test_nse_ticker_data(nse_tickers, nse_ticker_data):
 
 def test_nse_tickers_data(nse_tickers_data):
     data = nse_tickers_data.get_ticker_history(
-        period=Period.FIVE_DAYS, interval=Interval.NINETY_MINUTES
+        period=DataPeriod.FIVE_DAYS, interval=DataInterval.NINETY_MINUTES
     )
     for ticker in data:
         assert not data[ticker].select("close").is_empty()

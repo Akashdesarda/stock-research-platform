@@ -1,7 +1,7 @@
 import polars as pl
 from stocksense.data import Exchange
 
-exch = Exchange(name="NSE")
+exch = Exchange()
 
 
 def test_get_index_list():

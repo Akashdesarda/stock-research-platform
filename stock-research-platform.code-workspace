@@ -63,7 +63,7 @@
 			{
 				"label": "stockdb api",
 				"type": "shell",
-				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 8080",
+				"command": "cd ${cwd}/stockdb && uv run uvicorn main:app --reload --no-access-log --port 9000",
 				"problemMatcher": [
 					"$python"
 				]
@@ -109,6 +109,21 @@
 				],
 				"console": "integratedTerminal",
 				"justMyCode": true
+			},
+			{
+				"name": "Debug StockDB API",
+				"type": "debugpy",
+				"request": "launch",
+				"program": "${workspaceFolder}/stockdb/.venv/Scripts/uvicorn.exe",
+				"args": [
+					"main:app",
+					"--reload",
+					"--no-access-log",
+					"--port",
+					"9000"
+				],
+				"console": "integratedTerminal",
+				"justMyCode": false
 			}
 		]
 	}

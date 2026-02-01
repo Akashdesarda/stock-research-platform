@@ -29,9 +29,8 @@ class StockDataDB:
     def sql_filter(self, query: str) -> pl.LazyFrame:
         import duckdb
 
-        # NOTE - duckdb needs df variable in local scope to refer as table. Here `self._table` is
-        # referred as `stockdb` table locally
-        exec(f"{self.table_name} = self._table")
+        # NOTE - registering the table for duckdb to refer locally as `stockdb`
+        duckdb.register(self.table_name, self._table)
         return duckdb.sql(query).pl(lazy=True)
 
     def polars_filter(self, *predicates: Any, **constraints: Any) -> pl.LazyFrame:

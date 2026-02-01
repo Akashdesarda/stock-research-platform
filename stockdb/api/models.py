@@ -370,3 +370,21 @@ class PromptSearchInput(BaseModel):
 class PromptCacheOutput(BaseModel):
     response: str
     thinking: str | None = None
+
+
+class TickerQueryInput(BaseModel):
+    exchange: StockExchange = Field(
+        ...,
+        description="Stock Exchange of the ticker",
+        examples=[StockExchange.nse.value, StockExchange.nyse.value],
+    )
+    sql_query: str = Field(
+        ...,
+        description="""SQL query to get ticker(s) history data.
+
+        NOTE: Always use `stockdb` as table name in the sql query.""",
+        examples=[
+            "SELECT * FROM stockdb WHERE ticker = 'TCS' AND date >= '2025-01-01'",
+            "SELECT date, ticker, close FROM stockdb WHERE ticker IN ('INFY', '3MINDIA') AND date BETWEEN '2022-01-01' AND '2022-12-31' ORDER BY date DESC",
+        ],
+    )

@@ -1,11 +1,15 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ._nse import NSEAccessor
+if TYPE_CHECKING:
+    from ._nse import NSEAccessor
 
 
 @dataclass
 class Exchange:
     @property
-    def nse(self) -> NSEAccessor:
+    def nse(self) -> "NSEAccessor":
         """NSE (National Stock Exchange of India) data accessor."""
+        from ._nse import NSEAccessor
+
         return NSEAccessor()

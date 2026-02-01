@@ -4,11 +4,11 @@ from typing import AsyncGenerator
 import polars as pl
 import pytest
 import pytest_asyncio
-from api.models import Interval, Period
 from httpx import ASGITransport, AsyncClient
 from main import app
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
+from stocksense.types import DataInterval, DataPeriod
 
 settings = get_settings()
 
@@ -34,8 +34,8 @@ async def test_ticker_history_tcs(
     response = await async_client.get(
         url="/api/per-security/nse/tcs/history",
         params={
-            "period": Period.ONE_MONTH.value,
-            "interval": Interval.ONE_DAY.value,
+            "period": DataPeriod.ONE_MONTH.value,
+            "interval": DataInterval.ONE_DAY.value,
         },
     )
     assert response.status_code == 200
@@ -88,7 +88,7 @@ async def test_ticker_history_tcs_date(
         params={
             "start_date": date(2024, 3, 1),
             "end_date": date(2024, 5, 30),
-            "interval": Interval.ONE_MONTH.value,
+            "interval": DataInterval.ONE_MONTH.value,
         },  # type: ignore
     )
     dates_and_interval_result = pl.LazyFrame(dates_and_interval_response.json())
@@ -102,7 +102,7 @@ async def test_ticker_history_tcs_date(
         params={
             "start_date": date(2024, 3, 1),
             "end_date": date(2024, 5, 30),
-            "interval": Interval.ONE_WEEK.value,
+            "interval": DataInterval.ONE_WEEK.value,
         },  # type: ignore
     )
     dates_and_interval_1w_result = pl.LazyFrame(dates_and_interval_response.json())

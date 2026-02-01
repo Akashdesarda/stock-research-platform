@@ -1,13 +1,29 @@
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
 import polars as pl
-import yfinance as yf
 
 from stocksense.types import DataInterval, DataPeriod, StockExchangeYahooIdentifier
 
 logger = logging.getLogger("stocksense")
+
+if TYPE_CHECKING:
+    import yfinance as yf
+
+
+def _require_yfinance():
+    try:
+        import yfinance as yf
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "YFStockData requires optional dependency 'yfinance'. Install the 'data' extra, e.g.\n"
+            '  pip install "Stocksense-Core[data]"\n'
+            "or (uv)\n"
+            '  uv add "Stocksense-Core[data]"'
+        ) from e
+    return yf
 
 
 @dataclass
@@ -42,7 +58,8 @@ class YFStockData:
         )
 
     @property
-    def ticker_handler(self) -> yf.Ticker | yf.Tickers:
+    def ticker_handler(self) -> "yf.Ticker | yf.Tickers":
+        yf = _require_yfinance()
         return (
             yf.Ticker(self.yahoo_aware_ticker)
             if isinstance(self.ticker, str)
@@ -50,6 +67,7 @@ class YFStockData:
         )
 
     def get_ticker_info(self) -> dict[str, dict]:
+        yf = _require_yfinance()
         if isinstance(self.ticker_handler, yf.Ticker):
             self._ticker_data[self._ticker_without_exchange] = (
                 self.ticker_handler.get_info()

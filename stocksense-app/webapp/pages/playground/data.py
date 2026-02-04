@@ -258,7 +258,7 @@ def data() -> rx.Component:
                     action_button(
                         "Generate SQL",
                         left_icon="sparkles",
-                        on_click=DataState.generate_sql,
+                        on_click=DataState.generate_text_to_sql,
                         disabled=DataState.ai_is_generating
                         | (DataState.ai_prompt == ""),
                     ),

@@ -28,15 +28,12 @@ class DataState(TickerSelectionMixin, rx.State):
     """State for the Playground → Data page (manual + AI workflows)."""
 
     # Manual form fields
-    # Ticker selection fields are now in TickerSelectionMixin
     interval: str = DataInterval.ONE_DAY.value
     period: str = DataPeriod.SIX_MONTHS.value
     date_start: str = ""
     date_end: str = ""
     sql_query: str = ""
     preview_enabled: bool = True
-
-    # TODO - add prompt cache/history
 
     # AI workflow fields
     ai_prompt: str = ""
@@ -46,14 +43,15 @@ class DataState(TickerSelectionMixin, rx.State):
     ai_status_steps: list[str] = []
     ai_is_generating: bool = False
     ai_error: str = ""
+    # TODO - add prompt cache/history
 
     # Submit state
+    data: list[dict] = []
+    columns_def: list[dict] = []
     manual_submitted: bool = False
     fetch_data_ready: bool = False
     is_loading: bool = False
     _cancel_event: asyncio.Event = asyncio.Event()
-    data: list[dict] = []
-    columns_def: list[dict] = []
 
     @rx.event
     def set_interval(self, value: str):
@@ -102,6 +100,15 @@ class DataState(TickerSelectionMixin, rx.State):
         self.sql_query = self.ai_sql_query
         self.manual_submitted = True
 
+    @rx.event
+    def cancel_fetching(self):
+        """Cancel the ongoing fetch operation."""
+        self._cancel_event.set()
+        self.is_loading = False
+        self.data = []
+        self.columns_def = []
+        self.fetch_data_ready = False
+
     @rx.event(background=True)
     async def fetch_data(self):
         """Fetch data based on the current state settings."""
@@ -121,49 +128,8 @@ class DataState(TickerSelectionMixin, rx.State):
         else:
             await self._fetch_via_ticker_api(tickers)
 
-    async def _process_results(self, data: pl.LazyFrame):
-        """Process and set results from a Polars DataFrame."""
-        schema = data.collect_schema()
-        column_def = [
-            {
-                "field": col,
-                "filter": POLARS_AG_GRID_FILTER_MAP[schema[col]],
-                "sortable": True,
-            }
-            for col in schema
-        ]
-
-        async with self:
-            if not self._cancel_event.is_set():
-                _ = await data.collect_async()
-                self.data = _.to_dicts()
-                self.columns_def = column_def
-                self.fetch_data_ready = True
-                self.is_loading = False
-
-    async def _fetch_via_sql_api(self):
-        """Fetch data using the SQL API (Dummy implementation)."""
-        async with AsyncClient(timeout=None, follow_redirects=True) as client:
-            response = await client.post(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/query",
-                json={
-                    "exchange": self.selected_exchange,
-                    "sql_query": self.sql_query,
-                },
-            )
-
-            if response.is_error:
-                async with self:
-                    self.ai_error = f"Error fetching data: {response.text}"
-                    self.is_loading = False
-                return
-
-            result = response.json()
-            dummy_df = pl.LazyFrame(result)
-        await self._process_results(dummy_df)
-
     @rx.event(background=True)
-    async def generate_sql(self):
+    async def generate_text_to_sql(self):
         """Generate SQL query from the AI prompt."""
         async with self:
             if self.ai_is_generating:
@@ -218,6 +184,47 @@ class DataState(TickerSelectionMixin, rx.State):
                 self.ai_is_generating = False
                 self.ai_status_message = ""
 
+    async def _process_results(self, data: pl.LazyFrame):
+        """Process and set results from a Polars DataFrame."""
+        schema = data.collect_schema()
+        column_def = [
+            {
+                "field": col,
+                "filter": POLARS_AG_GRID_FILTER_MAP[schema[col]],
+                "sortable": True,
+            }
+            for col in schema
+        ]
+
+        async with self:
+            if not self._cancel_event.is_set():
+                _ = await data.collect_async()
+                self.data = _.to_dicts()
+                self.columns_def = column_def
+                self.fetch_data_ready = True
+                self.is_loading = False
+
+    async def _fetch_via_sql_api(self):
+        """Fetch data using the SQL API (Dummy implementation)."""
+        async with AsyncClient(timeout=None, follow_redirects=True) as client:
+            response = await client.post(
+                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/query",
+                json={
+                    "exchange": self.selected_exchange,
+                    "sql_query": self.sql_query,
+                },
+            )
+
+            if response.is_error:
+                async with self:
+                    self.ai_error = f"Error fetching data: {response.text}"
+                    self.is_loading = False
+                return
+
+            result = response.json()
+            dummy_df = pl.LazyFrame(result)
+        await self._process_results(dummy_df)
+
     async def _fetch_via_ticker_api(self, tickers: list[str]):
         """Fetch data by iterating over tickers with throttling."""
         sem = asyncio.Semaphore(10)  # Throttling to 10 concurrent requests
@@ -261,12 +268,3 @@ class DataState(TickerSelectionMixin, rx.State):
             logger.error(f"Error fetching data: {e}")
             async with self:
                 self.is_loading = False
-
-    @rx.event
-    def cancel_fetching(self):
-        """Cancel the ongoing fetch operation."""
-        self._cancel_event.set()
-        self.is_loading = False
-        self.data = []
-        self.columns_def = []
-        self.fetch_data_ready = False

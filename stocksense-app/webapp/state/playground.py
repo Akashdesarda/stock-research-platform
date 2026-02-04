@@ -1,17 +1,20 @@
 import asyncio
+import logging
 
 import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
 from httpx import AsyncClient
+from stocksense.ai.agents import StockDBContextDependency, text_to_sql
 from stocksense.config import get_settings
 from stocksense.types import DataInterval, DataPeriod
 
 from webapp.state.shared import TickerSelectionMixin
 
+logger = logging.getLogger("stocksense")
 settings = get_settings()
 
-POLARS_TO_AG_GRID_FILTER_TYPE_MAP = {
+POLARS_AG_GRID_FILTER_MAP = {
     pl.Int64: rxe.ag_grid.filters.number,
     pl.Float64: rxe.ag_grid.filters.number,
     pl.String: rxe.ag_grid.filters.text,
@@ -22,7 +25,7 @@ POLARS_TO_AG_GRID_FILTER_TYPE_MAP = {
 
 
 class DataState(TickerSelectionMixin, rx.State):
-    """State for the Playground → Data page (manual form only)."""
+    """State for the Playground → Data page (manual + AI workflows)."""
 
     # Manual form fields
     # Ticker selection fields are now in TickerSelectionMixin
@@ -32,6 +35,17 @@ class DataState(TickerSelectionMixin, rx.State):
     date_end: str = ""
     sql_query: str = ""
     preview_enabled: bool = True
+
+    # TODO - add prompt cache/history
+
+    # AI workflow fields
+    ai_prompt: str = ""
+    ai_generated_sql: str = ""
+    ai_sql_query: str = ""
+    ai_status_message: str = ""
+    ai_status_steps: list[str] = []
+    ai_is_generating: bool = False
+    ai_error: str = ""
 
     # Submit state
     manual_submitted: bool = False
@@ -62,11 +76,30 @@ class DataState(TickerSelectionMixin, rx.State):
         self.sql_query = value
 
     @rx.event
+    def set_ai_prompt(self, value: str):
+        self.ai_prompt = value
+        self.ai_generated_sql = ""
+        self.ai_sql_query = ""
+        self.ai_status_message = ""
+        self.ai_status_steps = []
+        self.ai_error = ""
+
+    @rx.event
+    def set_ai_sql_query(self, value: str):
+        self.ai_sql_query = value
+
+    @rx.event
     def set_preview_enabled(self, value: bool):
         self.preview_enabled = value
 
     @rx.event
     def submit_manual(self):
+        self.manual_submitted = True
+
+    @rx.event
+    def submit_ai(self):
+        """Store AI SQL into the shared query field before fetching data."""
+        self.sql_query = self.ai_sql_query
         self.manual_submitted = True
 
     @rx.event(background=True)
@@ -77,6 +110,7 @@ class DataState(TickerSelectionMixin, rx.State):
                 return
             self.is_loading = True
             self.fetch_data_ready = False
+            self.ai_error = ""
             self.data = []
             self._cancel_event.clear()
             tickers = self.selected_ticker
@@ -93,7 +127,7 @@ class DataState(TickerSelectionMixin, rx.State):
         column_def = [
             {
                 "field": col,
-                "filter": POLARS_TO_AG_GRID_FILTER_TYPE_MAP[schema[col]],
+                "filter": POLARS_AG_GRID_FILTER_MAP[schema[col]],
                 "sortable": True,
             }
             for col in schema
@@ -111,12 +145,78 @@ class DataState(TickerSelectionMixin, rx.State):
         """Fetch data using the SQL API (Dummy implementation)."""
         async with AsyncClient(timeout=None, follow_redirects=True) as client:
             response = await client.post(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/{self.selected_exchange}/query",
-                json={"sql_query": self.sql_query},
+                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/query",
+                json={
+                    "exchange": self.selected_exchange,
+                    "sql_query": self.sql_query,
+                },
             )
+
+            if response.is_error:
+                async with self:
+                    self.ai_error = f"Error fetching data: {response.text}"
+                    self.is_loading = False
+                return
+
             result = response.json()
             dummy_df = pl.LazyFrame(result)
         await self._process_results(dummy_df)
+
+    @rx.event(background=True)
+    async def generate_sql(self):
+        """Generate SQL query from the AI prompt."""
+        async with self:
+            if self.ai_is_generating:
+                return
+            self.ai_is_generating = True
+            self.ai_generated_sql = ""
+            self.ai_sql_query = ""
+            self.ai_error = ""
+            self.ai_status_message = "Generating SQL query"
+            self.ai_status_steps = ["Initializing text-to-SQL agent..."]
+
+        try:
+            columns = await self.get_ticker_history_columns()
+            async with self:
+                if not columns:
+                    self.ai_error = "Unable to fetch table schema from StockDB."
+                    self.ai_is_generating = False
+                    self.ai_status_message = ""
+                    return
+                self.ai_status_steps.append("Fetched schema context from StockDB.")
+
+            model_name = settings.app.text_to_sql_model
+            api_key = getattr(
+                settings.common,
+                f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
+                "",
+            )
+            if not api_key:
+                async with self:
+                    self.ai_error = "Missing API key for the text-to-SQL model."
+                    self.ai_is_generating = False
+                    self.ai_status_message = ""
+                return
+
+            async with self:
+                self.ai_status_steps.append(f"Running model: {model_name}.")
+
+            stockdb_ctx = StockDBContextDependency(columns=columns)
+            agent = text_to_sql(model_name=model_name, api_key=api_key)
+            result = await agent.run(self.ai_prompt, deps=stockdb_ctx)
+
+            async with self:
+                self.ai_generated_sql = result.output.sql_query
+                self.ai_sql_query = result.output.sql_query
+                self.ai_status_steps.append("SQL query generated successfully.")
+                self.ai_is_generating = False
+                self.ai_status_message = "SQL query generated successfully."
+        except Exception as e:
+            logger.error(f"Error generating SQL: {e}")
+            async with self:
+                self.ai_error = "Failed to generate SQL query. Please try again."
+                self.ai_is_generating = False
+                self.ai_status_message = ""
 
     async def _fetch_via_ticker_api(self, tickers: list[str]):
         """Fetch data by iterating over tickers with throttling."""
@@ -157,7 +257,8 @@ class DataState(TickerSelectionMixin, rx.State):
                 else:
                     async with self:
                         self.is_loading = False
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error fetching data: {e}")
             async with self:
                 self.is_loading = False
 

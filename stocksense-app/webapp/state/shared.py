@@ -109,6 +109,19 @@ class CommonMixin(rx.State, mixin=True):
             .to_list()
         )
 
+    async def get_ticker_history_columns(self) -> list[str]:
+        """Fetch column names for the stock history table."""
+        async with AsyncClient(timeout=None, follow_redirects=True) as client:
+            response = await client.get(
+                url=f"{settings.common.base_url}:{settings.stockdb.port}"
+                f"/api/per-security/nse/tcs/history",
+                params={"interval": "1d", "period": "1d"},
+            )
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            return list(payload[0].keys()) if payload else []
+
 
 class TickerSelectionMixin(CommonMixin, mixin=True):
     """Mixin for interactive ticker selection state logic."""

@@ -3,6 +3,7 @@ import reflex_enterprise as rxe
 from stocksense.types import DataInterval, DataPeriod
 
 from webapp.components.inputs import (
+    action_button,
     cancel_button,
     checkbox_input,
     date_range_picker,
@@ -50,6 +51,34 @@ def _submit_workflow() -> rx.Component:
         submit_button(
             on_click=DataState.fetch_data,
             disabled=DataState.is_loading,
+        ),
+        rx.cond(
+            DataState.is_loading,
+            rx.hstack(
+                rx.spinner(size="3"),
+                rx.text(
+                    "Fetching Data...",
+                    size="3",
+                    color=rx.color("blue", 11),
+                ),
+                cancel_button(on_click=DataState.cancel_fetching),
+                spacing="3",
+                align="center",
+            ),
+            rx.fragment(),
+        ),
+        spacing="4",
+        align="center",
+        width="100%",
+    )
+
+
+def _submit_workflow_ai() -> rx.Component:
+    """Controls for submitting AI query or cancelling."""
+    return rx.hstack(
+        submit_button(
+            on_click=[DataState.submit_ai, DataState.fetch_data],
+            disabled=DataState.is_loading | (DataState.ai_sql_query == ""),
         ),
         rx.cond(
             DataState.is_loading,
@@ -211,6 +240,16 @@ def data() -> rx.Component:
                     value=DataState.preview_enabled,
                     on_change=DataState.set_preview_enabled,
                 ),
+                rx.cond(
+                    DataState.ai_error != "",
+                    rx.callout(
+                        DataState.ai_error,
+                        icon="triangle_alert",
+                        color_scheme="red",
+                        width="100%",
+                    ),
+                    rx.fragment(),
+                ),
                 _submit_workflow(),
                 width="100%",
                 spacing="4",
@@ -222,10 +261,105 @@ def data() -> rx.Component:
     )
 
     ai_tab = rx.tabs.content(
-        rx.vstack(
-            rx.text("AI-Powered Data Query", size="4", weight="medium"),
-            rx.text("Coming soon in the next migration step."),
-            spacing="3",
+        bordered_container(
+            rx.vstack(
+                ticker_selector(DataState),
+                rx.separator(size="4", width="100%"),
+                rx.vstack(
+                    rx.text("AI-Powered Data Query", size="3", weight="medium"),
+                    form_field(
+                        label="Enter your data query prompt",
+                        control=text_area(
+                            value=DataState.ai_prompt,
+                            on_change=DataState.set_ai_prompt,
+                            placeholder="Ask a question about the data you want...",
+                            rows=3,
+                        ),
+                    ),
+                    action_button(
+                        "Generate SQL",
+                        left_icon="sparkles",
+                        on_click=DataState.generate_sql,
+                        disabled=DataState.ai_is_generating
+                        | (DataState.ai_prompt == ""),
+                    ),
+                    rx.cond(
+                        DataState.ai_is_generating
+                        | (DataState.ai_status_message != ""),
+                        rx.callout(
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.cond(
+                                        DataState.ai_is_generating,
+                                        rx.spinner(size="2"),
+                                        rx.icon("check", size=16),
+                                    ),
+                                    rx.text(
+                                        DataState.ai_status_message,
+                                        size="2",
+                                        weight="medium",
+                                    ),
+                                    spacing="2",
+                                    align="center",
+                                ),
+                                rx.foreach(
+                                    DataState.ai_status_steps,
+                                    lambda step: rx.text(
+                                        step, size="2", color_scheme="gray"
+                                    ),
+                                ),
+                                spacing="2",
+                                width="100%",
+                            ),
+                            icon="sparkles",
+                            color_scheme="blue",
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        DataState.ai_error != "",
+                        rx.callout(
+                            DataState.ai_error,
+                            icon="triangle_alert",
+                            color_scheme="red",
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    rx.cond(
+                        DataState.ai_generated_sql != "",
+                        rx.vstack(
+                            rx.text("Generated SQL", size="2", weight="medium"),
+                            rx.markdown(
+                                "```sql\n" + DataState.ai_generated_sql + "\n```"
+                            ),
+                            form_field(
+                                label="Edit SQL before running",
+                                control=text_area(
+                                    value=DataState.ai_sql_query,
+                                    on_change=DataState.set_ai_sql_query,
+                                    placeholder="Edit the SQL query...",
+                                    rows=6,
+                                ),
+                            ),
+                            checkbox_input(
+                                label="Enable data preview",
+                                value=DataState.preview_enabled,
+                                on_change=DataState.set_preview_enabled,
+                            ),
+                            _submit_workflow_ai(),
+                            spacing="3",
+                            width="100%",
+                        ),
+                        rx.fragment(),
+                    ),
+                    spacing="3",
+                    width="100%",
+                ),
+                width="100%",
+                spacing="4",
+            ),
             width="100%",
         ),
         value="ai",

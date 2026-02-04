@@ -45,40 +45,17 @@ def _results_view() -> rx.Component:
     )
 
 
-def _submit_workflow() -> rx.Component:
+def _submit_workflow(on_click=None, disabled=None) -> rx.Component:
     """Controls for submitting data fetch request or cancelling."""
+    if on_click is None:
+        on_click = DataState.fetch_data
+    if disabled is None:
+        disabled = DataState.is_loading
+
     return rx.hstack(
         submit_button(
-            on_click=DataState.fetch_data,
-            disabled=DataState.is_loading,
-        ),
-        rx.cond(
-            DataState.is_loading,
-            rx.hstack(
-                rx.spinner(size="3"),
-                rx.text(
-                    "Fetching Data...",
-                    size="3",
-                    color=rx.color("blue", 11),
-                ),
-                cancel_button(on_click=DataState.cancel_fetching),
-                spacing="3",
-                align="center",
-            ),
-            rx.fragment(),
-        ),
-        spacing="4",
-        align="center",
-        width="100%",
-    )
-
-
-def _submit_workflow_ai() -> rx.Component:
-    """Controls for submitting AI query or cancelling."""
-    return rx.hstack(
-        submit_button(
-            on_click=[DataState.submit_ai, DataState.fetch_data],
-            disabled=DataState.is_loading | (DataState.ai_sql_query == ""),
+            on_click=on_click,
+            disabled=disabled,
         ),
         rx.cond(
             DataState.is_loading,
@@ -250,7 +227,9 @@ def data() -> rx.Component:
                     ),
                     rx.fragment(),
                 ),
-                _submit_workflow(),
+                _submit_workflow(
+                    disabled=(DataState.selected_exchange == "") | DataState.is_loading
+                ),
                 width="100%",
                 spacing="4",
             ),
@@ -348,7 +327,12 @@ def data() -> rx.Component:
                                 value=DataState.preview_enabled,
                                 on_change=DataState.set_preview_enabled,
                             ),
-                            _submit_workflow_ai(),
+                            _submit_workflow(
+                                on_click=[DataState.submit_ai, DataState.fetch_data],
+                                disabled=(DataState.selected_exchange == "")
+                                | DataState.is_loading
+                                | (DataState.ai_sql_query == ""),
+                            ),
                             spacing="3",
                             width="100%",
                         ),

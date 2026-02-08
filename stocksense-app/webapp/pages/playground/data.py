@@ -255,12 +255,18 @@ def data() -> rx.Component:
                             rows=3,
                         ),
                     ),
+                    checkbox_input(
+                        label="Use Cache (if available)",
+                        value=DataState.ai_use_cache,
+                        on_change=DataState.set_ai_use_cache,
+                    ),
                     action_button(
                         "Generate SQL",
                         left_icon="sparkles",
                         on_click=DataState.generate_text_to_sql,
                         disabled=DataState.ai_is_generating
-                        | (DataState.ai_prompt == ""),
+                        | (DataState.ai_prompt == "")
+                        | (DataState.selected_exchange == ""),
                     ),
                     rx.cond(
                         DataState.ai_is_generating
@@ -328,7 +334,7 @@ def data() -> rx.Component:
                                 on_change=DataState.set_preview_enabled,
                             ),
                             _submit_workflow(
-                                on_click=[DataState.submit_ai, DataState.fetch_data],
+                                on_click=[DataState.submit_ai, DataState.fetch_data, DataState.put_cache],
                                 disabled=(DataState.selected_exchange == "")
                                 | DataState.is_loading
                                 | (DataState.ai_sql_query == ""),

@@ -244,7 +244,7 @@ class TaskState(CommonMixin, rx.State):
 
             url = (
                 f"{settings.common.base_url}:{settings.stockdb.port}"
-                "/api/task/ticker/history"
+                "/api/operation/download/ticker/history"
             )
 
             async with AsyncClient(follow_redirects=True) as client:

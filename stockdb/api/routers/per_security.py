@@ -56,7 +56,7 @@ async def list_ticker(
         .scan_delta(table_path)
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
-        .collect_async()
+        .collect_async()  # ty:ignore[invalid-await]
     )
     return ORJSONResponse(result.to_dicts())
 
@@ -91,12 +91,12 @@ async def list_ticker_in_index(
         .filter(pl.col("index_symbol").list.contains(index))
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
-        .collect_async()
+        .collect_async()  # ty:ignore[invalid-await]
     )
     return ORJSONResponse(result.to_dicts())
 
 
-@router.get("/{exchange}/{ticker}")
+@router.get("/{exchange}/{ticker}/info")
 async def ticker_information(
     ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
 ) -> dict[str, Any]:
@@ -170,5 +170,5 @@ async def ticker_history(
         .sort("date", descending=True)  # sorting back to latest date first
     )
 
-    result = await result.collect_async()
+    result = await result.collect_async()  # ty:ignore[invalid-await]
     return ORJSONResponse(result.to_dicts())

@@ -1324,7 +1324,7 @@ wheels = [
 [[package]]
 name = "stocksense-core"
 version = "0.6.0"
-source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#4c6b181576022bbfaea8c5e181ee1c6637f55555" }
+source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#4fdf807eaa7c2ab3c570d574d9096094c664e755" }
 dependencies = [
     { name = "httpx" },
     { name = "numpy" },
@@ -1346,7 +1346,7 @@ data = [
 
 [[package]]
 name = "stocksense-stockdb"
-version = "1.2.4"
+version = "1.3.4"
 source = { editable = "." }
 dependencies = [
     { name = "alive-progress" },

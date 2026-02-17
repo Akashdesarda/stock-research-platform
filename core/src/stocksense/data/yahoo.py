@@ -51,6 +51,8 @@ class YFStockData:
         if isinstance(self.ticker, list):
             self._ticker_data = dict.fromkeys(self._ticker_without_exchange)
 
+        self._ticker_handler = self._create_ticker_handler()
+
     @property
     def yahoo_aware_ticker(self) -> str | list[str]:
         return self._add_exchange_symbol(
@@ -59,6 +61,11 @@ class YFStockData:
 
     @property
     def ticker_handler(self) -> "yf.Ticker | yf.Tickers":
+        if self._ticker_handler is None:
+            self._ticker_handler = self._create_ticker_handler()
+        return self._ticker_handler
+
+    def _create_ticker_handler(self) -> "yf.Ticker | yf.Tickers":
         yf = _require_yfinance()
         return (
             yf.Ticker(self.yahoo_aware_ticker)
@@ -68,17 +75,14 @@ class YFStockData:
 
     def get_ticker_info(self) -> dict[str, dict]:
         yf = _require_yfinance()
-        if isinstance(self.ticker_handler, yf.Ticker):
-            self._ticker_data[self._ticker_without_exchange] = (
-                self.ticker_handler.get_info()
-            )
+        handler = self.ticker_handler
+        if isinstance(handler, yf.Ticker):
+            self._ticker_data[self._ticker_without_exchange] = handler.get_info()
         else:
             for ex_tick, tick in zip(
                 self.yahoo_aware_ticker, self._ticker_without_exchange
             ):
-                self._ticker_data[tick] = self.ticker_handler.tickers[
-                    ex_tick
-                ].get_info()
+                self._ticker_data[tick] = handler.tickers[ex_tick].get_info()
 
         return self._ticker_data
 
@@ -91,9 +95,10 @@ class YFStockData:
     ) -> dict[str, pl.DataFrame]:
         # If explicit date bounds are provided, period must be disabled for yfinance.
         period = None if start and end else period.value
+        handler = self.ticker_handler
         if isinstance(self.ticker, str):
             result = self._history_with_repair_fallback(
-                self.ticker_handler,
+                handler,
                 period=period,
                 interval=interval.value,
                 start=start,
@@ -111,7 +116,7 @@ class YFStockData:
 
         else:
             result = self._history_with_repair_fallback(
-                self.ticker_handler,
+                handler,
                 period=period,
                 interval=interval.value,
                 start=start,

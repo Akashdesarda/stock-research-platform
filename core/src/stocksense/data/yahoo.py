@@ -89,37 +89,37 @@ class YFStockData:
         start: date | None = None,
         end: date | None = None,
     ) -> dict[str, pl.DataFrame]:
-        # NOTE - If start, end & period is given then start & end will have preference
+        # If explicit date bounds are provided, period must be disabled for yfinance.
         period = None if start and end else period.value
         if isinstance(self.ticker, str):
-            result = self.ticker_handler.history(
+            result = self._history_with_repair_fallback(
+                self.ticker_handler,
                 period=period,
                 interval=interval.value,
                 start=start,
-                # WARNING - For some reason yfinance downloads data as end date - 1. So adding 1 day
+                # yfinance treats end as exclusive in some cases, so shift by +1 day.
                 end=end + timedelta(days=1) if end else None,
                 actions=False,
                 raise_errors=True,
                 # NOTE - not present in single `Ticker` object
                 # progress=False,
                 # group_by="ticker",
-                repair=True,
             )
             self._ticker_data[self._ticker_without_exchange] = (
                 self._transform_history_result(result)
             )
 
         else:
-            result = self.ticker_handler.history(
+            result = self._history_with_repair_fallback(
+                self.ticker_handler,
                 period=period,
                 interval=interval.value,
                 start=start,
-                # WARNING - For some reason yfinance downloads data as end date - 1. So adding 1 day
+                # yfinance treats end as exclusive in some cases, so shift by +1 day.
                 end=end + timedelta(days=1) if end else None,
                 group_by="ticker",
                 actions=False,
                 progress=False,
-                repair=True,
                 # raise_errors=True, # NOTE - currently not supported by `Tickers` object
             )
             for ex_tick, tick in zip(
@@ -132,6 +132,25 @@ class YFStockData:
         return self._ticker_data
 
     # TODO - add methods supporting all other api functionality provided by YFinance
+
+    @staticmethod
+    def _history_with_repair_fallback(handler, **history_kwargs):
+        try:
+            # Prefer repaired prices, but retry without repair for current upstream bug paths.
+            result = handler.history(**history_kwargs, repair=True)
+            if getattr(result, "empty", False):
+                logger.warning(
+                    "yfinance returned empty result with repair=True. Retrying with repair=False."
+                )
+                return handler.history(**history_kwargs, repair=False)
+            return result
+        except ValueError as exc:
+            if "output array is read-only" not in str(exc):
+                raise
+            logger.warning(
+                "yfinance repair=True failed with read-only array error. Retrying with repair=False."
+            )
+            return handler.history(**history_kwargs, repair=False)
 
     @staticmethod
     def _remove_exchange_symbol(symbol: str | list[str]) -> str | list[str]:
@@ -152,6 +171,7 @@ class YFStockData:
         return (
             pl
             .from_pandas(data, include_index=True)
+            # Normalize yfinance index/timestamp naming and schema for downstream strategy code.
             .rename(
                 lambda name: "date" if name in ["Date", "Datetime"] else name.lower()
             )

@@ -19,6 +19,11 @@ async def yahoo_finance_aware_ticker(
     ticker: Annotated[str, Path(description="Desired company's `Ticker` symbol")],
 ) -> YahooTickerIdentifier:
     """Dependency to get Yahoo Finance aware ticker symbol"""
+    if "[" in ticker or "]" in ticker:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ticker symbol cannot invalid characters",
+        )
     return YahooTickerIdentifier(
         symbol=ticker.upper(),  # making sure that ticker symbol are always Upper case
         exchange=exchange.name.upper(),

@@ -3,7 +3,6 @@ import reflex_enterprise as rxe
 from stocksense.types import DataInterval, DataPeriod
 
 from webapp.components.inputs import (
-    action_button,
     cancel_button,
     checkbox_input,
     date_range_picker,
@@ -260,9 +259,7 @@ def data() -> rx.Component:
                         value=DataState.ai_use_cache,
                         on_change=DataState.set_ai_use_cache,
                     ),
-                    action_button(
-                        "Generate SQL",
-                        left_icon="sparkles",
+                    submit_button(
                         on_click=DataState.generate_text_to_sql,
                         disabled=DataState.ai_is_generating
                         | (DataState.ai_prompt == "")
@@ -289,8 +286,11 @@ def data() -> rx.Component:
                                 ),
                                 rx.foreach(
                                     DataState.ai_status_steps,
-                                    lambda step: rx.text(
-                                        step, size="2", color_scheme="gray"
+                                    lambda step: rx.hstack(
+                                        rx.icon("check", size=16, color="green"),
+                                        rx.text(step, size="2", color="gray"),
+                                        spacing="2",
+                                        align="center",
                                     ),
                                 ),
                                 spacing="2",
@@ -334,7 +334,11 @@ def data() -> rx.Component:
                                 on_change=DataState.set_preview_enabled,
                             ),
                             _submit_workflow(
-                                on_click=[DataState.submit_ai, DataState.fetch_data, DataState.put_cache],
+                                on_click=[
+                                    DataState.submit_ai,
+                                    DataState.fetch_data,
+                                    DataState.put_cache,
+                                ],
                                 disabled=(DataState.selected_exchange == "")
                                 | DataState.is_loading
                                 | (DataState.ai_sql_query == ""),

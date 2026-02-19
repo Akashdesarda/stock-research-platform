@@ -127,7 +127,7 @@ class DataState(TickerSelectionMixin, rx.State):
     @rx.event
     async def put_cache(self):
         """Putting the current AI prompt and generated SQL into the cache."""
-        # updating cache in stockdb is handled by the agent itself as a post-run callback, so no need to do it here
+        # updating cache in stockdb as a event after generating the response
         async with AsyncClient(timeout=None, follow_redirects=True) as client:
             response = await client.put(
                 url=f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/prompt/cache",
@@ -209,7 +209,7 @@ class DataState(TickerSelectionMixin, rx.State):
             async with self:
                 self.ai_error = "Failed to generate SQL query. Please try again."
                 self.ai_status_message = ""
-                self.ai_status_steps.append(f"Generation failed: {type(e).__name__}.")
+                self.ai_status_steps.append(f"Generation failed: {type(e).__name__}")
 
         finally:
             async with self:

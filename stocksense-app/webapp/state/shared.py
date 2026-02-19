@@ -10,7 +10,7 @@ class CommonMixin(rx.State, mixin=True):
     """A mixin state for common StockDB data."""
 
     selected_exchange: str = ""
-    selected_ticker: list[str] = []
+    selected_ticker: str | list[str] = []
 
     @rx.var
     async def available_exchanges(self) -> pl.DataFrame:
@@ -107,6 +107,11 @@ class CommonMixin(rx.State, mixin=True):
             .select("ticker")
             .to_series()
             .to_list()
+            #     if isinstance(dropdown_values, list)
+            #     else df
+            #     .filter(pl.col("dropdown") == dropdown_values)
+            #     .select("ticker")
+            #     .item()
         )
 
     async def get_ticker_history_columns(self) -> list[str]:
@@ -128,9 +133,12 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
 
     # Form fields
     selected_exchange_dropdown: str = ""
+    allow_ticker_choice: bool = True
     ticker_choice: str = "Index Based"
+    selected_ticker_dropdown: str = ""
     selected_ticker_dropdowns: list[str] = []
     index_choice: str = ""
+    desired_choice_as_multi_select: bool = True
 
     @rx.var
     async def exchange_wise_index(self) -> dict:
@@ -149,6 +157,7 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
     @rx.event
     async def set_exchange_dropdown(self, value: str):
         self.selected_exchange_dropdown = value
+        self.selected_ticker_dropdown = ""
         self.selected_ticker_dropdowns = []
         # NOTE: get_exchange_symbol comes from CommonMixin
         await self.get_exchange_symbol(value)
@@ -181,7 +190,14 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
         self.selected_ticker = [i["ticker"] for i in response.json()]
 
     @rx.event
-    async def get_tickers_for_desired(self, values: list[str]):
-        self.selected_ticker_dropdowns = values
+    async def get_tickers_for_desired(self, values: list[str] | str):
+        if isinstance(values, str):
+            normalized_values = [values] if values else []
+            self.selected_ticker_dropdown = values
+        else:
+            normalized_values = values
+            self.selected_ticker_dropdown = values[0] if values else ""
+
+        self.selected_ticker_dropdowns = normalized_values
         # NOTE: get_ticker_symbols comes from CommonMixin
-        await self.get_ticker_symbols(values)
+        await self.get_ticker_symbols(normalized_values)

@@ -18,14 +18,26 @@ def _index_based_ticker_selection(state: type[TickerSelectionMixin]) -> rx.Compo
 
 
 def _desired_ticker_selection(state: type[TickerSelectionMixin]) -> rx.Component:
-    return multi_select_dropdown(
-        label="Ticker Symbols",
-        options=state.ticker_dropdown_list,
-        value=state.selected_ticker_dropdowns,
-        on_change=state.get_tickers_for_desired,
-        placeholder="Choose options",
-        disabled=state.ticker_choice != TickerChoice.desired.value,
-        width="100%",
+    return rx.cond(
+        state.desired_choice_as_multi_select,
+        multi_select_dropdown(
+            label="Ticker Symbols",
+            options=state.ticker_dropdown_list,
+            value=state.selected_ticker_dropdowns,
+            on_change=state.get_tickers_for_desired,
+            placeholder="Choose options",
+            disabled=state.ticker_choice != TickerChoice.desired.value,
+            width="100%",
+        ),
+        dropdown_select(
+            label="Ticker Symbols",
+            options=state.ticker_dropdown_list,
+            value=state.selected_ticker_dropdown,
+            on_change=state.get_tickers_for_desired,
+            placeholder="Choose options",
+            disabled=state.ticker_choice != TickerChoice.desired.value,
+            width="100%",
+        ),
     )
 
 
@@ -64,16 +76,20 @@ def ticker_selector(state: type[TickerSelectionMixin]) -> rx.Component:
                     width="100%",
                 ),
             ),
-            form_field(
-                label="Ticker Selection Mode",
-                control=dropdown_select(
+            rx.cond(
+                state.allow_ticker_choice,
+                form_field(
                     label="Ticker Selection Mode",
-                    options=[i.value for i in TickerChoice],
-                    value=state.ticker_choice,
-                    on_change=state.set_ticker_choice,
-                    placeholder="Choose a mode",
-                    width="100%",
+                    control=dropdown_select(
+                        label="Ticker Selection Mode",
+                        options=[i.value for i in TickerChoice],
+                        value=state.ticker_choice,
+                        on_change=state.set_ticker_choice,
+                        placeholder="Choose a mode",
+                        width="100%",
+                    ),
                 ),
+                rx.fragment(),
             ),
             width="100%",
             spacing="4",

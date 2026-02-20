@@ -2,7 +2,7 @@ import reflex as rx
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
 from webapp.components.layout import form_field
-from webapp.state.shared import TickerSelectionMixin
+from webapp.state.shared import TickerSelectionMixin, ChatMixin
 from webapp.types import TickerChoice
 
 
@@ -102,4 +102,87 @@ def ticker_selector(state: type[TickerSelectionMixin]) -> rx.Component:
         ),
         width="100%",
         spacing="4",
+    )
+
+def chat_bubble(role: str, content: str) -> rx.Component:
+    is_user = role == "user"
+
+    return rx.hstack(
+        rx.box(
+            rx.markdown(content),
+            background_color=rx.cond(is_user, rx.color("accent"), "transparent"),
+            border_radius="10px",
+            max_width="80%",
+            margin="16px",
+            padding="10px",
+        ),
+        justify=rx.cond(is_user, "end", "start"),
+        width="100%",
+        # padding_y="0.25em",
+    )
+
+def chat_window(state: type[ChatMixin]) -> rx.Component:
+    return rx.box(
+        rx.vstack(
+            rx.foreach(
+                state.messages,
+                lambda msg: chat_bubble(msg.role, msg.content),
+            ),
+            width="100%",
+            padding_x="24px",
+            padding_y="20px",
+            spacing="3",
+        ),
+        flex="1",
+        overflow_y="auto",
+        width="100%",
+    )
+
+def chat_input(state: type[ChatMixin]) -> rx.Component:
+    return rx.box(
+        rx.hstack(
+            rx.text_area(
+                value=state.prompt,
+                placeholder="Ask StockSense...",
+                on_change=state.set_prompt,
+                variant="soft",
+                radius="full",
+                resize="none",
+                rows="1",
+                auto_height=True,
+                width="100%",
+                padding_x="1em",
+                padding_y="0.75em",
+                style={
+                    "background": "transparent",
+                    "outline": "none",
+                    "box_shadow": "none",
+                },
+            ),
+            rx.button(
+                rx.icon("send", size=18),
+                on_click=state.append_message(role="user", content=state.prompt),
+                size="2",
+                radius="full",
+                variant="solid",
+                cursor="pointer",
+                margin_right="0.5em",
+            ),
+            width="100%",
+            max_width="900px",
+            align_items="center",
+            bg=rx.color("gray", 3),
+            radius="full",
+            padding_right="0.25em",
+        ),
+        position="sticky",
+        bottom="0",
+        width="100%",
+        padding="1em",
+        backdrop_filter="blur(10px)",
+        border_top="1px solid",
+        border_color=rx.color("gray", 4),
+        z_index="10",
+        display="flex",
+        justify_content="center",
     )

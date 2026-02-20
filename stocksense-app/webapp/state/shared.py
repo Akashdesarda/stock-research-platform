@@ -1,4 +1,6 @@
+from typing import Literal
 import polars as pl
+from pydantic import BaseModel
 import reflex as rx
 from httpx import AsyncClient
 from stocksense.config import get_settings
@@ -201,3 +203,36 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
         self.selected_ticker_dropdowns = normalized_values
         # NOTE: get_ticker_symbols comes from CommonMixin
         await self.get_ticker_symbols(normalized_values)
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+class ChatMixin(rx.State, mixin=True):
+    """A mixin state for common chat data."""
+
+    prompt: str = ""
+    messages: list[Message] = []
+    is_loading: bool = False
+
+    @rx.event
+    def set_prompt(self, value: str):
+        self.prompt = value
+
+    @rx.event
+    def reset_prompt(self):
+        self.prompt = ""
+        self.is_loading = True
+
+    @rx.event
+    async def append_message(self, role: Literal["user", "assistant"], content: str):
+        if not content.strip():
+            return
+
+        self.messages.append(
+            Message(role=role, content=content)
+        )
+
+        # Reset the prompt only if the message is from the user
+        if role == "user":
+            yield type(self).reset_prompt

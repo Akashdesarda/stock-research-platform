@@ -6,14 +6,14 @@ from stocksense.ai.agents import company_summary
 from stocksense.ai.models import get_thinking_parts
 from stocksense.config import get_settings
 
-from webapp.state.shared import TickerSelectionMixin
+from webapp.state.shared import TickerSelectionMixin, ChatMixin, Message
 from webapp.types import TickerChoice
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
 
 
-class CompanySummaryState(TickerSelectionMixin, rx.State):
+class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
     """State for the company summary research tool"""
 
     summary_result: str = ""
@@ -31,19 +31,19 @@ class CompanySummaryState(TickerSelectionMixin, rx.State):
 
     # Variables wrt to cache
     ai_use_cache: bool = True
-    ai_prompt: str = ""
+    summary_prompt: str = ""
     ai_thinking_part: str = ""
 
     @rx.event
-    def set_ai_prompt(self):
-        self.ai_prompt = f"Generate a company summary for {self.selected_ticker[0]} on {self.selected_exchange} exchange."
+    def set_summary_prompt(self):
+        self.summary_prompt = f"Generate a company summary for {self.selected_ticker[0]} on {self.selected_exchange} exchange."
 
     @rx.event
     def set_ai_use_cache(self, value: bool):
         self.ai_use_cache = value
         if not value:
             self.ai_status_steps.append(
-                "Cache disabled, will generate new SQL on next generation."
+                "Cache disabled, will generate new summary on next generation."
             )
         else:
             self.ai_status_steps.append(
@@ -52,17 +52,14 @@ class CompanySummaryState(TickerSelectionMixin, rx.State):
 
     @rx.event
     async def put_cache(self):
-        """Putting the current AI prompt and generated SQL into the cache."""
+        """Putting the current AI prompt and generated summary into the cache."""
         # updating cache in stockdb as a event after generating the response.
         async with AsyncClient(timeout=None, follow_redirects=True) as client:
-            logger.debug(
-                f"prompt: {self.ai_prompt}, response: {self.summary_result}, thinking: {self.ai_thinking_part}"
-            )
             response = await client.put(
                 url=f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/prompt/cache",
                 json={
                     "agent": "company-summary",
-                    "prompt": self.ai_prompt,
+                    "prompt": self.summary_prompt,
                     "model": settings.app.company_summary_model,
                     "response": self.summary_result,
                     "thinking": self.ai_thinking_part,
@@ -83,6 +80,12 @@ class CompanySummaryState(TickerSelectionMixin, rx.State):
             self.ai_status_message = "Generating company summary..."
             self.ai_status_steps = ["Initializing request"]
             self.ai_is_generating = True
+
+            # Add user prompt to chat window so they see what they asked
+            # (Optional but good UX since they clicked a button instead of typing)
+            self.messages.append(
+                Message(role="user", content=self.summary_prompt)
+            )
 
             use_cache = bool(self.ai_use_cache)
 
@@ -105,7 +108,9 @@ class CompanySummaryState(TickerSelectionMixin, rx.State):
             if use_cache:
                 async with self:
                     self.ai_status_steps.append("Checking prompt cache...")
-                retrieved_cache = await self._try_fetch_cached_summary(self.ai_prompt)
+                retrieved_cache = await self._try_fetch_cached_summary(
+                    self.summary_prompt
+                )
                 if retrieved_cache is not None:
                     cached_summary, cached_thinking = retrieved_cache
                     async with self:
@@ -114,6 +119,10 @@ class CompanySummaryState(TickerSelectionMixin, rx.State):
                         self.ai_status_steps.append("Fetched summary from cache.")
                         self.ai_status_message = (
                             "Company summary generated successfully (from cache)."
+                        )
+                        # Append message when returning from cache
+                        self.messages.append(
+                            Message(role="assistant", content=self.summary_result)
                         )
                     return
 
@@ -132,6 +141,11 @@ class CompanySummaryState(TickerSelectionMixin, rx.State):
                 self.ai_thinking_part = get_thinking_parts(cs_output.new_messages())
                 self.ai_status_steps.append("Company summary fetched successfully.")
                 self.summary_result = cs_output.output.text_output()
+
+                # Append message directly to state while in `async with self`
+                self.messages.append(
+                    Message(role="assistant", content=self.summary_result)
+                )
 
             # yield the cache update event after successful generation
             yield CompanySummaryState.put_cache

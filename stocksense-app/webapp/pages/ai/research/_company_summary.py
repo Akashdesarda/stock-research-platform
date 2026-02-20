@@ -2,7 +2,7 @@ import reflex as rx
 
 from webapp.components.inputs import checkbox_input, submit_button
 from webapp.components.layout import bordered_container
-from webapp.pages.shared_components import ticker_selector
+from webapp.pages.shared_components import ticker_selector, chat_window, chat_input
 from webapp.state.ai import CompanySummaryState
 
 
@@ -19,7 +19,7 @@ def company_summary_component() -> rx.Component:
                 ),
                 submit_button(
                     on_click=[
-                        CompanySummaryState.set_ai_prompt,
+                        CompanySummaryState.set_summary_prompt,
                         CompanySummaryState.get_summary,
                     ],
                     disabled=CompanySummaryState.ai_is_generating
@@ -76,38 +76,10 @@ def company_summary_component() -> rx.Component:
                 ),
             )
         ),
+        chat_window(CompanySummaryState),
         rx.cond(
             CompanySummaryState.summary_result != "",
-            rx.box(
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("sparkles", color=rx.color("accent", 9)),
-                        rx.text(
-                            "AI Summary",
-                            weight="bold",
-                            color=rx.color("accent", 11),
-                        ),
-                        align="center",
-                        spacing="2",
-                        margin_bottom="1em",
-                    ),
-                    rx.markdown(
-                        CompanySummaryState.summary_result,
-                        component_map={
-                            "p": lambda text: rx.text(
-                                text, margin_bottom="1em", line_height="1.6"
-                            ),
-                        },
-                    ),
-                    align_items="stretch",
-                    width="100%",
-                ),
-                # Making the box chat bubble like & scrollable
-                padding="2em",
-                background=rx.color("gray", 3),
-                border_radius="12px",
-                width="100%",
-            ),
+            chat_input(CompanySummaryState),
             rx.fragment(),
-        ),
+        )
     )

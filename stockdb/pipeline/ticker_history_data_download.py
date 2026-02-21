@@ -7,13 +7,8 @@ from api.models import StockExchange
 from rich.progress import track
 from rich.prompt import Prompt
 from stocksense.config import get_settings
-from stocksense.data import (
-    Interval,
-    Period,
-    StockDataDB,
-    StockExchangeYahooIdentifier,
-    YFStockData,
-)
+from stocksense.data import StockDataDB, YFStockData
+from stocksense.types import DataInterval, DataPeriod, StockExchangeYahooIdentifier
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -74,7 +69,7 @@ def download_specific_date_ticker_history(
         exchange_market=getattr(StockExchangeYahooIdentifier, exchange.value),
     )
     result = yf.get_ticker_history(
-        start=start_date, end=today, interval=Interval.ONE_DAY
+        start=start_date, end=today, interval=DataInterval.ONE_DAY
     )
 
     return (
@@ -103,7 +98,7 @@ def download_entire_ticker_history(
         exchange_market=getattr(StockExchangeYahooIdentifier, exchange.value),
     )
     logger.debug("downloading entire historical data")
-    result = yf.get_ticker_history(period=Period.MAX, interval=Interval.ONE_DAY)
+    result = yf.get_ticker_history(period=DataPeriod.MAX, interval=DataInterval.ONE_DAY)
 
     return (
         pl

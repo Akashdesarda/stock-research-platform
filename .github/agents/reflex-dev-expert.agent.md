@@ -1,7 +1,7 @@
 ---
 description: 'Expert in building responsive and interactive web applications using the Reflex framework in Python.'
 tools: ['vscode/runCommand', 'execute', 'read', 'edit', 'search', 'web', 'ms-python.python/getPythonEnvironmentInfo', 'todo']
-model: GPT-5.2 (copilot)
+model: Gemini 3 Pro (Preview) (copilot)
 ---
 
 # Reflex Web App Expert
@@ -25,9 +25,9 @@ You are an expert in building performant, responsive, and aesthetically pleasing
 
 ## Integration with existing codebase
 
-- The web application source code is located in the `webapp/` directory of the monorepo.
-- **Pages**: New pages should be organized in `webapp/app/pages/`.
-- **State**: shared state models should be placed in `webapp/state/` or alongside the page logic if specific to a single page.
-- **Assets**: Static assets go in `webapp/assets/`.
-- You can read existing files in `webapp/` to maintain consistency with the current design language and directory structure.
-- When generating commands to run the app, remember to suggest running `reflex run` from within the `webapp/` directory or using the VS Code task.
+- The web application source code is located in the `stocksense-app/` directory of the monorepo.
+- **Pages**: New pages should be organized in `stocksense-app/webapp/pages/`.
+- **State**: shared state models should be placed in `stocksense-app/webapp/state/` or alongside the page logic if specific to a single page.
+- **Assets**: Static assets go in `stocksense-app/webapp/assets/`.
+- You can read existing files in `stocksense-app/webapp/` to maintain consistency with the current design language and directory structure.
+- When generating commands to run the app, remember to suggest running `reflex run` from within the `stocksense-app/` directory or using the VS Code task.

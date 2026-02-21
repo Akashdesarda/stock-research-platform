@@ -1,58 +1,29 @@
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
-from enum import Enum
+from typing import TYPE_CHECKING
 
 import polars as pl
-import yfinance as yf
+
+from stocksense.types import DataInterval, DataPeriod, StockExchangeYahooIdentifier
 
 logger = logging.getLogger("stocksense")
 
-
-class Period(Enum):
-    ONE_DAY = "1d"
-    FIVE_DAYS = "5d"
-    ONE_MONTH = "1mo"
-    THREE_MONTHS = "3mo"
-    SIX_MONTHS = "6mo"
-    ONE_YEAR = "1y"
-    TWO_YEARS = "2y"
-    FIVE_YEARS = "5y"
-    TEN_YEARS = "10y"
-    YEAR_TO_DATE = "ytd"
-    MAX = "max"
+if TYPE_CHECKING:
+    import yfinance as yf
 
 
-class Interval(Enum):
-    ONE_MINUTE = "1m"
-    TWO_MINUTES = "2m"
-    FIVE_MINUTES = "5m"
-    FIFTEEN_MINUTES = "15m"
-    THIRTY_MINUTES = "30m"
-    SIXTY_MINUTES = "60m"
-    NINETY_MINUTES = "90m"
-    ONE_HOUR = "1h"
-    ONE_DAY = "1d"
-    FIVE_DAYS = "5d"
-    ONE_WEEK = "1wk"
-    ONE_MONTH = "1mo"
-    THREE_MONTHS = "3mo"
-
-
-class StockExchangeYahooIdentifier(Enum):
-    nse = ".NS"
-    bse = ".BO"
-    nasdaq = ""
-    nyse = ""
-    lse = ".L"
-    tse = ".T"
-    hkse = ".HK"
-    xetra = ".X"
-    sse = ".S"
-    asx = ".A"
-    bmv = ".M"
-    tsx = ".C"
-    euronext = ".F"
+def _require_yfinance():
+    try:
+        import yfinance as yf
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "YFStockData requires optional dependency 'yfinance'. Install the 'data' extra, e.g.\n"
+            '  pip install "Stocksense-Core[data]"\n'
+            "or (uv)\n"
+            '  uv add "Stocksense-Core[data]"'
+        ) from e
+    return yf
 
 
 @dataclass
@@ -80,6 +51,8 @@ class YFStockData:
         if isinstance(self.ticker, list):
             self._ticker_data = dict.fromkeys(self._ticker_without_exchange)
 
+        self._ticker_handler = self._create_ticker_handler()
+
     @property
     def yahoo_aware_ticker(self) -> str | list[str]:
         return self._add_exchange_symbol(
@@ -87,7 +60,13 @@ class YFStockData:
         )
 
     @property
-    def ticker_handler(self) -> yf.Ticker | yf.Tickers:
+    def ticker_handler(self) -> "yf.Ticker | yf.Tickers":
+        if self._ticker_handler is None:
+            self._ticker_handler = self._create_ticker_handler()
+        return self._ticker_handler
+
+    def _create_ticker_handler(self) -> "yf.Ticker | yf.Tickers":
+        yf = _require_yfinance()
         return (
             yf.Ticker(self.yahoo_aware_ticker)
             if isinstance(self.ticker, str)
@@ -95,58 +74,57 @@ class YFStockData:
         )
 
     def get_ticker_info(self) -> dict[str, dict]:
-        if isinstance(self.ticker_handler, yf.Ticker):
-            self._ticker_data[self._ticker_without_exchange] = (
-                self.ticker_handler.get_info()
-            )
+        yf = _require_yfinance()
+        handler = self.ticker_handler
+        if isinstance(handler, yf.Ticker):
+            self._ticker_data[self._ticker_without_exchange] = handler.get_info()
         else:
             for ex_tick, tick in zip(
                 self.yahoo_aware_ticker, self._ticker_without_exchange
             ):
-                self._ticker_data[tick] = self.ticker_handler.tickers[
-                    ex_tick
-                ].get_info()
+                self._ticker_data[tick] = handler.tickers[ex_tick].get_info()
 
         return self._ticker_data
 
     def get_ticker_history(
         self,
-        period: Period | None = Period.FIVE_DAYS,
-        interval: Interval = Interval.ONE_DAY,
+        period: DataPeriod | None = DataPeriod.FIVE_DAYS,
+        interval: DataInterval = DataInterval.ONE_DAY,
         start: date | None = None,
         end: date | None = None,
     ) -> dict[str, pl.DataFrame]:
-        # NOTE - If start, end & period is given then start & end will have preference
+        # If explicit date bounds are provided, period must be disabled for yfinance.
         period = None if start and end else period.value
+        handler = self.ticker_handler
         if isinstance(self.ticker, str):
-            result = self.ticker_handler.history(
+            result = self._history_with_repair_fallback(
+                handler,
                 period=period,
                 interval=interval.value,
                 start=start,
-                # WARNING - For some reason yfinance downloads data as end date - 1. So adding 1 day
+                # yfinance treats end as exclusive in some cases, so shift by +1 day.
                 end=end + timedelta(days=1) if end else None,
                 actions=False,
                 raise_errors=True,
                 # NOTE - not present in single `Ticker` object
                 # progress=False,
                 # group_by="ticker",
-                repair=True,
             )
             self._ticker_data[self._ticker_without_exchange] = (
                 self._transform_history_result(result)
             )
 
         else:
-            result = self.ticker_handler.history(
+            result = self._history_with_repair_fallback(
+                handler,
                 period=period,
                 interval=interval.value,
                 start=start,
-                # WARNING - For some reason yfinance downloads data as end date - 1. So adding 1 day
+                # yfinance treats end as exclusive in some cases, so shift by +1 day.
                 end=end + timedelta(days=1) if end else None,
                 group_by="ticker",
                 actions=False,
                 progress=False,
-                repair=True,
                 # raise_errors=True, # NOTE - currently not supported by `Tickers` object
             )
             for ex_tick, tick in zip(
@@ -159,6 +137,25 @@ class YFStockData:
         return self._ticker_data
 
     # TODO - add methods supporting all other api functionality provided by YFinance
+
+    @staticmethod
+    def _history_with_repair_fallback(handler, **history_kwargs):
+        try:
+            # Prefer repaired prices, but retry without repair for current upstream bug paths.
+            result = handler.history(**history_kwargs, repair=True)
+            if getattr(result, "empty", False):
+                logger.warning(
+                    "yfinance returned empty result with repair=True. Retrying with repair=False."
+                )
+                return handler.history(**history_kwargs, repair=False)
+            return result
+        except ValueError as exc:
+            if "output array is read-only" not in str(exc):
+                raise
+            logger.warning(
+                "yfinance repair=True failed with read-only array error. Retrying with repair=False."
+            )
+            return handler.history(**history_kwargs, repair=False)
 
     @staticmethod
     def _remove_exchange_symbol(symbol: str | list[str]) -> str | list[str]:
@@ -177,7 +174,9 @@ class YFStockData:
     @staticmethod
     def _transform_history_result(data):
         return (
-            pl.from_pandas(data, include_index=True)
+            pl
+            .from_pandas(data, include_index=True)
+            # Normalize yfinance index/timestamp naming and schema for downstream strategy code.
             .rename(
                 lambda name: "date" if name in ["Date", "Datetime"] else name.lower()
             )

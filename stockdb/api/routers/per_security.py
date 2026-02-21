@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 import polars as pl
-from duckdb import BinderException, ParserException
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import ORJSONResponse
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB, YFStockData
@@ -57,7 +56,7 @@ async def list_ticker(
         .scan_delta(table_path)
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
-        .collect_async()
+        .collect_async()  # ty:ignore[invalid-await]
     )
     return ORJSONResponse(result.to_dicts())
 
@@ -92,46 +91,12 @@ async def list_ticker_in_index(
         .filter(pl.col("index_symbol").list.contains(index))
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
-        .collect_async()
+        .collect_async()  # ty:ignore[invalid-await]
     )
     return ORJSONResponse(result.to_dicts())
 
 
-@router.post("/{exchange}/query", response_model=TickerHistoryOutput)
-async def ticker_query(
-    exchange: Annotated[
-        StockExchange,
-        Path(
-            description="Symbol of the exchange",
-            examples=["nse", "nyse"],
-        ),
-    ],
-    sql_query: Annotated[
-        str,
-        Body(
-            embed=True,
-            description="""SQL query to get ticker(s) history data.
-
-            NOTE: Always use `self` as table name in the sql query.""",
-        ),
-    ],
-) -> ORJSONResponse:
-    """Get stock history data for given `exchange` using SQL query"""
-    history_data = StockDataDB(
-        settings.stockdb.data_base_path / f"{exchange.value}/ticker_history"
-    )
-    # Execute SQL query
-    try:
-        result = history_data.sql_filter(sql_query)
-        result = await result.collect_async()
-        return ORJSONResponse(result.to_dicts())
-    except (BinderException, ParserException) as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        ) from e
-
-
-@router.get("/{exchange}/{ticker}")
+@router.get("/{exchange}/{ticker}/info")
 async def ticker_information(
     ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
 ) -> dict[str, Any]:
@@ -205,5 +170,5 @@ async def ticker_history(
         .sort("date", descending=True)  # sorting back to latest date first
     )
 
-    result = await result.collect_async()
+    result = await result.collect_async()  # ty:ignore[invalid-await]
     return ORJSONResponse(result.to_dicts())

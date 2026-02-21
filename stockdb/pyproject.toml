@@ -1,17 +1,17 @@
 [project]
 name = "StockSense-Stockdb"
-version = "1.1.4"
+version = "1.3.4"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alive-progress>=3.3.0",
-    "fastapi>=0.116.1",
+    "fastapi>=0.128.0",
     "orjson>=3.11.3",
     "polars[deltalake,pyarrow]>=1.33.0",
     "pydantic-settings>=2.10.1",
-    "rich>=14.1.0",
-    "scalar-fastapi>=1.4.3",
+    "rich>=14.3.1",
+    "scalar-fastapi>=1.6.1",
     "scipy>=1.16.2",
     "stocksense-core[data]",
     "uvicorn>=0.37.0",

@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 
+from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart
 from pydantic_ai.models import Model, infer_model
 
 
@@ -26,7 +27,8 @@ def get_model(model_name: str, api_key: str) -> Model:
     # 1. Extract provider to guess the Env Var Name (e.g., 'openai' -> 'OPENAI_API_KEY')
     if ":" in model_name:
         provider_prefix = (
-            model_name.split(":")[0]
+            model_name
+            .split(":")[0]
             # EG google-gla -> google (since google have multiple providers)
             .split("-")[0]
             .upper()
@@ -44,4 +46,18 @@ def get_model(model_name: str, api_key: str) -> Model:
         # infer_model reads the env var we just set
         model = infer_model(model_name)
 
+    # TODO - Add logic to handle LLM specific customizations/initialization
+
     return model
+
+
+def get_thinking_parts(messages: list[ModelMessage]) -> str:
+    """Extracts the 'thinking' parts from the model's response."""
+    thinking_content = []
+    for message in messages:
+        if isinstance(message, ModelResponse):
+            thinking_content.extend(
+                part.content for part in message.parts if isinstance(part, ThinkingPart)
+            )
+
+    return "\n".join(thinking_content)

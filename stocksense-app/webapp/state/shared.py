@@ -1,8 +1,9 @@
 from typing import Literal
+
 import polars as pl
-from pydantic import BaseModel
 import reflex as rx
 from httpx import AsyncClient
+from pydantic import BaseModel
 from stocksense.config import get_settings
 
 settings = get_settings()
@@ -12,7 +13,7 @@ class CommonMixin(rx.State, mixin=True):
     """A mixin state for common StockDB data."""
 
     selected_exchange: str = ""
-    selected_ticker: str | list[str] = []
+    selected_ticker: list[str] = []
 
     @rx.var
     async def available_exchanges(self) -> pl.DataFrame:
@@ -109,11 +110,6 @@ class CommonMixin(rx.State, mixin=True):
             .select("ticker")
             .to_series()
             .to_list()
-            #     if isinstance(dropdown_values, list)
-            #     else df
-            #     .filter(pl.col("dropdown") == dropdown_values)
-            #     .select("ticker")
-            #     .item()
         )
 
     async def get_ticker_history_columns(self) -> list[str]:
@@ -161,6 +157,8 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
         self.selected_exchange_dropdown = value
         self.selected_ticker_dropdown = ""
         self.selected_ticker_dropdowns = []
+        self.selected_ticker = []
+        self.index_choice = ""
         # NOTE: get_exchange_symbol comes from CommonMixin
         await self.get_exchange_symbol(value)
 
@@ -204,9 +202,11 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
         # NOTE: get_ticker_symbols comes from CommonMixin
         await self.get_ticker_symbols(normalized_values)
 
+
 class Message(BaseModel):
     role: str
     content: str
+
 
 class ChatMixin(rx.State, mixin=True):
     """A mixin state for common chat data."""
@@ -229,9 +229,7 @@ class ChatMixin(rx.State, mixin=True):
         if not content.strip():
             return
 
-        self.messages.append(
-            Message(role=role, content=content)
-        )
+        self.messages.append(Message(role=role, content=content))
 
         # Reset the prompt only if the message is from the user
         if role == "user":

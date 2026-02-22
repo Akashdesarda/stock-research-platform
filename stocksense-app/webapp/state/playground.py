@@ -157,11 +157,17 @@ class DataState(TickerSelectionMixin, rx.State):
             self._cancel_event.clear()
             tickers = self.selected_ticker
             use_sql = bool(self.sql_query.strip())
+            history_params = {
+                "period": self.period,
+                "interval": self.interval,
+                "start_date": self.date_start or None,
+                "end_date": self.date_end or None,
+            }
 
         if use_sql:
             await self._fetch_via_sql_api()
         else:
-            await self._fetch_via_ticker_api(tickers)
+            await self._fetch_via_ticker_api(tickers, history_params)
 
     @rx.event(background=True)
     async def generate_text_to_sql(self):
@@ -326,7 +332,9 @@ class DataState(TickerSelectionMixin, rx.State):
             data = pl.LazyFrame(result)
         await self._process_results(data)
 
-    async def _fetch_via_ticker_api(self, tickers: list[str]):
+    async def _fetch_via_ticker_api(
+        self, tickers: list[str], history_params: dict[str, str | None]
+    ):
         """Fetch data by iterating over tickers with throttling."""
         sem = asyncio.Semaphore(10)  # Throttling to 10 concurrent requests
 
@@ -337,7 +345,7 @@ class DataState(TickerSelectionMixin, rx.State):
                 resp = await client.get(
                     url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security"
                     f"/{self.selected_exchange}/{ticker}/history",
-                    params={"period": self.period, "interval": self.interval},
+                    params=history_params,
                 )
                 return resp.json()
 

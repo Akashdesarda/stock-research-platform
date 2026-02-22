@@ -18,9 +18,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
 
     summary_result: str = ""
     _company_summary: CompanySummaryOutput | None = None
-    qa_current_result: str = ""
     qa_messages: list = []
-
 
     # Common variables needed for shared mixin
     allow_ticker_choice: bool = False

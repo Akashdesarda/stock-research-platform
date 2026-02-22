@@ -99,8 +99,8 @@ class ConfigurationState(rx.State):
         self.app_company_summary_qa_model = value
 
     @rx.event
-    def reload_from_disk(self) -> None:
-        """Reload config.toml from disk and refresh state values."""
+    def apply_to_current_session(self) -> None:
+        """Apply form values to runtime settings for the current session."""
         global settings
         settings = get_settings()
 

@@ -196,10 +196,10 @@ def configuration() -> rx.Component:
                 rx.hstack(
                     save_button(on_click=ConfigurationState.update_config),
                     action_button(
-                        "Reload from disk",
+                        "Apply to current session",
                         kind="secondary",
                         left_icon="redo_2",
-                        on_click=ConfigurationState.reload_from_disk,
+                        on_click=ConfigurationState.apply_to_current_session,
                     ),
                     rx.spacer(),
                     rx.cond(

@@ -161,7 +161,9 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
             ),
             rx.button(
                 rx.icon("send", size=18),
-                on_click=state.append_message(role="user", content=state.prompt),
+                on_click=state.generate_answer,
+                loading=state.is_loading,
+                disabled=state.is_loading | (state.prompt == ""),
                 size="2",
                 radius="full",
                 variant="solid",

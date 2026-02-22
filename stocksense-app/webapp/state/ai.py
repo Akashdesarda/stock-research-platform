@@ -2,7 +2,7 @@ import logging
 
 import reflex as rx
 from httpx import AsyncClient
-from stocksense.ai.agents import company_summary
+from stocksense.ai.agents import company_summary, company_summary_qa, CompanySummaryOutput, CompanyDataContextDependency
 from stocksense.ai.models import get_thinking_parts
 from stocksense.config import get_settings
 
@@ -17,6 +17,10 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
     """State for the company summary research tool"""
 
     summary_result: str = ""
+    _company_summary: CompanySummaryOutput | None = None
+    qa_current_result: str = ""
+    qa_messages: list = []
+
 
     # Common variables needed for shared mixin
     allow_ticker_choice: bool = False
@@ -80,6 +84,10 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
             self.ai_status_message = "Generating company summary..."
             self.ai_status_steps = ["Initializing request"]
             self.ai_is_generating = True
+            self.ai_error = ""
+            self.is_loading = False
+            self.qa_messages = []
+            self.messages = []
 
             # Add user prompt to chat window so they see what they asked
             # (Optional but good UX since they clicked a button instead of typing)
@@ -96,12 +104,13 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
             "",
         )
         if not api_key:
-            async with self:
-                self.ai_error = "Missing API key for the text-to-SQL model."
+             logger.error("missing API key for company summary model")
+             async with self:
+                self.ai_error = "Missing API key for the company summary model."
                 self.ai_status_message = ""
                 self.ai_status_steps.append("Missing API key; cannot run model.")
                 self.ai_is_generating = False
-            return
+                return
 
         try:
             # Cache lookup (best-effort). Do not mutate the user's cache preference.
@@ -114,6 +123,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
                 if retrieved_cache is not None:
                     cached_summary, cached_thinking = retrieved_cache
                     async with self:
+                        self._company_summary = CompanySummaryOutput.from_text(cached_summary)
                         self.summary_result = cached_summary
                         self.ai_thinking_part = cached_thinking
                         self.ai_status_steps.append("Fetched summary from cache.")
@@ -131,16 +141,21 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
                     "No cache entry found; generating via model."
                 )
 
-            cs_output = await company_summary(
+            ctx_deps = CompanyDataContextDependency(self.selected_exchange, self.selected_ticker[0])
+            agent = await company_summary(
                 model_name=model_name,
                 api_key=api_key,
-                exchange=self.selected_exchange,
-                ticker=self.selected_ticker[0],
             )
             async with self:
-                self.ai_thinking_part = get_thinking_parts(cs_output.new_messages())
+                result = await agent.run("Give me detail information with respect to the given company data", deps=ctx_deps)
+                # explore how the output can be streamed in chunks using yield
+                self.summary_result = result.output.text_output()
+                self.ai_thinking_part = get_thinking_parts(result.new_messages())
                 self.ai_status_steps.append("Company summary fetched successfully.")
-                self.summary_result = cs_output.output.text_output()
+                self.ai_status_message = "Company summary generated successfully."
+
+                # Store the full output object for later QA use
+                self._company_summary = result.output
 
                 # Append message directly to state while in `async with self`
                 self.messages.append(
@@ -161,6 +176,74 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
         finally:
             async with self:
                 self.ai_is_generating = False
+
+    @rx.event(background=True)
+    async def generate_answer(self):
+        """Run QA for the current user prompt against the generated company summary."""
+        model_name = settings.app.company_summary_qa_model
+        api_key = getattr(
+            settings.common,
+            f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
+            "",
+        )
+        if not api_key:
+            logger.error("missing API key for company-summary-qa model")
+            async with self:
+                self.ai_error = "Missing API key for the company-summary-qa model."
+                self.ai_status_message = ""
+                self.ai_status_steps.append("Missing API key; cannot run model.")
+                self.ai_is_generating = False
+                self.is_loading = False
+            return
+
+        async with self:
+            if self.ai_is_generating:
+                return
+
+            prompt = self.prompt.strip()
+            if not prompt:
+                return
+
+            if not self._company_summary:
+                self.ai_error = "No company summary available to answer questions. Please generate the summary first."
+                logger.warning("Attempted to run QA without an available company summary.")
+                return
+
+            self.ai_error = ""
+            self.ai_status_message = "Generating answer..."
+            self.ai_is_generating = True
+            self.is_loading = True
+            self.messages.append(Message(role="user", content=prompt))
+            self.prompt = ""
+            company_summary = self._company_summary
+            qa_messages = list(self.qa_messages)
+
+        try:
+            agent = company_summary_qa(
+                model_name=model_name,
+                api_key=api_key,
+                company_summary=company_summary,
+            )
+            result = await agent.run(prompt, message_history=qa_messages)
+
+            async with self:
+                # Keep raw model messages for follow-up questions.
+                self.qa_messages.extend(result.new_messages())
+                self.messages.append(
+                    Message(role="assistant", content=result.output)
+                )
+                self.ai_status_message = ""
+
+        except Exception as e:
+            logger.error(f"Error during company summary QA: {e}")
+            async with self:
+                self.ai_error = f"Error during company summary QA: {str(e)}"
+                self.ai_status_steps.append(f"QA failed: {type(e).__name__}")
+
+        finally:
+            async with self:
+                self.ai_is_generating = False
+                self.is_loading = False
 
     async def _try_fetch_cached_summary(self, prompt: str) -> tuple[str, str] | None:
         """Try to fetch cached company summary for a prompt"""

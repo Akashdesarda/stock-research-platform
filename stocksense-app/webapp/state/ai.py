@@ -2,11 +2,16 @@ import logging
 
 import reflex as rx
 from httpx import AsyncClient
-from stocksense.ai.agents import company_summary, company_summary_qa, CompanySummaryOutput, CompanyDataContextDependency
+from stocksense.ai.agents import (
+    CompanyDataContextDependency,
+    CompanySummaryOutput,
+    company_summary,
+    company_summary_qa,
+)
 from stocksense.ai.models import get_thinking_parts
 from stocksense.config import get_settings
 
-from webapp.state.shared import TickerSelectionMixin, ChatMixin, Message
+from webapp.state.shared import ChatMixin, Message, TickerSelectionMixin
 from webapp.types import TickerChoice
 
 logger = logging.getLogger("stocksense")
@@ -85,25 +90,21 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
             self.ai_error = ""
             self.is_loading = False
             self.qa_messages = []
-            self.messages = []
-
             # Add user prompt to chat window so they see what they asked
-            # (Optional but good UX since they clicked a button instead of typing)
-            self.messages.append(
-                Message(role="user", content=self.summary_prompt)
-            )
+            # NOTE - resetting  messages from here onwards since new company is selected.
+            self.messages = [Message(role="user", content=self.summary_prompt)]
 
             use_cache = bool(self.ai_use_cache)
 
-        model_name = settings.app.text_to_sql_model
+        model_name = settings.app.company_summary_model
         api_key = getattr(
             settings.common,
             f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
             "",
         )
         if not api_key:
-             logger.error("missing API key for company summary model")
-             async with self:
+            logger.error("missing API key for company summary model")
+            async with self:
                 self.ai_error = "Missing API key for the company summary model."
                 self.ai_status_message = ""
                 self.ai_status_steps.append("Missing API key; cannot run model.")
@@ -121,7 +122,9 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
                 if retrieved_cache is not None:
                     cached_summary, cached_thinking = retrieved_cache
                     async with self:
-                        self._company_summary = CompanySummaryOutput.from_text(cached_summary)
+                        self._company_summary = CompanySummaryOutput.from_text(
+                            cached_summary
+                        )
                         self.summary_result = cached_summary
                         self.ai_thinking_part = cached_thinking
                         self.ai_status_steps.append("Fetched summary from cache.")
@@ -139,13 +142,18 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
                     "No cache entry found; generating via model."
                 )
 
-            ctx_deps = CompanyDataContextDependency(self.selected_exchange, self.selected_ticker[0])
+            ctx_deps = CompanyDataContextDependency(
+                self.selected_exchange, self.selected_ticker[0]
+            )
             agent = await company_summary(
                 model_name=model_name,
                 api_key=api_key,
             )
             async with self:
-                result = await agent.run("Give me detail information with respect to the given company data", deps=ctx_deps)
+                result = await agent.run(
+                    "Give me detail information with respect to the given company data",
+                    deps=ctx_deps,
+                )
                 # explore how the output can be streamed in chunks using yield
                 self.summary_result = result.output.text_output()
                 self.ai_thinking_part = get_thinking_parts(result.new_messages())
@@ -204,7 +212,9 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
 
             if not self._company_summary:
                 self.ai_error = "No company summary available to answer questions. Please generate the summary first."
-                logger.warning("Attempted to run QA without an available company summary.")
+                logger.warning(
+                    "Attempted to run QA without an available company summary."
+                )
                 return
 
             self.ai_error = ""
@@ -227,9 +237,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
             async with self:
                 # Keep raw model messages for follow-up questions.
                 self.qa_messages.extend(result.new_messages())
-                self.messages.append(
-                    Message(role="assistant", content=result.output)
-                )
+                self.messages.append(Message(role="assistant", content=result.output))
                 self.ai_status_message = ""
 
         except Exception as e:

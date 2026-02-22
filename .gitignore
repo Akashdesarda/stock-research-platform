@@ -227,3 +227,8 @@ stockdb/temp_data/**
 *.py[cod]
 **/.web
 **/*.db
+
+# zed
+.zed/
+
+config.toml

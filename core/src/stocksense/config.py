@@ -198,6 +198,13 @@ class Settings(BaseSettings):
         with open(_file, "w") as f:
             toml.dump(self.model_dump(), f)
 
+    def get_model_api_keys(self, model_name: str) -> str:
+        return getattr(
+            self.common,
+            f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
+            "",
+        )
+
 
 # the Settings model
 def get_settings(config_path: str | Path | None = None) -> Settings:

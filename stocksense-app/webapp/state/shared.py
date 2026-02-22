@@ -1,6 +1,9 @@
+from typing import Literal
+
 import polars as pl
 import reflex as rx
 from httpx import AsyncClient
+from pydantic import BaseModel
 from stocksense.config import get_settings
 
 settings = get_settings()
@@ -102,8 +105,132 @@ class CommonMixin(rx.State, mixin=True):
         _ = await self.available_tickers
         df = _[self.selected_exchange]
         self.selected_ticker = (
-            df.filter(pl.col("dropdown").is_in(dropdown_values))
+            df
+            .filter(pl.col("dropdown").is_in(dropdown_values))
             .select("ticker")
             .to_series()
             .to_list()
         )
+
+    async def get_ticker_history_columns(self) -> list[str]:
+        """Fetch column names for the stock history table."""
+        async with AsyncClient(timeout=None, follow_redirects=True) as client:
+            response = await client.get(
+                url=f"{settings.common.base_url}:{settings.stockdb.port}"
+                f"/api/per-security/nse/tcs/history",
+                params={"interval": "1d", "period": "1d"},
+            )
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            return list(payload[0].keys()) if payload else []
+
+
+class TickerSelectionMixin(CommonMixin, mixin=True):
+    """Mixin for interactive ticker selection state logic."""
+
+    # Form fields
+    selected_exchange_dropdown: str = ""
+    allow_ticker_choice: bool = True
+    ticker_choice: str = "Index Based"
+    selected_ticker_dropdown: str = ""
+    selected_ticker_dropdowns: list[str] = []
+    index_choice: str = ""
+    desired_choice_as_multi_select: bool = True
+
+    @rx.var
+    async def exchange_wise_index(self) -> dict:
+        async with AsyncClient() as client:
+            response = await client.get(
+                f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/list-indexes"
+            )
+            return response.json()
+
+    @rx.var
+    async def available_index(self) -> list[str]:
+        _ = await self.exchange_wise_index
+        # NOTE: self.selected_exchange comes from CommonMixin
+        return _.get(self.selected_exchange, [])
+
+    @rx.event
+    async def set_exchange_dropdown(self, value: str):
+        self.selected_exchange_dropdown = value
+        self.selected_ticker_dropdown = ""
+        self.selected_ticker_dropdowns = []
+        self.selected_ticker = []
+        self.index_choice = ""
+        # NOTE: get_exchange_symbol comes from CommonMixin
+        await self.get_exchange_symbol(value)
+
+    @rx.event
+    async def set_ticker_choice(self, value: str):
+        self.ticker_choice = value
+
+        # NOTE - for "All" committing right away
+        if value == "All":
+            # NOTE: available_tickers comes from CommonMixin
+            _ = await self.available_tickers
+            df = _[self.selected_exchange]
+            self.selected_ticker = df.select("ticker").to_series().to_list()
+        else:
+            self.selected_ticker = []
+
+    @rx.event
+    async def set_index_choice(self, value: str):
+        self.index_choice = value
+        await self.get_tickers_for_index()
+
+    @rx.event
+    async def get_tickers_for_index(self):
+        async with AsyncClient() as client:
+            # NOTE - response --> [{ticker, company},...]
+            response = await client.get(
+                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{self.selected_exchange}/{self.index_choice}"
+            )
+        self.selected_ticker = [i["ticker"] for i in response.json()]
+
+    @rx.event
+    async def get_tickers_for_desired(self, values: list[str] | str):
+        if isinstance(values, str):
+            normalized_values = [values] if values else []
+            self.selected_ticker_dropdown = values
+        else:
+            normalized_values = values
+            self.selected_ticker_dropdown = values[0] if values else ""
+
+        self.selected_ticker_dropdowns = normalized_values
+        # NOTE: get_ticker_symbols comes from CommonMixin
+        await self.get_ticker_symbols(normalized_values)
+
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+
+class ChatMixin(rx.State, mixin=True):
+    """A mixin state for common chat data."""
+
+    prompt: str = ""
+    messages: list[Message] = []
+    is_loading: bool = False
+
+    @rx.event
+    def set_prompt(self, value: str):
+        self.prompt = value
+
+    @rx.event
+    def reset_prompt(self):
+        self.prompt = ""
+        self.is_loading = True
+
+    @rx.event
+    async def append_message(self, role: Literal["user", "assistant"], content: str):
+        if not content.strip():
+            return
+
+        self.messages.append(Message(role=role, content=content))
+
+        # Reset the prompt only if the message is from the user
+        if role == "user":
+            yield type(self).reset_prompt

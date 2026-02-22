@@ -78,10 +78,6 @@ class ConfigurationState(rx.State):
     def update_stockdb_port(self, value: int | str):
         self.stockdb_port = int(value)
 
-    # @rx.event
-    # def update_stockdb_data_base_path(self, value: str):
-    #     self.stockdb_data_base_path = value
-
     @rx.event
     def update_stockdb_download_batch_size(self, value: int | str):
         self.stockdb_download_batch_size = int(value)
@@ -103,33 +99,27 @@ class ConfigurationState(rx.State):
         self.app_company_summary_qa_model = value
 
     @rx.event
-    def reload_from_disk(self) -> None:
-        """Reload config.toml from disk and refresh state values."""
+    def apply_to_current_session(self) -> None:
+        """Apply form values to runtime settings for the current session."""
         global settings
         settings = get_settings()
 
-        self.common_base_url = settings.common.base_url
-        self.common_available_llm_providers = list(
-            settings.common.available_llm_providers
-        )
-        self.common_available_llm_providers_csv = ", ".join(
-            settings.common.available_llm_providers
-        )
-        self.common_GROQ_API_KEY = settings.common.GROQ_API_KEY
-        self.common_OPENAI_API_KEY = settings.common.OPENAI_API_KEY
-        self.common_ANTHROPIC_API_KEY = settings.common.ANTHROPIC_API_KEY
-        self.common_OLLAMA_API_KEY = settings.common.OLLAMA_API_KEY
-        self.common_GOOGLE_API_KEY = settings.common.GOOGLE_API_KEY
-        self.common_mlflow_port = settings.common.mlflow_port
+        settings.common.base_url = self.common_base_url
+        settings.common.available_llm_providers = self.common_available_llm_providers
+        settings.common.GROQ_API_KEY = self.common_GROQ_API_KEY
+        settings.common.OPENAI_API_KEY = self.common_OPENAI_API_KEY
+        settings.common.ANTHROPIC_API_KEY = self.common_ANTHROPIC_API_KEY
+        settings.common.OLLAMA_API_KEY = self.common_OLLAMA_API_KEY
+        settings.common.GOOGLE_API_KEY = self.common_GOOGLE_API_KEY
+        settings.common.mlflow_port = self.common_mlflow_port
 
-        self.stockdb_port = settings.stockdb.port
-        # self.stockdb_data_base_path = settings.stockdb.data_base_path.as_posix()
-        self.stockdb_download_batch_size = settings.stockdb.download_batch_size
+        settings.stockdb.port = self.stockdb_port
+        settings.stockdb.download_batch_size = self.stockdb_download_batch_size
 
-        self.app_port = settings.app.port
-        self.app_text_to_sql_model = settings.app.text_to_sql_model
-        self.app_company_summary_model = settings.app.company_summary_model
-        self.app_company_summary_qa_model = settings.app.company_summary_qa_model
+        settings.app.port = self.app_port
+        settings.app.text_to_sql_model = self.app_text_to_sql_model
+        settings.app.company_summary_model = self.app_company_summary_model
+        settings.app.company_summary_qa_model = self.app_company_summary_qa_model
 
         self.save_error = ""
 
@@ -254,7 +244,7 @@ class TaskState(CommonMixin, rx.State):
 
             url = (
                 f"{settings.common.base_url}:{settings.stockdb.port}"
-                "/api/task/ticker/history"
+                "/api/operation/download/ticker/history"
             )
 
             async with AsyncClient(follow_redirects=True) as client:

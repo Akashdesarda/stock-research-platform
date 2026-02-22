@@ -174,7 +174,7 @@ def data() -> rx.Component:
                         & (DataState.date_start != "")
                         & (DataState.date_end != ""),
                         rx.callout(
-                            "Data Period selection will be prioritized over the Date Range.",
+                            "Date Range selection will be prioritized over the Data Period.",
                             icon="info",
                             color_scheme="yellow",
                             width="100%",

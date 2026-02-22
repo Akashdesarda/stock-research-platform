@@ -2,7 +2,7 @@ import reflex as rx
 
 from webapp.components.inputs import checkbox_input, submit_button
 from webapp.components.layout import bordered_container
-from webapp.pages.shared_components import ticker_selector, chat_window, chat_input
+from webapp.pages.shared_components import chat_input, chat_window, ticker_selector
 from webapp.state.ai import CompanySummaryState
 
 
@@ -23,8 +23,7 @@ def company_summary_component() -> rx.Component:
                         CompanySummaryState.get_summary,
                     ],
                     disabled=CompanySummaryState.ai_is_generating
-                    | (CompanySummaryState.selected_exchange == "")
-                    | (CompanySummaryState.selected_ticker[0] == ""),
+                    | (CompanySummaryState.selected_ticker == []),
                 ),
                 rx.cond(
                     CompanySummaryState.ai_is_generating
@@ -81,5 +80,5 @@ def company_summary_component() -> rx.Component:
             CompanySummaryState.summary_result != "",
             chat_input(CompanySummaryState),
             rx.fragment(),
-        )
+        ),
     )

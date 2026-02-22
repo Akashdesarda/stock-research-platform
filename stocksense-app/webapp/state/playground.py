@@ -157,12 +157,17 @@ class DataState(TickerSelectionMixin, rx.State):
             self._cancel_event.clear()
             tickers = self.selected_ticker
             use_sql = bool(self.sql_query.strip())
-            history_params = {
-                "period": self.period,
-                "interval": self.interval,
-                "start_date": self.date_start or None,
-                "end_date": self.date_end or None,
-            }
+            if self.date_start and self.date_end:
+                history_params = {
+                    "interval": self.interval,
+                    "start_date": self.date_start,
+                    "end_date": self.date_end,
+                }
+            else:
+                history_params = {
+                    "interval": self.interval,
+                    "period": self.period,
+                }
 
         if use_sql:
             await self._fetch_via_sql_api()

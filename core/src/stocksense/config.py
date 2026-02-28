@@ -153,6 +153,7 @@ class Common(BaseModel):
     ANTHROPIC_API_KEY: str
     OLLAMA_API_KEY: str
     GOOGLE_API_KEY: str
+    phoenix_port: int
     mlflow_port: int
 
 

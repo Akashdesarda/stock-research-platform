@@ -1,24 +1,28 @@
 import re
 from dataclasses import dataclass
 
-import mlflow
-from httpx import Client, AsyncClient
-from mlflow.genai import load_prompt
+from httpx import AsyncClient
+from phoenix.client import AsyncClient as PhoenixAsyncClient
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, AgentRunResult, RunContext
+from pydantic_ai import Agent, RunContext
 
+from stocksense.ai import setup_phoenix_tracing
 from stocksense.ai.models import get_model
 from stocksense.config import get_settings
 
 settings = get_settings()
-# mlflow setup
-mlflow.set_tracking_uri(f"{settings.common.base_url}:{settings.common.mlflow_port}")
-mlflow.set_experiment("stocksense")
-mlflow.pydantic_ai.autolog()
+
+# Phoenix setup
+setup_phoenix_tracing()
+phoenix_client = PhoenixAsyncClient(
+    base_url=f"{settings.common.base_url}:{settings.common.phoenix_port}"
+)
 
 
 class CompanySummaryOutput(BaseModel):
-    company_overview: str = Field(..., description="High level overview of the company")
+    company_overview: str = Field(
+        ..., description="High level overview of the company"
+    )
     business_summary: str = Field(
         ..., description="Summary regarding all the business the company does"
     )
@@ -71,10 +75,16 @@ class CompanySummaryOutput(BaseModel):
         ).strip()
 
         # Split on separator lines (--- alone on a line)
-        parts = [p.strip() for p in re.split(r"(?m)^\s*---\s*$", cleaned) if p.strip()]
+        parts = [
+            p.strip()
+            for p in re.split(r"(?m)^\s*---\s*$", cleaned)
+            if p.strip()
+        ]
 
         if len(parts) != 6:
-            raise ValueError(f"Expected 6 sections separated by '---', found {len(parts)}.")
+            raise ValueError(
+                f"Expected 6 sections separated by '---', found {len(parts)}."
+            )
 
         return cls(
             company_overview=parts[0],
@@ -94,39 +104,68 @@ class CompanyDataContextDependency:
         f"{settings.common.base_url}:{settings.stockdb.port}/api"
     )
     http_client: AsyncClient = AsyncClient(
-        base_url=f'{settings.common.base_url}:{settings.stockdb.port}/api'
+        base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api"
     )
 
-async def company_summary(model_name: str, api_key: str) -> Agent[CompanyDataContextDependency, CompanySummaryOutput]:
+
+async def company_summary(
+    model_name: str, api_key: str
+) -> Agent[CompanyDataContextDependency, CompanySummaryOutput]:
+
     # initialize the agent
     agent: Agent[CompanyDataContextDependency, CompanySummaryOutput] = Agent(
         model=get_model(model_name, api_key),
         deps_type=CompanyDataContextDependency,
         output_type=CompanySummaryOutput,
-        system_prompt=str(load_prompt("company_analysis_report_system").format()),
+        instrument=True,
     )
+
+    @agent.system_prompt
+    async def add_system_prompt(
+        ctx: RunContext[CompanyDataContextDependency],
+    ) -> str:
+
+        prompt = await phoenix_client.prompts.get(
+            prompt_identifier="comapny-summary"
+        )
+        # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
+        msg = prompt.format(variables={"company_data": ""}).messages
+        for m in msg:
+            if m["role"] == "system":
+                return m["content"]
+        raise ValueError("No system prompt found in the retrieved prompt.")
 
     # REVIEW - See if vector embeddings can be used here instead of putting the text in prompt.
     @agent.instructions
-    async def add_company_data(ctx: RunContext[CompanyDataContextDependency]) -> str:
+    async def add_company_data(
+        ctx: RunContext[CompanyDataContextDependency],
+    ) -> str:
         _ = await ctx.deps.http_client.get(
             f"/per-security/{ctx.deps.exchange}/{ctx.deps.ticker}/info"
         )
         ticker_info = _.json()
-
-        return str(
-            load_prompt("company_analysis_report_task").format(company_data=ticker_info)
+        prompt = await phoenix_client.prompts.get(
+            prompt_identifier="comapny-summary"
+        )
+        msg = prompt.format(variables={"company_data": ticker_info}).messages
+        for m in msg:
+            if m["role"] == "user":
+                return m["content"]
+        raise ValueError(
+            "No user prompt/instruction found in the retrieved prompt."
         )
 
     return agent
 
+
 def company_summary_qa(
     model_name: str, api_key: str, company_summary: CompanySummaryOutput
-)-> Agent[None, str]:
+) -> Agent[None, str]:
     agent = Agent(
         model=get_model(model_name, api_key),
         system_prompt="You are a helpful finance analyst assistant.",
         output_type=str,
+        instrument=True,
     )
 
     # TODO - Use vector embeddings instead of putting the whole summary in the system prompt.

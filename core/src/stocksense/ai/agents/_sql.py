@@ -1,21 +1,23 @@
 from dataclasses import dataclass
 
-import mlflow
 from httpx import Client
-from mlflow.genai import load_prompt
+from phoenix.client import AsyncClient as PhoenixAsyncClient
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
+from stocksense.ai import setup_phoenix_tracing
 from stocksense.ai.models import get_model
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.tools.sql import ParseError, SQLQueryValidator
 
 settings = get_settings()
-# mlflow setup
-mlflow.set_tracking_uri(f"{settings.common.base_url}:{settings.common.mlflow_port}")
-mlflow.set_experiment("stocksense")
-mlflow.pydantic_ai.autolog()
+
+# Phoenix setup
+setup_phoenix_tracing()
+phoenix_client = PhoenixAsyncClient(
+    base_url=f"{settings.common.base_url}:{settings.common.phoenix_port}"
+)
 
 
 @dataclass
@@ -38,7 +40,7 @@ class TextToSQLOutput(BaseModel):
     )
 
 
-def text_to_sql(
+async def text_to_sql(
     model_name: str, api_key: str
 ) -> Agent[StockDBContextDependency, TextToSQLOutput]:
     # initialize the agent
@@ -46,18 +48,43 @@ def text_to_sql(
         model=get_model(model_name, api_key),
         deps_type=StockDBContextDependency,
         output_type=TextToSQLOutput,
-        system_prompt=str(load_prompt("text_to_sql_system").format()),
+        instrument=True,
     )
+
+    @agent.system_prompt
+    async def add_system_prompt(
+        ctx: RunContext[StockDBContextDependency],
+    ) -> str:
+        prompt = await phoenix_client.prompts.get(
+            prompt_identifier="text-to-sql"
+        )
+        # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
+        msg = prompt.format(
+            variables={"table_name": "", "columns_to_used": ""}
+        ).messages
+        for m in msg:
+            if m["role"] == "system":
+                return m["content"]
+        raise ValueError("No system prompt found in the retrieved prompt.")
 
     # Adding instruction to the agent
     @agent.instructions
-    def adding_tasks(ctx: RunContext[StockDBContextDependency]) -> str:
-
-        return str(
-            load_prompt("text_to_sql_task").format(
-                table_name=ctx.deps.table_name,
-                columns_to_used=", ".join(ctx.deps.columns),
-            )
+    async def adding_tasks(ctx: RunContext[StockDBContextDependency]) -> str:
+        prompt = await phoenix_client.prompts.get(
+            prompt_identifier="text-to-sql"
+        )
+        # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
+        msg = prompt.format(
+            variables={
+                "table_name": ctx.deps.table_name,
+                "columns_to_used": ", ".join(ctx.deps.columns),
+            }
+        ).messages
+        for m in msg:
+            if m["role"] == "user":
+                return m["content"]
+        raise ValueError(
+            "No user prompt/instruction found in the retrieved prompt."
         )
 
     @agent.tool
@@ -86,8 +113,7 @@ def text_to_sql(
         validator = SQLQueryValidator(query=query)
         try:
             return (
-                validator
-                .verify_syntax()
+                validator.verify_syntax()
                 # TODO - improved column verification logic
                 # .verify_columns(ctx.deps.columns)
                 .verify_table_name(ctx.deps.table_name)

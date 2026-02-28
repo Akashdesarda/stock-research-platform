@@ -28,22 +28,16 @@ services:
       init_snapshot:
         condition: service_completed_successfully
     tty: true
-  # 3. MLflow tracking server
-  mlflow:
-    image: ghcr.io/mlflow/mlflow
+  # 3. Arize phoenix server
+  phoenix:
+    image: arizephoenix/phoenix:latest
     ports:
-      - "5000:5000"
+      - 5000:5000 # PHOENIX_PORT
+      - 4317:4317 # PHOENIX_GRPC_PORT
+    environment:
+      PHOENIX_WORKING_DIR: /shared/phoenix
     volumes:
       - shared-data:/shared
-    environment:
-      MLFLOW_TRACKING_URI: http://0.0.0.0:5000
-      MLFLOW_ARTIFACT_ROOT: /shared/mlflow/artifacts
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri sqlite:////shared/mlflow/mlflow.db
-      --default-artifact-root /shared/mlflow/artifacts
     tty: true
 
 volumes:

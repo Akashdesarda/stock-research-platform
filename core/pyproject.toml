@@ -23,7 +23,15 @@ data = [
     "ta-lib>=0.6.8",
     "yfinance>=1.0",
 ]
-ai = ["mlflow-skinny>=3.7.0", "pydantic-ai>=1.31.0"]
+ai = [
+    "arize-phoenix-client>=1.29.0",
+    "arize-phoenix-otel>=0.14.0",
+    "openinference-instrumentation-pydantic-ai>=0.1.12",
+    "opentelemetry-api>=1.39.1",
+    "opentelemetry-exporter-otlp>=1.39.1",
+    "opentelemetry-sdk>=1.39.1",
+    "pydantic-ai>=1.31.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.2,<0.10.0"]

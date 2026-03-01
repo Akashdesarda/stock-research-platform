@@ -44,7 +44,7 @@ async def text_to_sql(
     model_name: str, api_key: str
 ) -> Agent[StockDBContextDependency, TextToSQLOutput]:
     # initialize the agent
-    agent = Agent(
+    agent: Agent[StockDBContextDependency, TextToSQLOutput] = Agent(
         model=get_model(model_name, api_key),
         deps_type=StockDBContextDependency,
         output_type=TextToSQLOutput,

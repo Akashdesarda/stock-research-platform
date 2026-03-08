@@ -23,7 +23,7 @@ class StockDataDB:
         )
 
     @property
-    def table_data(self):
+    def table_data(self) -> pl.LazyFrame:
         return self._table
 
     def sql_filter(self, query: str) -> pl.LazyFrame:
@@ -33,7 +33,9 @@ class StockDataDB:
         duckdb.register(self.table_name, self._table)
         return duckdb.sql(query).pl(lazy=True)
 
-    def polars_filter(self, *predicates: Any, **constraints: Any) -> pl.LazyFrame:
+    def polars_filter(
+        self, *predicates: Any, **constraints: Any
+    ) -> pl.LazyFrame:
         return self._table.filter(*predicates, **constraints)
 
     def merge(
@@ -42,8 +44,7 @@ class StockDataDB:
         predicate: str = "s.date = t.date AND s.ticker = t.ticker",
     ) -> dict:
         return (
-            data
-            .write_delta(
+            data.write_delta(
                 target=self.db_path,
                 mode="merge",
                 delta_merge_options={

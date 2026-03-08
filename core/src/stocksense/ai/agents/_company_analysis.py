@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 
 from stocksense.ai import setup_phoenix_tracing
-from stocksense.ai.models import get_model
+from stocksense.ai.utils import get_model
 from stocksense.config import get_settings
 
 settings = get_settings()

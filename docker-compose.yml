@@ -32,9 +32,10 @@ services:
   phoenix:
     image: arizephoenix/phoenix:latest
     ports:
-      - 5000:5000 # PHOENIX_PORT
+      - 6006:6006 # PHOENIX_PORT
       - 4317:4317 # PHOENIX_GRPC_PORT
     environment:
+      PHOENIX_PORT: 6006
       PHOENIX_WORKING_DIR: /shared/phoenix
     volumes:
       - shared-data:/shared

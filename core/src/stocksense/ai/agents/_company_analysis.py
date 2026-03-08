@@ -182,7 +182,7 @@ def company_summary_qa(
         cs = CompanySummaryOutput.from_text(company_summary)
         return (
             "Use only the following company data in json format while answering questions.\n"
-            f"{cs.model_dump()}"
+            f"{cs.model_dump(mode='json')}"
         )
 
     return agent

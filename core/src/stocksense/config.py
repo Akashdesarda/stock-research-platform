@@ -154,7 +154,6 @@ class Common(BaseModel):
     OLLAMA_API_KEY: str
     GOOGLE_API_KEY: str
     phoenix_port: int
-    mlflow_port: int
 
 
 # Model for the 'App' section

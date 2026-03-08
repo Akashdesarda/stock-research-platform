@@ -1,3 +1,4 @@
+import json
 import re
 from dataclasses import dataclass
 
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 
 from stocksense.ai import setup_phoenix_tracing
-from stocksense.ai.models import get_model
+from stocksense.ai.utils import get_model
 from stocksense.config import get_settings
 
 settings = get_settings()
@@ -104,7 +105,8 @@ class CompanyDataContextDependency:
         f"{settings.common.base_url}:{settings.stockdb.port}/api"
     )
     http_client: AsyncClient = AsyncClient(
-        base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api"
+        base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
+        timeout=None,
     )
 
 
@@ -126,7 +128,7 @@ async def company_summary(
     ) -> str:
 
         prompt = await phoenix_client.prompts.get(
-            prompt_identifier="comapny-summary"
+            prompt_identifier="company-summary"
         )
         # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
         msg = prompt.format(variables={"company_data": ""}).messages
@@ -145,9 +147,11 @@ async def company_summary(
         )
         ticker_info = _.json()
         prompt = await phoenix_client.prompts.get(
-            prompt_identifier="comapny-summary"
+            prompt_identifier="company-summary"
         )
-        msg = prompt.format(variables={"company_data": ticker_info}).messages
+        msg = prompt.format(
+            variables={"company_data": json.dumps(ticker_info)}
+        ).messages
         for m in msg:
             if m["role"] == "user":
                 return m["content"]
@@ -159,7 +163,7 @@ async def company_summary(
 
 
 def company_summary_qa(
-    model_name: str, api_key: str, company_summary: CompanySummaryOutput
+    model_name: str, api_key: str, company_summary: str | None
 ) -> Agent[None, str]:
     agent = Agent(
         model=get_model(model_name, api_key),
@@ -168,12 +172,15 @@ def company_summary_qa(
         instrument=True,
     )
 
-    # TODO - Use vector embeddings instead of putting the whole summary in the system prompt.
+    # TODO - Try to use vector embeddings instead of putting the whole summary in the system prompt.
     @agent.system_prompt
-    def add_company_summary() -> str:
+    def add_company_summary() -> str | None:
+        if company_summary is None:
+            return None
+        cs = CompanySummaryOutput.from_text(company_summary)
         return (
-            "Use only the following company data while answering questions.\n"
-            f"{company_summary.text_output()}"
+            "Use only the following company data in json format while answering questions.\n"
+            f"{cs.model_dump()}"
         )
 
     return agent

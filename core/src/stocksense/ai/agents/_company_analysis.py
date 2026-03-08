@@ -117,6 +117,7 @@ async def company_summary(
     # initialize the agent
     agent: Agent[CompanyDataContextDependency, CompanySummaryOutput] = Agent(
         model=get_model(model_name, api_key),
+        name="company-summary",
         deps_type=CompanyDataContextDependency,
         output_type=CompanySummaryOutput,
         instrument=True,
@@ -167,6 +168,7 @@ def company_summary_qa(
 ) -> Agent[None, str]:
     agent = Agent(
         model=get_model(model_name, api_key),
+        name="company-summary-qa",
         system_prompt="You are a helpful finance analyst assistant.",
         output_type=str,
         instrument=True,

@@ -1,5 +1,7 @@
 from datetime import date, datetime
 from enum import Enum
+from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -14,6 +16,7 @@ class APITags(Enum):
     dataset = "Dataset"
     task = "Task"
     ops = "Operation"
+    agent = "Agents"
 
 
 class Period(Enum):
@@ -151,7 +154,8 @@ class TickerHistoryQuery(BaseModel):
     model_config = {"extra": "forbid"}
 
     interval: Interval = Field(
-        Interval.ONE_DAY, description="Day interval between historical data points"
+        Interval.ONE_DAY,
+        description="Day interval between historical data points",
     )
     period: Period = Field(
         Period.ONE_DAY,
@@ -172,7 +176,11 @@ class TickerHistoryQuery(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -205,9 +213,12 @@ class TickerInput(BaseModel):
 
 class TaskTickerHistoryDownloadInput(BaseModel):
     exchange: StockExchange = Field(
-        StockExchange.nse, description="Stock Exchange to download ticker history for"
+        StockExchange.nse,
+        description="Stock Exchange to download ticker history for",
     )
-    task_mode: TaskMode = Field(TaskMode.auto, description="Mode of task execution")
+    task_mode: TaskMode = Field(
+        TaskMode.auto, description="Mode of task execution"
+    )
     download_mode: TickerHistoryDownloadMode = Field(
         TickerHistoryDownloadMode.incremental,
         description="Download mode. `full` mode downloads complete history. `incremental` mode downloads only latest/missing data.",
@@ -242,7 +253,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             )
         if self.task_mode == TaskMode.manual:
             if self.start_date is None or self.end_date is None:
-                raise ValueError("start_date and end_date are required in manual mode")
+                raise ValueError(
+                    "start_date and end_date are required in manual mode"
+                )
             if self.start_date > self.end_date:
                 raise ValueError("start_date must be less than end_date")
         return self
@@ -271,10 +284,30 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t,
                 exchange=self.exchange.name,
-                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
+                exch_id=getattr(
+                    StockExchangeYahooIdentifier, self.exchange.name
+                ),
             )
             for t in self.ticker
         ]
+
+
+class TickerQueryInput(BaseModel):
+    exchange: StockExchange = Field(
+        ...,
+        description="Stock Exchange of the ticker",
+        examples=[StockExchange.nse.value, StockExchange.nyse.value],
+    )
+    sql_query: str = Field(
+        ...,
+        description="""SQL query to get ticker(s) history data.
+
+        NOTE: Always use `stockdb` as table name in the sql query.""",
+        examples=[
+            "SELECT * FROM stockdb WHERE ticker = 'TCS' AND date >= '2025-01-01'",
+            "SELECT date, ticker, close FROM stockdb WHERE ticker IN ('INFY', '3MINDIA') AND date BETWEEN '2022-01-01' AND '2022-12-31' ORDER BY date DESC",
+        ],
+    )
 
 
 class PromptCacheInput(BaseModel):
@@ -372,19 +405,117 @@ class PromptCacheOutput(BaseModel):
     thinking: str | None = None
 
 
-class TickerQueryInput(BaseModel):
-    exchange: StockExchange = Field(
+# SECTION - Agents related models
+class TextChunk(BaseModel):
+    type: Literal["text"] = "text"
+    content: str
+
+
+class ThinkingChunk(BaseModel):
+    type: Literal["thinking"] = "thinking"
+    content: str
+
+
+class ToolCallChunk(BaseModel):
+    type: Literal["tool_call"] = "tool_call"
+    tool_name: str
+    args: dict | None = None
+
+
+class ResultChunk(BaseModel):
+    type: Literal["result"] = "result"
+    content: Any
+
+
+class TextToSQLAgent(BaseModel):
+    model: str = Field(
         ...,
-        description="Stock Exchange of the ticker",
+        description="LLM model name to be used for the agent",
+        examples=[
+            "groq:openai/gpt-oss-120b",
+            "google-gla:gemini-2.5-flash",
+        ],
+    )
+    prompt: str = Field(
+        ...,
+        description="The user's natural language request for which SQL query needs to be generated",
+        examples=[
+            "Get me the historical stock price data for TCS from 1st Jan 2025",
+            "What was the closing price of INFY on 15th Aug 2022?",
+        ],
+    )
+    exchange: StockExchange = Field(
+        StockExchange.nse,
+        description="Stock Exchange for which the SQL query needs to be generated",
         examples=[StockExchange.nse.value, StockExchange.nyse.value],
     )
-    sql_query: str = Field(
-        ...,
-        description="""SQL query to get ticker(s) history data.
+    session_id: str | None = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Unique session ID for the agent run",
+    )
 
-        NOTE: Always use `stockdb` as table name in the sql query.""",
+
+class CompanySummaryAgent(BaseModel):
+    model: str = Field(
+        ...,
+        description="LLM model name to be used for the agent",
         examples=[
-            "SELECT * FROM stockdb WHERE ticker = 'TCS' AND date >= '2025-01-01'",
-            "SELECT date, ticker, close FROM stockdb WHERE ticker IN ('INFY', '3MINDIA') AND date BETWEEN '2022-01-01' AND '2022-12-31' ORDER BY date DESC",
+            "groq:openai/gpt-oss-120b",
+            "google-gla:gemini-2.5-flash",
         ],
+    )
+    exchange: StockExchange = Field(
+        StockExchange.nse,
+        description="Stock Exchange for which the company summary needs to be generated",
+        examples=[StockExchange.nse.value, StockExchange.nyse.value],
+    )
+    ticker: str = Field(
+        ...,
+        description="The ticker symbol of the company for which summary needs to be generated",
+        examples=["TCS", "INFY"],
+    )
+    session_id: str | None = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Unique session ID for the agent run",
+    )
+
+
+class CompanySummaryAgentQA(BaseModel):
+    prompt: str = Field(
+        ...,
+        description="The user's natural language question for which answer needs to be generated based on company summary",
+        examples=[
+            "What are the key financial metrics of TCS based on key financial data points?",
+            "For summary of recent news about INFY use company summary.",
+        ],
+    )
+    model: str = Field(
+        ...,
+        description="LLM model name to be used for the agent",
+        examples=[
+            "groq:openai/gpt-oss-120b",
+            "google-gla:gemini-2.5-flash",
+        ],
+    )
+    exchange: StockExchange = Field(
+        StockExchange.nse,
+        description="Stock Exchange for which the company summary needs to be generated",
+        examples=[StockExchange.nse.value, StockExchange.nyse.value],
+    )
+    ticker: str = Field(
+        ...,
+        description="The ticker symbol of the company for which summary needs to be generated",
+        examples=["TCS", "INFY"],
+    )
+    instruction: str | None = Field(
+        None,
+        description="The instruction wrt to current user prompt. Its optional & can be use to give specific instruction to agent for current prompt. ",
+        examples=[
+            "What are the key financial metrics of TCS basedn on key financial data points?",
+            "For summary of recent news about INFY use company summary.",
+        ],
+    )
+    session_id: str | None = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Unique session ID for the agent run",
     )

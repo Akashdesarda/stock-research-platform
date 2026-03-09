@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 from fastapi import APIRouter, HTTPException, status
 from httpx import AsyncClient
+from openinference.instrumentation import using_session
 from pydantic_ai import ThinkingPart, ToolCallPart
 from stocksense.ai.agents import (
     CompanyDataContextDependency,
@@ -166,16 +167,17 @@ async def company_summary_agent(
         model_name=input.model, api_key=settings.get_model_api_keys(input.model)
     )
     try:
-        async with agent.run_stream(
-            "Give me detail information with respect to the given company data",
-            deps=context,
-        ) as result:
-            async for stream_event in _stream_structured_agent_run(
-                result, stream_state
-            ):
-                yield stream_event
+        with using_session(input.session_id):
+            async with agent.run_stream(
+                "Give me detail information with respect to the given company data",
+                deps=context,
+            ) as result:
+                async for stream_event in _stream_structured_agent_run(
+                    result, stream_state
+                ):
+                    yield stream_event
 
-            final_output = await result.get_output()
+                final_output = await result.get_output()
 
         # Persist company summary as cache
         final_thinking = "".join(stream_state.thinking_parts).strip() or None
@@ -254,11 +256,12 @@ async def company_summary_qa_agent(
         api_key=settings.get_model_api_keys(input.model),
         company_summary=company_summary,
     )
-    async with agent.run_stream(
-        input.prompt, message_history=messages
-    ) as result:
-        async for text in result.stream_text(debounce_by=0.1):
-            yield text
+    with using_session(input.session_id):
+        async with agent.run_stream(
+            input.prompt, message_history=messages
+        ) as result:
+            async for text in result.stream_text(debounce_by=0.1):
+                yield text
     logger.info(f"Completed agent execution for session_id {input.session_id}")
 
     # Saving the entire conversation till now

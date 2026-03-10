@@ -4,8 +4,6 @@ from typing import Annotated
 import polars as pl
 from deltalake import DeltaTable
 from fastapi import APIRouter, HTTPException, Path, status
-from fastapi.responses import ORJSONResponse
-from pipeline.ticker_history_data_download import download_ticker_history
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
@@ -19,6 +17,7 @@ from api.models import (
     TaskTickerHistoryDownloadInput,
     TickerHistoryDownloadMode,
 )
+from pipeline.ticker_history_data_download import download_ticker_history
 
 settings = get_settings()
 
@@ -36,7 +35,7 @@ async def table_optimize_ticker_history(
     ],
     compact: bool = True,
     vacuum: bool = True,
-) -> ORJSONResponse:
+) -> dict:
     """Optimize ticker history table for given exchange
     Optimization includes -
     1. compaction of small files and reorganization of data for better query performance.
@@ -53,11 +52,13 @@ async def table_optimize_ticker_history(
         vacuum_result = dt_table.vacuum(dry_run=False)
         result["vacuum"] = vacuum_result
 
-    return ORJSONResponse(result)
+    return result
 
 
 @router.post("/download/ticker/history")
-async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInput):
+async def daily_ticker_history_download(
+    task_input: TaskTickerHistoryDownloadInput,
+) -> dict | None:
     """Trigger daily ticker history download for all tickers in given exchange"""
     # SECTION 1- Auto mode
     if task_input.task_mode == TaskMode.auto:
@@ -71,8 +72,9 @@ async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInp
             / f"{task_input.exchange.value}/ticker_history"
         )
         date_check = (
-            await stock_db
-            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
+            await stock_db.polars_filter(
+                pl.col("date").max().cast(pl.Date) < latest_data_date
+            )
             .select("close")
             .count()
             .collect_async()
@@ -86,12 +88,12 @@ async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInp
         # background_tasks.add_task(download_ticker_history, exchange=task_input.exchange)
         if task_input.download_mode == TickerHistoryDownloadMode.incremental:
             result = await download_ticker_history(exchange=task_input.exchange)
-            return ORJSONResponse(result)
+            return result
         if task_input.download_mode == TickerHistoryDownloadMode.full:
             result = await download_ticker_history(
                 exchange=task_input.exchange, full_download=True
             )
-            return ORJSONResponse(result)
+            return result
 
     # SECTION 2 - Manual mode
     elif task_input.task_mode == TaskMode.manual:
@@ -116,8 +118,8 @@ async def daily_ticker_history_download(task_input: TaskTickerHistoryDownloadInp
             # ]
 
 
-@router.post("/prompt/search", response_model=PromptCacheOutput)
-async def search_prompt_cache(query: PromptSearchInput) -> ORJSONResponse:
+@router.post("/prompt/search")
+async def search_prompt_cache(query: PromptSearchInput) -> PromptCacheOutput:
     """Retrieve LLM response from cache"""
     key = query.get_cache_key()
     prompt_cache_table = StockDataDB(
@@ -126,38 +128,43 @@ async def search_prompt_cache(query: PromptSearchInput) -> ORJSONResponse:
 
     result = await prompt_cache_table.polars_filter(
         (pl.col("prompt_hash") == key)
-        & (pl.col("last_modified") + pl.duration(days=pl.col("ttl")) > datetime.now())
+        & (
+            pl.col("last_modified") + pl.duration(days=pl.col("ttl"))
+            > datetime.now()
+        )
     ).collect_async()
     if not result.is_empty():
-        return ORJSONResponse(result.select("response", "thinking").to_dicts()[0])
+        return PromptCacheOutput(
+            **result.select("response", "thinking").to_dicts()[0]
+        )
     else:
-        return ORJSONResponse(
+        raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={
-                "message": f"No cached response found for the given prompt and '{query.agent}' agent."
-            },
+            detail=f"No cached response found for the given prompt and '{query.agent}' agent.",
         )
     # TODO - Add Tier 2 - Vector DB Storage
 
 
-@router.put("/prompt/cache")
-async def cache_prompt_response(cache_data: PromptCacheInput) -> ORJSONResponse:
+@router.put("/prompt/cache", status_code=status.HTTP_201_CREATED)
+async def cache_prompt_response(cache_data: PromptCacheInput) -> dict:
     """Store LLM response in cache for future reuse"""
     # Tier 1 - Store in StockDB Delta Table as Hash
     prompt_cache_table = StockDataDB(
         settings.stockdb.data_base_path / "common/prompt_cache"
     )
 
-    current_cache_df = pl.LazyFrame({
-        "prompt_hash": cache_data.get_cache_key(),
-        "prompt": cache_data.prompt,
-        "response": cache_data.response,
-        "thinking": cache_data.thinking,
-        "agent": cache_data.agent,
-        "model": cache_data.model,
-        "ttl": cache_data.ttl,
-        "last_modified": datetime.now(),
-    })
+    current_cache_df = pl.LazyFrame(
+        {
+            "prompt_hash": cache_data.get_cache_key(),
+            "prompt": cache_data.prompt,
+            "response": cache_data.response,
+            "thinking": cache_data.thinking,
+            "agent": cache_data.agent,
+            "model": cache_data.model,
+            "ttl": cache_data.ttl,
+            "last_modified": datetime.now(),
+        }
+    )
 
     prompt_cache_table.merge(
         current_cache_df.collect(),
@@ -165,8 +172,4 @@ async def cache_prompt_response(cache_data: PromptCacheInput) -> ORJSONResponse:
     )
 
     # TODO - Add Tier 2 - Vector DB Storage
-
-    return ORJSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"message": "Prompt cache stored successfully."},
-    )
+    return {"message": "Prompt cache stored successfully"}

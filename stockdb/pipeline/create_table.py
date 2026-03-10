@@ -2,12 +2,13 @@ import logging
 
 import deltalake
 import polars as pl
-from api.models import StockExchange
 from deltalake.table import DeltaTable
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from stocksense.config import get_settings
+
+from api.models import StockExchange
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -32,7 +33,8 @@ def create_ticker_history_table():
     for exchange in StockExchange:
         logger.info(f"Creating ticker history table for {exchange.name}")
         ticker_history.write_delta(
-            settings.stockdb.data_base_path / f"{exchange.value}/ticker_history",
+            settings.stockdb.data_base_path
+            / f"{exchange.value}/ticker_history",
             mode="ignore",
             delta_write_options={
                 "writer_properties": deltalake.WriterProperties(
@@ -72,7 +74,9 @@ def create_exchange_equity_table():
                 "schema_mode": "overwrite",
             },
         )
-        dt = DeltaTable(settings.stockdb.data_base_path / f"{exchange.value}/equity")
+        dt = DeltaTable(
+            settings.stockdb.data_base_path / f"{exchange.value}/equity"
+        )
         dt.optimize.z_order(["symbol", "company", "index_symbol"])
         logger.info(f"Finished creating table & z-ordering for {exchange.name}")
 
@@ -104,6 +108,60 @@ def create_cache_table():
     dt = DeltaTable(settings.stockdb.data_base_path / "common/prompt_cache")
     dt.optimize.z_order(["prompt_hash", "last_modified"])
     logger.info("Finished creating table & z-ordering for prompt cache")
+
+
+def create_chat_history_table():
+    chat_history_table = pl.DataFrame(
+        schema={
+            "session_id": pl.String,  # Unique ID for the conversation session
+            "model": pl.String,  # The LLM model used
+            "agent": pl.String,  # The AI agent that was handling the request
+            "message_json": pl.String,  # The fully serialized Pydantic AI message
+            "timestamp": pl.Datetime,  # When the message was created
+        }
+    )
+    logger.info("Creating chat history table")
+    chat_history_table.write_delta(
+        settings.stockdb.data_base_path / "common/chat_history",
+        mode="ignore",
+        delta_write_options={
+            "writer_properties": deltalake.WriterProperties(
+                compression="ZSTD", compression_level=5
+            ),
+        },
+    )
+    dt = DeltaTable(settings.stockdb.data_base_path / "common/chat_history")
+
+    dt.optimize.z_order(["session_id", "agent"])
+    logger.info("Finished creating table & z-ordering for chat history")
+
+
+def create_registered_data_table():
+    registered_data_table = pl.DataFrame(
+        schema={
+            "dataset_id": pl.String,  # Unique ID for the dataset
+            "name": pl.String,  # A human readable name for the dataset
+            "description": pl.String,  # A brief description about the dataset
+            "logical_plan": pl.String,  # The actual data serialized as JSON string
+            "last_modified": pl.Datetime,  # When the dataset was registered
+            "tags": pl.List(
+                pl.String
+            ),  # Any tags to help categorize and search the dataset
+        }
+    )
+    logger.info("Creating registered data table")
+    registered_data_table.write_delta(
+        settings.stockdb.data_base_path / "common/registered_data",
+        mode="ignore",
+        delta_write_options={
+            "writer_properties": deltalake.WriterProperties(
+                compression="ZSTD", compression_level=5
+            ),
+        },
+    )
+    dt = DeltaTable(settings.stockdb.data_base_path / "common/registered_data")
+    dt.optimize.z_order(["dataset_id", "last_modified"])
+    logger.info("Finished creating table & z-ordering for registered data")
 
 
 def _display_menu(console: Console) -> None:

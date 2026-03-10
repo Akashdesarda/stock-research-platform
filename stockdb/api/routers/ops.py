@@ -9,9 +9,11 @@ from stocksense.data import StockDataDB
 
 from api.models import (
     APITags,
+    DataRegistrationInput,
     PromptCacheInput,
     PromptCacheOutput,
     PromptSearchInput,
+    RegisteredDataOutput,
     StockExchange,
     TaskMode,
     TaskTickerHistoryDownloadInput,
@@ -173,3 +175,64 @@ async def cache_prompt_response(cache_data: PromptCacheInput) -> dict:
 
     # TODO - Add Tier 2 - Vector DB Storage
     return {"message": "Prompt cache stored successfully"}
+
+
+@router.get("/data", response_model=list[RegisteredDataOutput])
+async def list_registered_data() -> list[dict]:
+    """List all registered data"""
+    registered_data = StockDataDB(
+        settings.stockdb.data_base_path / "common/registered_data"
+    )
+    result = await registered_data.table_data.collect_async()
+    return result.to_dicts()
+
+
+@router.get("/data/{dataset_id}", response_model=RegisteredDataOutput)
+async def get_registered_data(dataset_id: str) -> dict:
+    """Retrieve registered data based on dataset_id"""
+    registered_data = StockDataDB(
+        settings.stockdb.data_base_path / "common/registered_data"
+    )
+    result = await registered_data.polars_filter(
+        pl.col("dataset_id") == dataset_id
+    ).collect_async()
+
+    if not result.is_empty():
+        return result.to_dicts()[0]
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No registered data found for dataset_id: {dataset_id}",
+        )
+
+
+@router.put("/data/register", status_code=status.HTTP_201_CREATED)
+async def register_data(register: DataRegistrationInput):
+    """Store OHLC data that can be used running all kinds of quantitative and qualitative analysis"""
+    registered_data = StockDataDB(
+        settings.stockdb.data_base_path / "common/registered_data"
+    )
+    current_data_df = pl.DataFrame(
+        {
+            "dataset_id": register.dataset_id,
+            "name": register.name,
+            "description": register.description,
+            "logical_plan": register.logical_plan,
+            "last_modified": datetime.now(),
+            "tags": register.tags,
+        }
+    )
+
+    # Verifying if logical plan is valid by trying to parse it using polars.
+    df = pl.LazyFrame.deserialize(register.logical_plan, format="binary")
+    if df.limit(1).collect().is_empty():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid logical plan provided. Please ensure the logical plan is correctly serialized and represents a valid Polars LazyFrame.",
+        )
+
+    # Merging on dataset_id
+    registered_data.merge(
+        current_data_df, predicate="s.dataset_id = t.dataset_id"
+    )
+    return {"message": "Data registered successfully"}

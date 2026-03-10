@@ -405,6 +405,33 @@ class PromptCacheOutput(BaseModel):
     thinking: str | None = None
 
 
+class DataRegistrationInput(BaseModel):
+    dataset_id: str | None = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Unique identifier for the dataset. If not provided, a UUID will be generated.",
+    )
+    name: str = Field(..., description="Name of the dataset to be registered")
+    description: str | None = Field(
+        None, description="Description of the dataset to be registered"
+    )
+    logical_plan: bytes = Field(
+        ..., description="Logical plan of Polars lazyframe"
+    )
+    tags: list[str] | None = Field(
+        None,
+        description="List of tags associated with the dataset for better discoverability",
+    )
+
+
+class RegisteredDataOutput(BaseModel):
+    dataset_id: str
+    name: str
+    description: str | None = None
+    logical_plan: bytes
+    tags: list[str] | None = None
+    last_modified: datetime
+
+
 # SECTION - Agents related models
 class TextChunk(BaseModel):
     type: Literal["text"] = "text"

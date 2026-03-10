@@ -172,6 +172,8 @@ def _display_menu(console: Console) -> None:
     table.add_row("1", "Create ticker history table")
     table.add_row("2", "Create exchange equity table")
     table.add_row("3", "Create prompt cache table")
+    table.add_row("4", "Create chat history table")
+    table.add_row("5", "Create register data table")
     table.add_row("all", "Create all tables")
     table.add_row("q", "Quit")
     console.print(table)
@@ -184,6 +186,8 @@ def main() -> None:
         "1": create_ticker_history_table,
         "2": create_exchange_equity_table,
         "3": create_cache_table,
+        "4": create_chat_history_table,
+        "5": create_registered_data_table,
         "all": lambda: (
             create_ticker_history_table(),
             create_exchange_equity_table(),
@@ -194,7 +198,9 @@ def main() -> None:
     while True:
         _display_menu(console)
         choice = Prompt.ask(
-            "Select an option", choices=list(options.keys()) + ["q"], default="all"
+            "Select an option",
+            choices=list(options.keys()) + ["q"],
+            default="all",
         )
         if choice == "q":
             console.print("Goodbye!")
@@ -211,8 +217,12 @@ def main() -> None:
         try:
             action()
             console.print(f"[green]Completed action for '{choice}'[/green]")
-        except Exception as exc:  # pragma: no cover - interactive error handling
-            console.print(f"[red]Error while running action '{choice}': {exc}[/red]")
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - interactive error handling
+            console.print(
+                f"[red]Error while running action '{choice}': {exc}[/red]"
+            )
 
         if not Confirm.ask("Run another action?"):
             break

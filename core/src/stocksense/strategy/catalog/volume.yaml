@@ -1,0 +1,120 @@
+# Curated volume strategy metadata for AI-assisted strategy selection.
+name: Volume Strategy Catalog
+parent: Technical Analysis
+strategies:
+  obv:
+    id: volume.obv
+    name: On-Balance Volume
+    category: volume
+    summary: >
+      Cumulative volume indicator that adds or subtracts volume based on price direction to infer participation strength.
+    purpose:
+      - confirm whether price trends are supported by volume
+      - detect participation divergences between price and volume
+    best_for:
+      - trend confirmation
+      - participation analysis
+      - divergence spotting when price rises without supportive volume
+    avoid_when:
+      - assets with poor volume quality
+      - pure short term timing questions without trend context
+    required_columns:
+      - close
+      - volume
+    output_columns:
+      - OBV
+    parameters:
+      col:
+        type: str
+        default: close
+        description: Price column used for directional volume accumulation
+    tags:
+      - volume-confirmation
+      - trend-following
+      - divergence
+      - participation
+    market_regimes:
+      - trending
+      - breakout
+      - reversal candidate
+    time_horizons:
+      - swing
+      - medium term
+    interpretation: >
+      Rising OBV alongside rising price suggests healthy participation. Divergence between price and OBV may indicate weakening conviction.
+    decision_guidance:
+      use_if:
+        - the user asks whether a move is supported by volume
+        - you need confirmation for trend or breakout quality
+      combine_with:
+        - trend.macd
+        - trend.adx_dmi
+        - momentum.mfi
+    limitations:
+      - cumulative series can drift over time and is often more useful directionally than in absolute terms
+      - depends on trustworthy volume data
+    llm_hint: >
+      Prefer this when participation and volume confirmation are central to the question.
+
+  adosc:
+    id: volume.adosc
+    name: Chaikin A/D Oscillator
+    category: volume
+    summary: >
+      Oscillator derived from the Accumulation/Distribution line that highlights short term shifts in buying and selling pressure.
+    purpose:
+      - detect changes in money flow momentum
+      - assess whether accumulation or distribution is strengthening
+    best_for:
+      - short term participation shifts
+      - confirming breakout quality with money flow context
+    avoid_when:
+      - long-horizon structural trend analysis without need for oscillator sensitivity
+      - datasets with unreliable volume or intraday noise issues
+    required_columns:
+      - high
+      - low
+      - close
+      - volume
+    output_columns:
+      - ADOSC_<fastperiod>_<slowperiod>
+    parameters:
+      fastperiod:
+        type: int
+        default: 3
+        min: 1
+        max: 50
+        description: Fast oscillator smoothing window
+      slowperiod:
+        type: int
+        default: 10
+        min: 2
+        max: 100
+        description: Slow oscillator smoothing window
+    tags:
+      - volume-confirmation
+      - oscillator
+      - participation
+      - short term
+    market_regimes:
+      - breakout
+      - trending
+      - reversal candidate
+    time_horizons:
+      - short term
+      - swing
+    interpretation: >
+      A rising oscillator suggests increasing accumulation pressure, while a falling oscillator suggests increasing distribution pressure.
+    decision_guidance:
+      use_if:
+        - the user asks whether recent buying pressure is strengthening or weakening
+        - you need a volume-based short term confirmation signal
+      combine_with:
+        - volume.obv
+        - trend.macd
+        - overlap.bbands
+    limitations:
+      - more sensitive and noisier than slower cumulative volume indicators
+      - depends on reliable volume data
+    llm_hint: >
+      Prefer this when short term changes in accumulation or distribution matter more than long-term volume trend.

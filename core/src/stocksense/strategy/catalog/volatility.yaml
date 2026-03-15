@@ -1,0 +1,119 @@
+# Curated volatility strategy metadata for AI-assisted strategy selection.
+name: Volatility Strategy Catalog
+parent: Technical Analysis
+strategies:
+  atr:
+    id: volatility.atr
+    name: Average True Range
+    category: volatility
+    summary: >
+      Measures average price range expansion over a rolling period to quantify absolute volatility.
+    purpose:
+      - estimate recent volatility
+      - support stop-loss sizing and position-risk framing
+      - compare volatility across time for the same instrument
+    best_for:
+      - volatility regime assessment
+      - stop placement and risk budgeting
+      - breakout follow-through context
+    avoid_when:
+      - comparing raw values across instruments with very different price scales
+      - drawing directional conclusions from volatility alone
+    required_columns:
+      - high
+      - low
+      - close
+    output_columns:
+      - ATR_<period>
+    parameters:
+      period:
+        type: int
+        default: 14
+        min: 2
+        max: 100
+        description: Lookback window for true range averaging
+    tags:
+      - volatility
+      - risk-management
+      - breakout-support
+      - non-directional
+    market_regimes:
+      - volatile
+      - breakout
+      - trending
+      - ranging
+    time_horizons:
+      - short term
+      - swing
+    interpretation: >
+      Higher ATR indicates larger recent price movement ranges. ATR does not indicate bullish or bearish direction by itself.
+    decision_guidance:
+      use_if:
+        - the user asks how volatile the instrument currently is
+        - you need stop-loss or risk-sizing context
+      combine_with:
+        - trend.adx_dmi
+        - overlap.bbands
+        - trend.macd
+    limitations:
+      - non-directional measure only
+      - raw ATR is price-scale dependent
+    llm_hint: >
+      Prefer this for volatility and risk framing, not for deciding bullish versus bearish direction.
+
+  natr:
+    id: volatility.natr
+    name: Normalized Average True Range
+    category: volatility
+    summary: >
+      Normalizes ATR as a percentage of price, making volatility comparisons more interpretable across price levels.
+    purpose:
+      - compare relative volatility more fairly than raw ATR
+      - assess whether recent range expansion is large relative to price
+    best_for:
+      - cross-asset relative volatility comparisons
+      - screening for unusually volatile instruments on a normalized basis
+    avoid_when:
+      - pure direction analysis
+      - situations where absolute point movement matters more than percentage movement
+    required_columns:
+      - high
+      - low
+      - close
+    output_columns:
+      - NATR_<period>
+    parameters:
+      period:
+        type: int
+        default: 14
+        min: 2
+        max: 100
+        description: Lookback window for normalized ATR
+    tags:
+      - volatility
+      - normalized
+      - risk-management
+      - screening
+    market_regimes:
+      - volatile
+      - breakout
+      - trending
+      - ranging
+    time_horizons:
+      - short term
+      - swing
+    interpretation: >
+      Higher NATR indicates larger price movement relative to current price level.
+      It is more useful than raw ATR when comparing securities with different price scales.
+    decision_guidance:
+      use_if:
+        - the user wants relative volatility rather than absolute movement
+        - you need to compare different instruments on a similar scale
+      combine_with:
+        - volatility.atr
+        - trend.adx_dmi
+    limitations:
+      - still non-directional
+      - percentage normalization can hide large nominal point moves that matter operationally
+    llm_hint: >
+      Prefer this over ATR when cross-instrument comparison or normalized volatility ranking is the main task.

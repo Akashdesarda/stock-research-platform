@@ -32,7 +32,7 @@ class CompanySummaryOutput(BaseModel):
     )
     financial_highlights: str = Field(
         ...,
-        description="All the financials highlights and key information of the company",
+        description="All the financial highlights and key information of the company",
     )
     stock_performance: str = Field(
         ...,
@@ -121,7 +121,7 @@ async def company_summary(
         deps_type=CompanyDataContextDependency,
         output_type=CompanySummaryOutput,
         instrument=True,
-    )
+    )  # ty:ignore[invalid-assignment]
 
     @agent.system_prompt
     async def add_system_prompt(

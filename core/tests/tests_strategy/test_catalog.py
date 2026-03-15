@@ -70,6 +70,7 @@ def test_get_catalog_strategy_id_map_matches_loaded_strategies():
         expected_ids = [
             strategy.id for strategy in strategies if strategy.category == category
         ]
+        assert set(strategy_ids) == set(expected_ids)
         assert strategy_ids == expected_ids
 
 

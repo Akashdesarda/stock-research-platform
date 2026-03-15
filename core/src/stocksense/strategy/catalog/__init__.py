@@ -1,7 +1,9 @@
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import BaseModel
 
 CATALOG_DIR = Path(__file__).resolve().parent
@@ -84,10 +86,10 @@ def catalog_files() -> list[Path]:
     return list(CATALOG_DIR.glob("*.yaml"))
 
 
-def list_catalog() -> list[StrategyCatalog]:
+@lru_cache()
+@lru_cache()
+def list_catalog() -> tuple[StrategyCatalog, ...]:
     """List all strategies available in the catalog"""
-
-    import yaml
 
     descriptors = []
     for file in catalog_files():

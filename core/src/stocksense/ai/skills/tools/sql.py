@@ -1,7 +1,7 @@
 import io
 import logging
 from dataclasses import dataclass
-from typing import ClassVar, Self
+from typing import Self
 
 import duckdb
 import polars as pl
@@ -19,15 +19,12 @@ class SQLQueryValidator:
 
     Attributes
     ----------
-    table_name : str
-        Class variable storing the default table name, defaults to "stockdb".
     query : str
         The SQL query string to be validated.
     dialect : DialectType
         The SQL dialect to parse with, defaults to Dialects.DUCKDB.
     """
 
-    table_name: ClassVar[str] = "stockdb"
     query: str
     dialect: DialectType = Dialects.DUCKDB
 
@@ -99,7 +96,6 @@ class SQLQueryValidator:
         ParseError
             If the SQL syntax is invalid.
         """
-        SQLQueryValidator.table_name = table_name
         try:
             # Parse the SQL query
             expression = parse_one(self.query, dialect=self.dialect)

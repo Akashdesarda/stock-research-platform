@@ -1,0 +1,84 @@
+# Curated overlap-study metadata for AI-assisted strategy selection.
+name: Overlap Study Strategy Catalog
+parent: Technical Analysis
+strategies:
+  bbands:
+    id: overlap.bbands
+    name: Bollinger Bands
+    category: overlap
+    summary: >
+      Plots an upper band and lower band around a moving average to frame relative price stretch and volatility expansion.
+    purpose:
+      - identify relative price extremes around a moving average
+      - evaluate volatility expansion and contraction
+      - support range-trading and breakout-context analysis
+    best_for:
+      - overextended price analysis
+      - squeeze and expansion setups
+      - range-bound market context
+    avoid_when:
+      - treating a touch of the upper or lower band as a standalone reversal signal
+      - ignoring broader trend context in strong directional markets
+    required_columns:
+      - close
+    output_columns:
+      - BBANDS_upper_20
+      - BBANDS_middle_20
+      - BBANDS_lower_20
+    parameters:
+      period:
+        type: int
+        default: 20
+        min: 2
+        max: 200
+        description: Lookback window for the center moving average
+      nbdevup:
+        type: float
+        default: 2.0
+        min: 0.1
+        max: 5.0
+        description: Standard deviation multiplier for the upper band
+      nbdevdn:
+        type: float
+        default: 2.0
+        min: 0.1
+        max: 5.0
+        description: Standard deviation multiplier for the lower band
+      matype:
+        type: int
+        default: 0
+        description: Moving-average type used for the middle band
+      col:
+        type: str
+        default: close
+        description: Price column to analyze
+    tags:
+      - mean-reversion
+      - volatility
+      - breakout-support
+      - range-analysis
+    market_regimes:
+      - ranging
+      - breakout
+      - volatile
+      - reversal candidate
+    time_horizons:
+      - short term
+      - swing
+    interpretation: >
+      Price near the upper band may indicate relative strength or overextension.
+      Price near the lower band may indicate weakness or oversold conditions.
+      Band contraction can suggest reduced volatility; expansion can suggest increased volatility.
+    decision_guidance:
+      use_if:
+        - the user asks whether price is stretched relative to recent behavior
+        - you need volatility envelope context for range or breakout analysis
+      combine_with:
+        - momentum.rsi
+        - volatility.atr
+        - trend.adx_dmi
+    limitations:
+      - band touches alone do not confirm reversal
+      - can mislead if used without trend and momentum context
+    llm_hint: >
+      Prefer this for price-stretch and volatility-envelope questions, especially when combined with RSI or ATR.

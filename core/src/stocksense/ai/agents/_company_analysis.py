@@ -32,7 +32,7 @@ class CompanySummaryOutput(BaseModel):
     )
     financial_highlights: str = Field(
         ...,
-        description="All the financials highlights and key information of the company",
+        description="All the financial highlights and key information of the company",
     )
     stock_performance: str = Field(
         ...,
@@ -121,7 +121,7 @@ async def company_summary(
         deps_type=CompanyDataContextDependency,
         output_type=CompanySummaryOutput,
         instrument=True,
-    )
+    )  # ty:ignore[invalid-assignment]
 
     @agent.system_prompt
     async def add_system_prompt(
@@ -182,7 +182,7 @@ def company_summary_qa(
         cs = CompanySummaryOutput.from_text(company_summary)
         return (
             "Use only the following company data in json format while answering questions.\n"
-            f"{cs.model_dump()}"
+            f"{cs.model_dump(mode='json')}"
         )
 
     return agent

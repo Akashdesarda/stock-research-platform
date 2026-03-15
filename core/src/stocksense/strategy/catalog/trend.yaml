@@ -1,0 +1,275 @@
+# Curated trend strategy metadata for AI-assisted strategy selection.
+# Contributors should keep field names stable so the Python loader can validate them.
+name: Trend Strategy Catalog
+parent: Technical Analysis
+strategies:
+  sma_crossover:
+    id: trend.sma_crossover
+    name: SMA Crossover
+    category: trend
+    summary: >
+      Uses a fast and slow simple moving average crossover to detect possible
+      changes in prevailing price trend.
+    purpose:
+      - identify potential bullish or bearish trend transitions
+      - provide a simple trend-following confirmation signal
+    best_for:
+      - directional trending markets
+      - swing trading setups
+      - simple interpretable trend confirmation
+    avoid_when:
+      - sideways or range-bound markets
+      - highly noisy short term intraday data
+    required_columns:
+      - close
+    output_columns:
+      - SMA_<fast>
+      - SMA_<slow>
+      - SMA_crossover_<fast>_<slow>
+    parameters:
+      fast:
+        type: int
+        default: 10
+        min: 2
+        max: 100
+        description: Fast moving-average lookback window
+      slow:
+        type: int
+        default: 20
+        min: 3
+        max: 300
+        description: Slow moving-average lookback window
+      col:
+        type: str
+        default: close
+        description: Price column to analyze
+    tags:
+      - trend-following
+      - crossover
+      - lagging
+      - interpretable
+    market_regimes:
+      - trending
+    time_horizons:
+      - swing
+      - medium term
+    interpretation: >
+      A bullish condition is indicated when the fast SMA is above the slow SMA.
+      A bearish condition is indicated when the fast SMA is below the slow SMA.
+    decision_guidance:
+      use_if:
+        - the user asks whether a trend is turning or continuing
+        - you need a simple trend-following signal before combining with momentum
+      combine_with:
+        - trend.adx_dmi
+        - momentum.rsi
+        - volume.obv
+    limitations:
+      - lagging by construction
+      - prone to whipsaws in choppy markets
+      - may react late after sharp price moves
+    llm_hint: >
+      Prefer this for simple trend confirmation. Do not prefer it for short term
+      overbought or oversold questions.
+
+  ema_crossover:
+    id: trend.ema_crossover
+    name: EMA Crossover
+    category: trend
+    summary: >
+      Uses fast and slow exponential moving averages to detect trend shifts with
+      more sensitivity than SMA crossovers.
+    purpose:
+      - detect trend changes earlier than SMA-based signals
+      - confirm persistent directional momentum
+    best_for:
+      - trending markets with moderate acceleration
+      - traders who want faster trend confirmation than SMA
+    avoid_when:
+      - highly noisy sideways conditions
+      - situations where lower sensitivity is preferred
+    required_columns:
+      - close
+    output_columns:
+      - EMA_<fast>
+      - EMA_<slow>
+      - EMA_crossover_<fast>_<slow>
+    parameters:
+      fast:
+        type: int
+        default: 12
+        min: 2
+        max: 100
+        description: Fast EMA lookback window
+      slow:
+        type: int
+        default: 26
+        min: 3
+        max: 300
+        description: Slow EMA lookback window
+      col:
+        type: str
+        default: close
+        description: Price column to analyze
+    tags:
+      - trend-following
+      - crossover
+      - lagging
+      - responsive
+    market_regimes:
+      - trending
+      - breakout
+    time_horizons:
+      - short term
+      - swing
+    interpretation: >
+      A bullish condition is indicated when the fast EMA is above the slow EMA.
+      Compared with SMA crossover, EMA crossover reacts faster to recent price changes.
+    decision_guidance:
+      use_if:
+        - the user wants a responsive trend-following signal
+        - recent price acceleration matters more than long smoothing
+      combine_with:
+        - trend.adx_dmi
+        - momentum.macd
+        - overlap.bbands
+    limitations:
+      - more sensitive to noise than SMA crossover
+      - still a lagging signal despite faster reaction speed
+    llm_hint: >
+      Prefer this over SMA crossover when the question emphasizes recent momentum
+      or faster detection of trend transitions.
+
+  macd:
+    id: trend.macd
+    name: MACD
+    category: trend
+    summary: >
+      Measures the relationship between fast and slow exponential moving averages
+      to assess trend direction and momentum.
+    purpose:
+      - detect trend direction with momentum confirmation
+      - identify momentum acceleration or weakening within a trend
+    best_for:
+      - trend continuation analysis
+      - momentum confirmation within directional markets
+      - spotting bullish or bearish momentum divergences when used with price
+    avoid_when:
+      - flat low-volatility ranges
+      - single-candle reversal questions without broader context
+    required_columns:
+      - close
+    output_columns:
+      - MACD
+      - MACD_signal
+      - MACD_hist
+    parameters:
+      fastperiod:
+        type: int
+        default: 12
+        min: 2
+        max: 100
+        description: Fast EMA lookback window
+      slowperiod:
+        type: int
+        default: 26
+        min: 3
+        max: 300
+        description: Slow EMA lookback window
+      signalperiod:
+        type: int
+        default: 9
+        min: 2
+        max: 100
+        description: Signal-line EMA lookback window
+      col:
+        type: str
+        default: close
+        description: Price column to analyze
+    tags:
+      - trend-following
+      - momentum
+      - crossover
+      - confirmation
+    market_regimes:
+      - trending
+      - breakout
+    time_horizons:
+      - swing
+      - medium term
+    interpretation: >
+      MACD above its signal line is typically bullish; below the signal line is typically bearish.
+      Rising histogram suggests strengthening momentum, while a shrinking histogram suggests weakening momentum.
+    decision_guidance:
+      use_if:
+        - the user asks about both trend and momentum together
+        - you need a richer signal than a basic moving-average crossover
+      combine_with:
+        - trend.adx_dmi
+        - momentum.rsi
+        - volume.obv
+    limitations:
+      - lagging in sudden reversals
+      - weaker in non-directional ranges
+    llm_hint: >
+      Prefer this when the question is about trend plus momentum confirmation,
+      not when the main question is pure volatility or volume analysis.
+
+  adx_dmi:
+    id: trend.adx_dmi
+    name: ADX with DMI
+    category: trend
+    summary: >
+      Measures trend strength using ADX and directional bias using the +DI and -DI lines.
+    purpose:
+      - determine whether a market is truly trending
+      - separate strong trends from weak noisy price movement
+    best_for:
+      - checking trend strength before applying trend-following strategies
+      - filtering breakout or crossover signals
+    avoid_when:
+      - exact entry timing decisions without other signals
+      - pure mean-reversion setups without trend context
+    required_columns:
+      - high
+      - low
+      - close
+    output_columns:
+      - ADX_<period>
+      - DI_plus_<period>
+      - DI_minus_<period>
+    parameters:
+      period:
+        type: int
+        default: 14
+        min: 2
+        max: 100
+        description: Lookback window for directional movement calculations
+    tags:
+      - trend-strength
+      - confirmation
+      - filter
+      - lagging
+    market_regimes:
+      - trending
+      - breakout
+      - ranging
+    time_horizons:
+      - swing
+      - medium term
+    interpretation: >
+      Higher ADX indicates stronger trend strength. +DI above -DI indicates bullish directional bias,
+      while -DI above +DI indicates bearish directional bias.
+    decision_guidance:
+      use_if:
+        - the user asks whether a move is strong or weak
+        - you need to validate whether a trend-following indicator should be trusted
+      combine_with:
+        - trend.sma_crossover
+        - trend.ema_crossover
+        - trend.macd
+    limitations:
+      - does not directly indicate overbought or oversold conditions
+      - can remain elevated after a trend has already matured
+    llm_hint: >
+      Prefer this as a trend-strength filter before recommending crossover-based or breakout-based strategies.

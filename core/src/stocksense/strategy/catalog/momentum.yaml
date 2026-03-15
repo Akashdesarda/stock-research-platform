@@ -1,0 +1,195 @@
+# Curated momentum strategy metadata for AI-assisted strategy selection.
+name: Momentum Strategy Catalog
+parent: Technical Analysis
+strategies:
+  rsi:
+    id: momentum.rsi
+    name: Relative Strength Index
+    category: momentum
+    summary: >
+      Oscillator that measures the speed and magnitude of recent price changes
+      to identify overbought and oversold conditions.
+    purpose:
+      - detect stretched momentum conditions
+      - support mean-reversion and momentum exhaustion analysis
+    best_for:
+      - overbought or oversold screening
+      - range-bound markets
+      - confirming momentum exhaustion after strong moves
+    avoid_when:
+      - using threshold signals alone in strong sustained trends
+      - relying on a single oscillator for final trade decisions
+    tags:
+      - oscillator
+      - mean-reversion
+      - momentum
+      - overbought
+      - oversold
+    required_columns:
+      - close
+    parameters:
+      period:
+        type: int
+        default: 14
+        min: 2
+        max: 100
+        description: Lookback window for RSI
+      col:
+        type: str
+        default: close
+        description: Price column to analyze
+    output_columns:
+      - RSI_<period>
+    interpretation: >
+      RSI above 70 is commonly treated as overbought and RSI below 30 as oversold,
+      but those thresholds should be adapted to context and market regime.
+    market_regimes:
+      - ranging
+      - reversal candidate
+      - trending
+    time_horizons:
+      - short term
+      - swing
+    decision_guidance:
+      use_if:
+        - the user asks whether a stock looks overbought or oversold
+        - you need momentum exhaustion context
+      combine_with:
+        - overlap.bbands
+        - trend.adx_dmi
+        - volume.obv
+    limitations:
+      - can remain overbought or oversold for extended periods in strong trends
+      - threshold interpretation is regime-dependent
+    llm_hint: >
+      Prefer this for overbought or oversold questions. Combine it with a trend-strength filter
+      before concluding a reversal is likely.
+
+  stochastic:
+    id: momentum.stochastic
+    name: Stochastic Oscillator
+    category: momentum
+    summary: >
+      Compares the latest close to the recent high-low range to assess short term momentum and exhaustion.
+    purpose:
+      - identify short term momentum turning points
+      - detect overbought and oversold conditions in a bounded oscillator framework
+    best_for:
+      - swing analysis in range-bound markets
+      - short term entry timing with confirmation
+      - spotting short term momentum shifts
+    avoid_when:
+      - using in isolation during strong persistent trends
+      - long-horizon trend analysis
+    tags:
+      - oscillator
+      - mean-reversion
+      - short term
+      - momentum
+    required_columns:
+      - high
+      - low
+      - close
+    parameters:
+      fastk_period:
+        type: int
+        default: 5
+        min: 2
+        max: 100
+        description: Fast %K lookback window
+      slowk_period:
+        type: int
+        default: 3
+        min: 1
+        max: 50
+        description: Smoothing period for slow %K
+      slowd_period:
+        type: int
+        default: 3
+        min: 1
+        max: 50
+        description: Smoothing period for slow %D
+    output_columns:
+      - STOCH_slowk
+      - STOCH_slowd
+    interpretation: >
+      Values near the upper bound suggest strong recent closes relative to the recent range;
+      values near the lower bound suggest weak recent closes. Crosses between %K and %D can be used as timing cues.
+    market_regimes:
+      - ranging
+      - reversal candidate
+    time_horizons:
+      - short term
+      - swing
+    decision_guidance:
+      use_if:
+        - the user wants short term turning point or timing context
+        - you need a faster oscillator than RSI
+      combine_with:
+        - momentum.rsi
+        - overlap.bbands
+        - trend.adx_dmi
+    limitations:
+      - often produces false signals in strong trends
+      - sensitive and noisy on very short timeframes
+    llm_hint: >
+      Prefer this when short term timing matters more than broad trend confirmation.
+
+  mfi:
+    id: momentum.mfi
+    name: Money Flow Index
+    category: momentum
+    summary: >
+      Volume-weighted oscillator that measures buying and selling pressure using price and volume.
+    purpose:
+      - evaluate overbought and oversold conditions with volume participation
+      - confirm whether momentum is supported by money flow
+    best_for:
+      - confirming momentum with volume context
+      - identifying exhaustion when price moves lack participation
+    avoid_when:
+      - assets with unreliable or sparse volume data
+      - pure price-only analysis where volume is absent
+    required_columns:
+      - high
+      - low
+      - close
+      - volume
+    output_columns:
+      - MFI_14
+    parameters:
+      period:
+        type: int
+        default: 14
+        min: 2
+        max: 100
+        description: Lookback window for money flow aggregation
+    tags:
+      - oscillator
+      - volume-confirmation
+      - overbought
+      - oversold
+      - momentum
+    market_regimes:
+      - ranging
+      - trending
+      - reversal candidate
+    time_horizons:
+      - short term
+      - swing
+    interpretation: >
+      Higher values suggest stronger buying pressure and lower values suggest stronger selling pressure.
+      Like RSI, MFI thresholds should be interpreted in context rather than mechanically.
+    decision_guidance:
+      use_if:
+        - the user asks whether momentum is supported by volume
+        - price is moving strongly and you need participation confirmation
+      combine_with:
+        - volume.obv
+        - momentum.rsi
+        - trend.macd
+    limitations:
+      - depends on reliable volume data
+      - can remain elevated in strong trending environments
+    llm_hint: >
+      Prefer this over RSI when the question explicitly mentions volume-backed momentum or participation.

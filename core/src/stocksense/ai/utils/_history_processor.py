@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from typing import List
 
 from pydantic_ai import ModelMessagesTypeAdapter
 from pydantic_ai.messages import (
@@ -23,7 +22,7 @@ def json_to_history_messages(messages_json: str) -> list[ModelMessage]:
     return ModelMessagesTypeAdapter.validate_json(messages_json)
 
 
-def condense_old_tool_calls(messages: List[ModelMessage]) -> List[ModelMessage]:
+def condense_old_tool_calls(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Strips tool execution data from old messages, keeping only the human/AI chat."""
     processed_messages = []
 
@@ -61,7 +60,7 @@ def condense_old_tool_calls(messages: List[ModelMessage]) -> List[ModelMessage]:
     return processed_messages
 
 
-def loop_breaker_processor(messages: List[ModelMessage]) -> List[ModelMessage]:
+def loop_breaker_processor(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Detects if the AI is repeating itself and injects a disruption prompt."""
     if len(messages) < 4:
         return messages
@@ -102,7 +101,7 @@ def loop_breaker_processor(messages: List[ModelMessage]) -> List[ModelMessage]:
     return messages
 
 
-def session_ttl_processor(messages: List[ModelMessage]) -> List[ModelMessage]:
+def session_ttl_processor(messages: list[ModelMessage]) -> list[ModelMessage]:
     """Drops messages older than 2 hours to prevent stale context, while preserving system prompts."""
     if not messages:
         return messages

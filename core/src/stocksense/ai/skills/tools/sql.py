@@ -51,7 +51,9 @@ class SQLQueryValidator:
                 pretty=True, dialect=self.dialect
             )
             if optimize
-            else self.query
+            else parse_one(self.query, read=self.dialect).sql(
+                pretty=True, dialect=self.dialect
+            )
         )
 
     def verify_syntax(self) -> Self:

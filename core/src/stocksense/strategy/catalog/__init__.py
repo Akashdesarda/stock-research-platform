@@ -87,7 +87,6 @@ def catalog_files() -> list[Path]:
 
 
 @lru_cache()
-@lru_cache()
 def list_catalog() -> tuple[StrategyCatalog, ...]:
     """List all strategies available in the catalog"""
 
@@ -97,7 +96,7 @@ def list_catalog() -> tuple[StrategyCatalog, ...]:
             data = yaml.safe_load(f)
             descriptor = StrategyCatalog.model_validate(data)
             descriptors.append(descriptor)
-    return descriptors
+    return tuple(descriptors)
 
 
 def list_strategies() -> list[StrategyDescriptor]:

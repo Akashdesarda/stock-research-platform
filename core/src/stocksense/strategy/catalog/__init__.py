@@ -87,7 +87,8 @@ def catalog_files() -> list[Path]:
 
 
 @lru_cache()
-def list_catalog() -> list[StrategyCatalog]:
+@lru_cache()
+def list_catalog() -> tuple[StrategyCatalog, ...]:
     """List all strategies available in the catalog"""
 
     descriptors = []

@@ -1,6 +1,6 @@
 [project]
 name = "Stocksense-Core"
-version = "0.7.3"
+version = "0.8.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Akash Desarda", email = "desardaakash@gmail.com" }]
@@ -42,3 +42,6 @@ module-name = "stocksense"
 
 [dependency-groups]
 dev = ["ipykernel>=7.1.0", "pytest>=9.0.0"]
+
+[tool.ty.rules]
+unresolved-attribute = "ignore"

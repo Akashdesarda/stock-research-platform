@@ -1,10 +1,10 @@
 # Copilot Instructions for Stock Research Platform
 
 ## Project Architecture
-- **Monorepo Structure**: Contains `core`, `stockdb`, `webapp`, and `snapshot` directories, each with its own `pyproject.toml` and codebase.
+- **Monorepo Structure**: Contains `core`, `stockdb`, `stocksense-app`, and `snapshot` directories, each with its own `pyproject.toml` and codebase.
 - **Core Logic**: Business logic and utilities are in `core/src/stocksense/`.
-- **API Service**: `stockdb/api/` provides FastAPI endpoints, with routers in `routers/` and models in `models.py`.
-- **Web Application**: `webapp/app/` contains the Reflex-based frontend, with pages in `pages/` and shared logic in `core/`.
+- **API Service**: `stockdb/api` provides FastAPI endpoints, with routers in `stockdb/api/routers/` and models in `stockdb/api/models.py`.
+- **Web Application**: `stocksense-app/webapp/` contains the Reflex-based frontend, with pages in `stocksense-app/webapp/pages/` and shared logic in `core/`.
 - **Snapshot Automation**: `snapshot/` scripts handle data compression/decompression and automation tasks.
 
 ## Developer Workflows

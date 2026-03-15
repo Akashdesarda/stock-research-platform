@@ -186,7 +186,7 @@ def check_sql_query_returns_data(
     Returns
     -------
     bool
-        True if the query result is empty, False otherwise.
+        True if the query result is not empty, False otherwise.
     """
     df = pl.LazyFrame.deserialize(io.BytesIO(lazyframe_query_plan))
 
@@ -202,4 +202,5 @@ def check_sql_query_returns_data(
     duckdb.register("stockdb", df)
 
     result = duckdb.sql(query).pl(lazy=True)
-    return result.limit(1).collect().is_empty()
+    # inverting the logic because we want to return True if the query returns data
+    return not result.limit(1).collect().is_empty()

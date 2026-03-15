@@ -1,8 +1,9 @@
 import pytest
+
 from stocksense.strategy.catalog import (
     CatalogCategory,
     catalog_files,
-    get_catalog_strategy_id__map,
+    get_catalog_strategy_id_map,
     get_strategy_by_id,
     list_catalog,
     list_strategies,
@@ -22,7 +23,9 @@ def test_strategy_catalog_loads_all_yaml_files():
 
     strategies = list_strategies()
     assert strategies
-    assert len(strategies) == sum(len(catalog.strategies) for catalog in catalogs)
+    assert len(strategies) == sum(
+        len(catalog.strategies) for catalog in catalogs
+    )
 
 
 def test_strategy_catalog_required_fields_are_present():
@@ -51,7 +54,9 @@ def test_list_strategies_by_category_returns_only_matching_strategies(category):
     strategies = list_strategies_by_category(category)
 
     assert strategies
-    assert all(strategy.category == CatalogCategory.trend for strategy in strategies)
+    assert all(
+        strategy.category == CatalogCategory.trend for strategy in strategies
+    )
 
 
 def test_list_strategies_by_category_rejects_unknown_category():
@@ -60,7 +65,7 @@ def test_list_strategies_by_category_rejects_unknown_category():
 
 
 def test_get_catalog_strategy_id_map_matches_loaded_strategies():
-    category_map = get_catalog_strategy_id__map()
+    category_map = get_catalog_strategy_id_map()
     strategies = list_strategies()
 
     assert category_map
@@ -68,7 +73,9 @@ def test_get_catalog_strategy_id_map_matches_loaded_strategies():
 
     for category, strategy_ids in category_map.items():
         expected_ids = [
-            strategy.id for strategy in strategies if strategy.category == category
+            strategy.id
+            for strategy in strategies
+            if strategy.category == category
         ]
         assert set(strategy_ids) == set(expected_ids)
         assert strategy_ids == expected_ids

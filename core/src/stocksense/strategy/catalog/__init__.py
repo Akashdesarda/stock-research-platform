@@ -120,7 +120,7 @@ def list_strategies_by_category(
     return [s for s in strategies if s.category == category]
 
 
-def get_catalog_strategy_id__map() -> dict[CatalogCategory, list[str]]:
+def get_catalog_strategy_id_map() -> dict[CatalogCategory, list[str]]:
     """Get a mapping of catalog categories to the IDs of strategies that belong to each category"""
 
     catalogs = list_catalog()

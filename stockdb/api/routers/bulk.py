@@ -4,7 +4,6 @@ from typing import Any
 import polars as pl
 from duckdb import BinderException, ParserException
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import ORJSONResponse
 from stocksense.config import get_settings
 from stocksense.data import Exchange, StockDataDB
 from stocksense.types import DataInterval, DataPeriod
@@ -23,8 +22,8 @@ settings = get_settings()
 router = APIRouter(prefix="/api/bulk", tags=[APITags.bulk])
 
 
-@router.get("/list-tickers", response_model=dict[str, list[ExchangeTickerInfo] | None])
-async def list_exchange_wise_ticker() -> dict:
+@router.get("/list-tickers")
+async def list_exchange_wise_ticker() -> dict[str, list[ExchangeTickerInfo] | None]:
     """Get all the available `ticker` for all `exchange`"""
     all_exchanges = {}
 
@@ -42,11 +41,11 @@ async def list_exchange_wise_ticker() -> dict:
             )
             all_exchanges[exch.value] = result.to_dicts()
 
-    return ORJSONResponse(all_exchanges)
+    return all_exchanges
 
 
-@router.get("/list-indexes", response_model=dict[str, list[str] | None])
-async def list_exchange_wise_indexes() -> ORJSONResponse:
+@router.get("/list-indexes")
+async def list_exchange_wise_indexes() -> dict[str, list[str] | None]:
     """Get all the available `index_symbol` for all `exchange`"""
     exch = Exchange()
     all_exchanges = {}
@@ -60,10 +59,10 @@ async def list_exchange_wise_indexes() -> ORJSONResponse:
         except AttributeError:
             all_exchanges[exch_name.value] = None
 
-    return ORJSONResponse(all_exchanges)
+    return all_exchanges
 
 
-@router.post("/ticker/query", response_model=list[dict[str, Any]])
+@router.post("/ticker/query")
 async def ticker_query(input_body: TickerQueryInput) -> list[dict[str, Any]]:
     """Get stock history data for given `exchange` using SQL query"""
     history_data = StockDataDB(

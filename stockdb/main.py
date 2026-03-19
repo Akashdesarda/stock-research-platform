@@ -11,7 +11,7 @@ from api import setup
 from api.models import APITags, StockExchange
 from api.routers import bulk, ops, per_security
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from scalar_fastapi import get_scalar_api_reference
 from stocksense.config import get_settings
@@ -22,7 +22,11 @@ settings = get_settings()
 STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
-    debug=True, title="StockDB API", version="1.3.4", docs_url=None, redoc_url=None
+    debug=True,
+    title="StockDB API",
+    version="1.3.4",
+    docs_url=None,
+    redoc_url=None,
 )
 
 
@@ -76,12 +80,7 @@ async def _health():
     return {"message": "StockDB API is up and running"}
 
 
-@app.get(
-    "/health/data/",
-    status_code=200,
-    tags=[APITags.health],
-    response_class=ORJSONResponse,
-)
+@app.get("/health/data/", status_code=200, tags=[APITags.health])
 async def _stockdb_data_health() -> dict:
     # REVIEW - Should I add more exchange info?
     """StockDB Data Health check"""

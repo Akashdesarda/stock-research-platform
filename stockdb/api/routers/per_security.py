@@ -3,16 +3,14 @@ from typing import Annotated, Any
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from fastapi.responses import ORJSONResponse
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB, YFStockData
+from stocksense.types import DataInterval, DataPeriod
 
 from api.dependency.utils import yahoo_finance_aware_ticker
 from api.models import (
     APITags,
     ExchangeTickerInfo,
-    Interval,
-    Period,
     StockExchange,
     StockExchangeFullName,
     StockExchangeYahooIdentifier,
@@ -29,10 +27,13 @@ router = APIRouter(prefix="/api/per-security", tags=[APITags.per_security])
 @router.get("/")
 async def list_exchange() -> dict[str, str]:
     """Get list of available exchanges"""
-    return {exchange.name.lower(): exchange.value for exchange in StockExchangeFullName}
+    return {
+        exchange.name.lower(): exchange.value
+        for exchange in StockExchangeFullName
+    }
 
 
-@router.get("/{exchange}", response_model=ExchangeTickerInfo)
+@router.get("/{exchange}", response_model=list[ExchangeTickerInfo])
 async def list_ticker(
     exchange: Annotated[
         StockExchange,
@@ -42,7 +43,7 @@ async def list_ticker(
         ),
     ],
     # REVIEW - Should I add more exchange info?
-) -> ORJSONResponse:
+) -> list[dict]:
     """Get all the available `ticker` in given `exchange`"""
     table_path = settings.stockdb.data_base_path / f"{exchange.value}/equity"
 
@@ -52,16 +53,15 @@ async def list_ticker(
             detail=f"Exchange data for '{exchange.value}' not found",
         )
     result = await (
-        pl
-        .scan_delta(table_path)
+        pl.scan_delta(table_path)
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
         .collect_async()  # ty:ignore[invalid-await]
     )
-    return ORJSONResponse(result.to_dicts())
+    return result.to_dicts()
 
 
-@router.get("/{exchange}/{index}", response_model=ExchangeTickerInfo)
+@router.get("/{exchange}/{index}", response_model=list[ExchangeTickerInfo])
 async def list_ticker_in_index(
     exchange: Annotated[
         StockExchange,
@@ -77,7 +77,7 @@ async def list_ticker_in_index(
             examples=["NIFTY 50", "S&P 500"],
         ),
     ],
-) -> ORJSONResponse:
+) -> list[dict]:
     """Get all the available `ticker` in given `exchange` & `index`"""
     table_path = settings.stockdb.data_base_path / f"{exchange.value}/equity"
     if not table_path.exists():
@@ -86,44 +86,53 @@ async def list_ticker_in_index(
             detail=f"Exchange data for '{exchange.value}' not found",
         )
     result = await (
-        pl
-        .scan_delta(table_path)
+        pl.scan_delta(table_path)
         .filter(pl.col("index_symbol").list.contains(index))
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
         .collect_async()  # ty:ignore[invalid-await]
     )
-    return ORJSONResponse(result.to_dicts())
+    return result.to_dicts()
 
 
 @router.get("/{exchange}/{ticker}/info")
 async def ticker_information(
-    ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
+    ticker: Annotated[
+        YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)
+    ],
 ) -> dict[str, Any]:
     """Get given `Ticker` information"""
     # getting data
     stock_data = YFStockData(
-        ticker.symbol, getattr(StockExchangeYahooIdentifier, ticker.exchange.lower())
+        ticker.symbol,
+        getattr(StockExchangeYahooIdentifier, ticker.exchange.lower()),
     )
     result = stock_data.get_ticker_info()
     return result[ticker.symbol]
 
 
-@router.get("/{exchange}/{ticker}/history", response_model=TickerHistoryOutput)
+@router.get(
+    "/{exchange}/{ticker}/history", response_model=list[TickerHistoryOutput]
+)
 async def ticker_history(
-    ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
+    ticker: Annotated[
+        YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)
+    ],
     query_param: Annotated[TickerHistoryQuery, Query()],
-) -> ORJSONResponse:
+) -> list[dict]:
     """Get stock history data for given `Ticker`"""
     history_data = StockDataDB(
-        settings.stockdb.data_base_path / f"{ticker.exchange.lower()}/ticker_history"
+        settings.stockdb.data_base_path
+        / f"{ticker.exchange.lower()}/ticker_history"
     )
     # Building the query
     query = [pl.col("ticker") == ticker.symbol]
     # 1. start & end condition
     if query_param.start_date is not None:
         query.append(
-            pl.col("date").is_between(query_param.start_date, query_param.end_date)
+            pl.col("date").is_between(
+                query_param.start_date, query_param.end_date
+            )
         )
     # 2. Period condition
     elif query_param.period:
@@ -131,21 +140,23 @@ async def ticker_history(
             pl.col("date")
             >= (
                 pl.col("date").min()
-                if query_param.period == Period.MAX
+                if query_param.period == DataPeriod.MAX
                 else pl.datetime(datetime.now().year, 1, 1)
-                if query_param.period == Period.YEAR_TO_DATE
-                else pl.col("date").max().dt.offset_by(f"-{query_param.period.value}")
+                if query_param.period == DataPeriod.YEAR_TO_DATE
+                else pl.col("date")
+                .max()
+                .dt.offset_by(f"-{query_param.period.value}")
             )
         )
     result = history_data.polars_filter(query)
 
     # 3. Interval condition
     if query_param.interval not in {
-        Interval.ONE_DAY,
-        Interval.FIVE_DAYS,
-        Interval.ONE_WEEK,
-        Interval.ONE_MONTH,
-        Interval.THREE_MONTHS,
+        DataInterval.ONE_DAY,
+        DataInterval.FIVE_DAYS,
+        DataInterval.ONE_WEEK,
+        DataInterval.ONE_MONTH,
+        DataInterval.THREE_MONTHS,
     }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -157,8 +168,7 @@ async def ticker_history(
         interval_value = "1w"
 
     result = (
-        result
-        .sort("date")  # grouping requires ascending sorted data
+        result.sort("date")  # grouping requires ascending sorted data
         .group_by_dynamic(
             index_column="date",
             every=interval_value,
@@ -166,9 +176,18 @@ async def ticker_history(
             # aggregation is done by simply taking all value from group; then taking first value from each
         )
         .agg(pl.all().first())
-        .select("date", "ticker", "company", "open", "high", "low", "close", "volume")
+        .select(
+            "date",
+            "ticker",
+            "company",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+        )
         .sort("date", descending=True)  # sorting back to latest date first
     )
 
     result = await result.collect_async()  # ty:ignore[invalid-await]
-    return ORJSONResponse(result.to_dicts())
+    return result.to_dicts()

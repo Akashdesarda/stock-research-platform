@@ -142,13 +142,22 @@ def create_registered_data_table():
             "dataset_id": pl.String,  # Unique ID for the dataset
             "name": pl.String,  # A human readable name for the dataset
             "description": pl.String,  # A brief description about the dataset
-            "logical_plan": pl.String,  # The actual data serialized as JSON string
+            "logical_plan": pl.Struct(
+                {
+                    "exchange": pl.String,
+                    "ticker": pl.List(pl.String),
+                    "interval": pl.String,
+                    "period": pl.String,
+                    "start_date": pl.Date,
+                    "end_date": pl.Date,
+                    "sql_query": pl.String,
+                }
+            ),  # The logical plan for how to retrieve the data, stored as a struct with all necessary parameters to reconstruct the Polars LazyFrame
+            "tags": pl.List(pl.String),  # to categorize and search the dataset
             "last_modified": pl.Datetime,  # When the dataset was registered
-            "tags": pl.List(
-                pl.String
-            ),  # Any tags to help categorize and search the dataset
         }
     )
+
     logger.info("Creating registered data table")
     registered_data_table.write_delta(
         settings.stockdb.data_base_path / "common/registered_data",
@@ -209,9 +218,6 @@ def main() -> None:
         action = options.get(choice)
         if not action:
             console.print(f"[red]Invalid choice: {choice}[/red]")
-            continue
-
-        if not Confirm.ask(f"Proceed with '{choice}'?"):
             continue
 
         try:

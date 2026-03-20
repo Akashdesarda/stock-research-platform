@@ -27,10 +27,7 @@ router = APIRouter(prefix="/api/per-security", tags=[APITags.per_security])
 @router.get("/")
 async def list_exchange() -> dict[str, str]:
     """Get list of available exchanges"""
-    return {
-        exchange.name.lower(): exchange.value
-        for exchange in StockExchangeFullName
-    }
+    return {exchange.name.lower(): exchange.value for exchange in StockExchangeFullName}
 
 
 @router.get("/{exchange}", response_model=list[ExchangeTickerInfo])
@@ -53,7 +50,8 @@ async def list_ticker(
             detail=f"Exchange data for '{exchange.value}' not found",
         )
     result = await (
-        pl.scan_delta(table_path)
+        pl
+        .scan_delta(table_path)
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
         .collect_async()  # ty:ignore[invalid-await]
@@ -86,7 +84,8 @@ async def list_ticker_in_index(
             detail=f"Exchange data for '{exchange.value}' not found",
         )
     result = await (
-        pl.scan_delta(table_path)
+        pl
+        .scan_delta(table_path)
         .filter(pl.col("index_symbol").list.contains(index))
         .select(pl.col("symbol").alias("ticker"), "company")
         .sort("ticker")
@@ -97,9 +96,7 @@ async def list_ticker_in_index(
 
 @router.get("/{exchange}/{ticker}/info")
 async def ticker_information(
-    ticker: Annotated[
-        YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)
-    ],
+    ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
 ) -> dict[str, Any]:
     """Get given `Ticker` information"""
     # getting data
@@ -111,28 +108,21 @@ async def ticker_information(
     return result[ticker.symbol]
 
 
-@router.get(
-    "/{exchange}/{ticker}/history", response_model=list[TickerHistoryOutput]
-)
+@router.get("/{exchange}/{ticker}/history", response_model=list[TickerHistoryOutput])
 async def ticker_history(
-    ticker: Annotated[
-        YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)
-    ],
+    ticker: Annotated[YahooTickerIdentifier, Depends(yahoo_finance_aware_ticker)],
     query_param: Annotated[TickerHistoryQuery, Query()],
 ) -> list[dict]:
     """Get stock history data for given `Ticker`"""
     history_data = StockDataDB(
-        settings.stockdb.data_base_path
-        / f"{ticker.exchange.lower()}/ticker_history"
+        settings.stockdb.data_base_path / f"{ticker.exchange.lower()}/ticker_history"
     )
     # Building the query
     query = [pl.col("ticker") == ticker.symbol]
     # 1. start & end condition
     if query_param.start_date is not None:
         query.append(
-            pl.col("date").is_between(
-                query_param.start_date, query_param.end_date
-            )
+            pl.col("date").is_between(query_param.start_date, query_param.end_date)
         )
     # 2. Period condition
     elif query_param.period:
@@ -143,9 +133,7 @@ async def ticker_history(
                 if query_param.period == DataPeriod.MAX
                 else pl.datetime(datetime.now().year, 1, 1)
                 if query_param.period == DataPeriod.YEAR_TO_DATE
-                else pl.col("date")
-                .max()
-                .dt.offset_by(f"-{query_param.period.value}")
+                else pl.col("date").max().dt.offset_by(f"-{query_param.period.value}")
             )
         )
     result = history_data.polars_filter(query)
@@ -168,9 +156,14 @@ async def ticker_history(
         interval_value = "1w"
 
     result = (
-        result.sort("date")  # grouping requires ascending sorted data
+        result
+        .sort([
+            "ticker",
+            "date",
+        ])  # dynamic grouping requires ascending data within each ticker
         .group_by_dynamic(
             index_column="date",
+            group_by="ticker",
             every=interval_value,
             start_by="datapoint",  # grouping should start from first data point
             # aggregation is done by simply taking all value from group; then taking first value from each

@@ -1,15 +1,18 @@
+from base64 import b64encode
 from datetime import datetime, timedelta
 from typing import Annotated
 
 import polars as pl
 from deltalake import DeltaTable
 from fastapi import APIRouter, HTTPException, Path, status
+from pipeline.ticker_history_data_download import download_ticker_history
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
 from api.models import (
     APITags,
     DataRegistrationInput,
+    LogicalPlan,
     PromptCacheInput,
     PromptCacheOutput,
     PromptSearchInput,
@@ -19,7 +22,7 @@ from api.models import (
     TaskTickerHistoryDownloadInput,
     TickerHistoryDownloadMode,
 )
-from pipeline.ticker_history_data_download import download_ticker_history
+from api.routers import _build_history_lf_from_query, _logical_plan_to_lf
 
 settings = get_settings()
 
@@ -74,9 +77,8 @@ async def daily_ticker_history_download(
             / f"{task_input.exchange.value}/ticker_history"
         )
         date_check = (
-            await stock_db.polars_filter(
-                pl.col("date").max().cast(pl.Date) < latest_data_date
-            )
+            await stock_db
+            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
             .select("close")
             .count()
             .collect_async()
@@ -130,15 +132,10 @@ async def search_prompt_cache(query: PromptSearchInput) -> PromptCacheOutput:
 
     result = await prompt_cache_table.polars_filter(
         (pl.col("prompt_hash") == key)
-        & (
-            pl.col("last_modified") + pl.duration(days=pl.col("ttl"))
-            > datetime.now()
-        )
+        & (pl.col("last_modified") + pl.duration(days=pl.col("ttl")) > datetime.now())
     ).collect_async()
     if not result.is_empty():
-        return PromptCacheOutput(
-            **result.select("response", "thinking").to_dicts()[0]
-        )
+        return PromptCacheOutput(**result.select("response", "thinking").to_dicts()[0])
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -155,18 +152,16 @@ async def cache_prompt_response(cache_data: PromptCacheInput) -> dict:
         settings.stockdb.data_base_path / "common/prompt_cache"
     )
 
-    current_cache_df = pl.LazyFrame(
-        {
-            "prompt_hash": cache_data.get_cache_key(),
-            "prompt": cache_data.prompt,
-            "response": cache_data.response,
-            "thinking": cache_data.thinking,
-            "agent": cache_data.agent,
-            "model": cache_data.model,
-            "ttl": cache_data.ttl,
-            "last_modified": datetime.now(),
-        }
-    )
+    current_cache_df = pl.LazyFrame({
+        "prompt_hash": cache_data.get_cache_key(),
+        "prompt": cache_data.prompt,
+        "response": cache_data.response,
+        "thinking": cache_data.thinking,
+        "agent": cache_data.agent,
+        "model": cache_data.model,
+        "ttl": cache_data.ttl,
+        "last_modified": datetime.now(),
+    })
 
     prompt_cache_table.merge(
         current_cache_df.collect(),
@@ -206,33 +201,105 @@ async def get_registered_data(dataset_id: str) -> dict:
         )
 
 
-@router.put("/data/register", status_code=status.HTTP_201_CREATED)
-async def register_data(register: DataRegistrationInput):
-    """Store OHLC data that can be used running all kinds of quantitative and qualitative analysis"""
+@router.get("/data/{dataset_id}/serialize")
+async def get_registered_data_bytes(dataset_id: str) -> str:
+    """Retrieve registered data as polars lazyframe serialized into base64 string based"""
     registered_data = StockDataDB(
         settings.stockdb.data_base_path / "common/registered_data"
     )
-    current_data_df = pl.DataFrame(
-        {
-            "dataset_id": register.dataset_id,
-            "name": register.name,
-            "description": register.description,
-            "logical_plan": register.logical_plan,
-            "last_modified": datetime.now(),
-            "tags": register.tags,
-        }
+    result = (
+        await registered_data
+        .polars_filter(pl.col("dataset_id") == dataset_id)
+        .select("logical_plan")
+        .collect_async()
     )
 
+    if result.is_empty():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No registered data found for dataset_id: {dataset_id}",
+        )
+    logical_plan_dict = result.select(
+        "logical_plan"
+    ).item()  # to_dicts()[0]["logical_plan"]
+    logical_plan = LogicalPlan.model_validate(logical_plan_dict)
+    lf = _logical_plan_to_lf(logical_plan)
+
+    return b64encode(lf.serialize()).decode("utf-8")
+
+
+@router.post("/data/hydrate")
+async def hydrate_registered_data(plan: LogicalPlan) -> list[dict]:
+    """Hydrate & return registered data based on the logical plan provided in the request body"""
+    result = await _logical_plan_to_lf(plan).collect_async()
+
+    return result.to_dicts()
+
+
+@router.put("/data/register", status_code=status.HTTP_201_CREATED)
+async def register_data(register: DataRegistrationInput):
+    """Store OHLC data that can be used running all kinds of quantitative and qualitative analysis"""
+
     # Verifying if logical plan is valid by trying to parse it using polars.
-    df = pl.LazyFrame.deserialize(register.logical_plan, format="binary")
+    sdb = StockDataDB(
+        settings.stockdb.data_base_path
+        / f"{register.logical_plan.exchange.value}/ticker_history"
+    )
+    # 1st priority to sql query
+    if register.logical_plan.sql_query:
+        df = sdb.sql_filter(register.logical_plan.sql_query)
+    # 2nd priority to logical plan serialized in bytes
+    else:
+        try:
+            df = _build_history_lf_from_query(
+                data=sdb,
+                ticker=register.logical_plan.ticker,
+                start_date=register.logical_plan.start_date,
+                end_date=register.logical_plan.end_date,
+                period=register.logical_plan.period,
+                interval=register.logical_plan.interval,
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            ) from e
+
     if df.limit(1).collect().is_empty():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid logical plan provided. Please ensure the logical plan is correctly serialized and represents a valid Polars LazyFrame.",
         )
 
-    # Merging on dataset_id
-    registered_data.merge(
-        current_data_df, predicate="s.dataset_id = t.dataset_id"
+    registered_data = StockDataDB(
+        settings.stockdb.data_base_path / "common/registered_data"
     )
+    current_data_df = pl.DataFrame(
+        [
+            {
+                "dataset_id": register.dataset_id,
+                "name": register.name,
+                "description": register.description,
+                "logical_plan": register.logical_plan.model_dump(mode="json"),
+                "tags": register.tags,
+                "last_modified": datetime.now(),
+            }
+        ],
+        schema_overrides={
+            "logical_plan": pl.Struct({
+                "exchange": pl.String,
+                "ticker": pl.List(pl.String),
+                "interval": pl.String,
+                "period": pl.String,
+                "start_date": pl.Date,
+                "end_date": pl.Date,
+                "sql_query": pl.String,
+            }),
+            "tags": pl.List(pl.String),
+        },
+    )
+    # .with_columns(pl.col("tags").cast(pl.List(pl.String)))
+
+    # Merging on dataset_id
+    registered_data.merge(current_data_df, predicate="s.dataset_id = t.dataset_id")
     return {"message": "Data registered successfully"}

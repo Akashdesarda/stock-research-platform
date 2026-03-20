@@ -2,12 +2,13 @@ import logging
 
 import deltalake
 import polars as pl
-from api.models import StockExchange
 from deltalake.table import DeltaTable
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from stocksense.config import get_settings
+
+from api.models import StockExchange
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -32,7 +33,8 @@ def create_ticker_history_table():
     for exchange in StockExchange:
         logger.info(f"Creating ticker history table for {exchange.name}")
         ticker_history.write_delta(
-            settings.stockdb.data_base_path / f"{exchange.value}/ticker_history",
+            settings.stockdb.data_base_path
+            / f"{exchange.value}/ticker_history",
             mode="ignore",
             delta_write_options={
                 "writer_properties": deltalake.WriterProperties(
@@ -72,7 +74,9 @@ def create_exchange_equity_table():
                 "schema_mode": "overwrite",
             },
         )
-        dt = DeltaTable(settings.stockdb.data_base_path / f"{exchange.value}/equity")
+        dt = DeltaTable(
+            settings.stockdb.data_base_path / f"{exchange.value}/equity"
+        )
         dt.optimize.z_order(["symbol", "company", "index_symbol"])
         logger.info(f"Finished creating table & z-ordering for {exchange.name}")
 
@@ -106,6 +110,69 @@ def create_cache_table():
     logger.info("Finished creating table & z-ordering for prompt cache")
 
 
+def create_chat_history_table():
+    chat_history_table = pl.DataFrame(
+        schema={
+            "session_id": pl.String,  # Unique ID for the conversation session
+            "model": pl.String,  # The LLM model used
+            "agent": pl.String,  # The AI agent that was handling the request
+            "message_json": pl.String,  # The fully serialized Pydantic AI message
+            "timestamp": pl.Datetime,  # When the message was created
+        }
+    )
+    logger.info("Creating chat history table")
+    chat_history_table.write_delta(
+        settings.stockdb.data_base_path / "common/chat_history",
+        mode="ignore",
+        delta_write_options={
+            "writer_properties": deltalake.WriterProperties(
+                compression="ZSTD", compression_level=5
+            ),
+        },
+    )
+    dt = DeltaTable(settings.stockdb.data_base_path / "common/chat_history")
+
+    dt.optimize.z_order(["session_id", "agent"])
+    logger.info("Finished creating table & z-ordering for chat history")
+
+
+def create_registered_data_table():
+    registered_data_table = pl.DataFrame(
+        schema={
+            "dataset_id": pl.String,  # Unique ID for the dataset
+            "name": pl.String,  # A human readable name for the dataset
+            "description": pl.String,  # A brief description about the dataset
+            "logical_plan": pl.Struct(
+                {
+                    "exchange": pl.String,
+                    "ticker": pl.List(pl.String),
+                    "interval": pl.String,
+                    "period": pl.String,
+                    "start_date": pl.Date,
+                    "end_date": pl.Date,
+                    "sql_query": pl.String,
+                }
+            ),  # The logical plan for how to retrieve the data, stored as a struct with all necessary parameters to reconstruct the Polars LazyFrame
+            "tags": pl.List(pl.String),  # to categorize and search the dataset
+            "last_modified": pl.Datetime,  # When the dataset was registered
+        }
+    )
+
+    logger.info("Creating registered data table")
+    registered_data_table.write_delta(
+        settings.stockdb.data_base_path / "common/registered_data",
+        mode="ignore",
+        delta_write_options={
+            "writer_properties": deltalake.WriterProperties(
+                compression="ZSTD", compression_level=5
+            ),
+        },
+    )
+    dt = DeltaTable(settings.stockdb.data_base_path / "common/registered_data")
+    dt.optimize.z_order(["dataset_id", "last_modified"])
+    logger.info("Finished creating table & z-ordering for registered data")
+
+
 def _display_menu(console: Console) -> None:
     """Render a small menu of options using Rich Table."""
     table = Table(title="Create Tables")
@@ -114,6 +181,8 @@ def _display_menu(console: Console) -> None:
     table.add_row("1", "Create ticker history table")
     table.add_row("2", "Create exchange equity table")
     table.add_row("3", "Create prompt cache table")
+    table.add_row("4", "Create chat history table")
+    table.add_row("5", "Create register data table")
     table.add_row("all", "Create all tables")
     table.add_row("q", "Quit")
     console.print(table)
@@ -126,6 +195,8 @@ def main() -> None:
         "1": create_ticker_history_table,
         "2": create_exchange_equity_table,
         "3": create_cache_table,
+        "4": create_chat_history_table,
+        "5": create_registered_data_table,
         "all": lambda: (
             create_ticker_history_table(),
             create_exchange_equity_table(),
@@ -136,7 +207,9 @@ def main() -> None:
     while True:
         _display_menu(console)
         choice = Prompt.ask(
-            "Select an option", choices=list(options.keys()) + ["q"], default="all"
+            "Select an option",
+            choices=list(options.keys()) + ["q"],
+            default="all",
         )
         if choice == "q":
             console.print("Goodbye!")
@@ -147,14 +220,15 @@ def main() -> None:
             console.print(f"[red]Invalid choice: {choice}[/red]")
             continue
 
-        if not Confirm.ask(f"Proceed with '{choice}'?"):
-            continue
-
         try:
             action()
             console.print(f"[green]Completed action for '{choice}'[/green]")
-        except Exception as exc:  # pragma: no cover - interactive error handling
-            console.print(f"[red]Error while running action '{choice}': {exc}[/red]")
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - interactive error handling
+            console.print(
+                f"[red]Error while running action '{choice}': {exc}[/red]"
+            )
 
         if not Confirm.ask("Run another action?"):
             break

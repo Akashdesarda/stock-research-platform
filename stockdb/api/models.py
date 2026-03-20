@@ -4,6 +4,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, model_validator
+from stocksense.types import DataInterval, DataPeriod
 
 from api.dependency import stable_hash
 
@@ -17,6 +18,7 @@ class APITags(Enum):
     task = "Task"
     ops = "Operation"
     agent = "Agents"
+    strategy = "Strategy"
 
 
 class Period(Enum):
@@ -153,12 +155,12 @@ class ExchangeTickersHistory(BaseModel):
 class TickerHistoryQuery(BaseModel):
     model_config = {"extra": "forbid"}
 
-    interval: Interval = Field(
-        Interval.ONE_DAY,
+    interval: DataInterval = Field(
+        DataInterval.ONE_DAY,
         description="Day interval between historical data points",
     )
-    period: Period = Field(
-        Period.ONE_DAY,
+    period: DataPeriod = Field(
+        DataPeriod.ONE_DAY,
         description="Day period between historical data points. This is mutually exclusive with `start_date` and `end_date`",
     )
     start_date: date | None = Field(
@@ -176,11 +178,7 @@ class TickerHistoryQuery(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if (
-            self.start_date
-            and self.end_date
-            and self.start_date > self.end_date
-        ):
+        if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -216,9 +214,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
         StockExchange.nse,
         description="Stock Exchange to download ticker history for",
     )
-    task_mode: TaskMode = Field(
-        TaskMode.auto, description="Mode of task execution"
-    )
+    task_mode: TaskMode = Field(TaskMode.auto, description="Mode of task execution")
     download_mode: TickerHistoryDownloadMode = Field(
         TickerHistoryDownloadMode.incremental,
         description="Download mode. `full` mode downloads complete history. `incremental` mode downloads only latest/missing data.",
@@ -253,9 +249,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             )
         if self.task_mode == TaskMode.manual:
             if self.start_date is None or self.end_date is None:
-                raise ValueError(
-                    "start_date and end_date are required in manual mode"
-                )
+                raise ValueError("start_date and end_date are required in manual mode")
             if self.start_date > self.end_date:
                 raise ValueError("start_date must be less than end_date")
         return self
@@ -284,9 +278,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t,
                 exchange=self.exchange.name,
-                exch_id=getattr(
-                    StockExchangeYahooIdentifier, self.exchange.name
-                ),
+                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
             )
             for t in self.ticker
         ]
@@ -308,6 +300,61 @@ class TickerQueryInput(BaseModel):
             "SELECT date, ticker, close FROM stockdb WHERE ticker IN ('INFY', '3MINDIA') AND date BETWEEN '2022-01-01' AND '2022-12-31' ORDER BY date DESC",
         ],
     )
+
+
+class BulkTickerHistoryInput(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    exchange: StockExchange = Field(
+        ...,
+        description="Stock Exchange of the ticker",
+        examples=[StockExchange.nse.value, StockExchange.nyse.value],
+    )
+    ticker: list[str] = Field(
+        description="Desired company's `Ticker` symbol",
+        examples=[
+            ["infy", "tcs", "AKASH"],
+            ["AAPL", "msft"],
+        ],
+    )
+
+    interval: DataInterval = Field(
+        DataInterval.ONE_DAY,
+        description="Day interval between historical data points",
+    )
+    period: DataPeriod = Field(
+        DataPeriod.ONE_DAY,
+        description="Day period between historical data points. This is mutually exclusive with `start_date` and `end_date`",
+    )
+    start_date: date | None = Field(
+        None,
+        description="Start date for historical data points. This is mutually exclusive with `period`",
+        examples=["2024-01-01", "2020-12-31"],
+    )
+    end_date: date | None = Field(
+        None,
+        description="End date for historical data points. This is mutually exclusive with `period`",
+        examples=["2024-02-01", "2021-01-31"],
+    )
+
+    @model_validator(mode="after")
+    def check_start_end_date(self):
+        if (self.start_date is not None) and (self.end_date is None):
+            raise ValueError("end_date is required when start_date is set")
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValueError("Start date must be less than end date")
+        return self
+
+    def get_yahoo_aware_ticker(self) -> list[YahooTickerIdentifier]:
+        """Get Ticker wrt to yahoo aware exchange."""
+        return [
+            YahooTickerIdentifier(
+                symbol=t.upper(),  # ticker symbol must be always Upper case
+                exchange=self.exchange.name,
+                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
+            )
+            for t in self.ticker
+        ]
 
 
 class PromptCacheInput(BaseModel):
@@ -405,6 +452,53 @@ class PromptCacheOutput(BaseModel):
     thinking: str | None = None
 
 
+class LogicalPlan(BaseModel):
+    exchange: StockExchange
+    ticker: list[str] | None = None
+    interval: DataInterval | None = None
+    period: DataPeriod | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    sql_query: str | None = None
+
+    @model_validator(mode="after")
+    def check_start_end_date(self):
+        if (self.start_date is not None) and (self.end_date is None):
+            raise ValueError("end_date is required when start_date is set")
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValueError("Start date must be less than end date")
+        return self
+
+    @model_validator(mode="after")
+    def check_sql_or_query_params(self):
+        # When sql_query is provided, other query parameters should not be provided and vice versa.
+        if self.sql_query is not None and any([
+            self.ticker,
+            self.interval,
+            self.period,
+            self.start_date,
+            self.end_date,
+        ]):
+            raise ValueError("sql_query cannot be provided with other query parameters")
+
+        # When sql_query is not provided, ticker and interval are required. Also, either period or
+        # start_date & end_date should be provided.
+        if self.sql_query is None and not all([self.ticker, self.interval]):
+            raise ValueError(
+                "ticker and interval are required when sql_query is not provided"
+            )
+        if self.sql_query is None:
+            if not self.period and not (self.start_date and self.end_date):
+                raise ValueError(
+                    "Either period or both start_date and end_date must be provided when sql_query is not provided"
+                )
+            if self.period and (self.start_date or self.end_date):
+                raise ValueError(
+                    "period is mutually exclusive with start_date and end_date"
+                )
+        return self
+
+
 class DataRegistrationInput(BaseModel):
     dataset_id: str | None = Field(
         default_factory=lambda: str(uuid4()),
@@ -414,8 +508,9 @@ class DataRegistrationInput(BaseModel):
     description: str | None = Field(
         None, description="Description of the dataset to be registered"
     )
-    logical_plan: bytes = Field(
-        ..., description="Logical plan of Polars lazyframe"
+    logical_plan: LogicalPlan = Field(
+        ...,
+        description="Logical plan for the dataset to be rebuild dynamically based on user query",
     )
     tags: list[str] | None = Field(
         None,
@@ -427,7 +522,7 @@ class RegisteredDataOutput(BaseModel):
     dataset_id: str
     name: str
     description: str | None = None
-    logical_plan: bytes
+    logical_plan: LogicalPlan
     tags: list[str] | None = None
     last_modified: datetime
 
@@ -545,4 +640,25 @@ class CompanySummaryAgentQA(BaseModel):
     session_id: str | None = Field(
         default_factory=lambda: str(uuid4()),
         description="Unique session ID for the agent run",
+    )
+
+
+# SECTION - Strategy related models
+class ApplyStrategyInput(BaseModel):
+    strategy_id: str = Field(
+        ...,
+        description="Unique identifier of the strategy to be applied.",
+        examples=["momentum.rsi", "trend.macd"],
+    )
+    registered_dataset_id: str = Field(
+        ...,
+        description="Unique identifier of the registered dataset on which the strategy needs to be applied.",
+    )
+    parameters: dict = Field(
+        ...,
+        description="Dictionary of parameters to be passed to the strategy. The required parameters depend on the specific strategy being applied.",
+        examples=[
+            {"period": 14},
+            {"fast_period": 12, "slow_period": 26, "signal_period": 9},
+        ],
     )

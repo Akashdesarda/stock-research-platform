@@ -43,8 +43,7 @@ async def yahoo_finance_aware_exchange_check(
 ):
     """Dependency to get Yahoo Finance aware exchange"""
     exchange_name = {exch.name for exch in StockExchange}
-    diff = list(set(exchange).difference(exchange_name))
-    if diff:
+    if diff := list(set(exchange).difference(exchange_name)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"The following exchanges are not supported: {diff}",

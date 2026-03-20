@@ -2,7 +2,6 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, AsyncIterable
-from zoneinfo import ZoneInfo
 
 import polars as pl
 from fastapi import APIRouter, HTTPException, status
@@ -77,10 +76,8 @@ def _handle_response_part(
         if not part.has_content():
             return None
 
-        thinking_delta, stream_state.last_thinking_content = (
-            _extract_thinking_delta(
-                part.content, stream_state.last_thinking_content
-            )
+        thinking_delta, stream_state.last_thinking_content = _extract_thinking_delta(
+            part.content, stream_state.last_thinking_content
         )
         if not thinking_delta:
             return None
@@ -126,8 +123,7 @@ async def text_to_sql_agent(
 ) -> AsyncIterable[StreamEvent]:
     """Agent that converts natural language text to SQL query"""
     history_data = StockDataDB(
-        settings.stockdb.data_base_path
-        / f"{input.exchange.value}/ticker_history"
+        settings.stockdb.data_base_path / f"{input.exchange.value}/ticker_history"
     )
     cols = history_data.table_data.collect_schema().names()
     context = StockDBContextDependency(columns=cols)
@@ -208,9 +204,7 @@ async def company_summary_qa_agent(
     input: CompanySummaryAgentQA,
 ) -> AsyncIterable[str]:
     """Agent that answers questions about a given company based on its summary"""
-    chat_history = StockDataDB(
-        settings.stockdb.data_base_path / "common/chat_history"
-    )
+    chat_history = StockDataDB(settings.stockdb.data_base_path / "common/chat_history")
     message_df = chat_history.polars_filter(
         pl.col("session_id") == input.session_id
     ).collect()
@@ -223,9 +217,7 @@ async def company_summary_qa_agent(
         response = await http_client.post(
             "/operation/prompt/search",
             json={
-                "prompt": _company_summary_prompt(
-                    input.exchange.value, input.ticker
-                ),
+                "prompt": _company_summary_prompt(input.exchange.value, input.ticker),
                 "agent": "company-summary",
                 "model": settings.app.company_summary_model,  # REVIEW - This is a bit brittle, we should ideally be able to specify the model used for caching at a more granular level instead of hardcoding it here.
                 # "cache_tier": "tier2" # TODO - Add support when vector DB is implemented
@@ -242,9 +234,7 @@ async def company_summary_qa_agent(
             f"retrieved company summary from cache for {input.ticker} on {input.exchange.value}"
         )
     else:
-        logger.debug(
-            f"found existing chat history for session_id {input.session_id}"
-        )
+        logger.debug(f"found existing chat history for session_id {input.session_id}")
         # For existing session, found the previous conversation and use it as context for the QA agent
         company_summary = None
         messages = json_to_history_messages(
@@ -257,9 +247,7 @@ async def company_summary_qa_agent(
         company_summary=company_summary,
     )
     with using_session(input.session_id):
-        async with agent.run_stream(
-            input.prompt, message_history=messages
-        ) as result:
+        async with agent.run_stream(input.prompt, message_history=messages) as result:
             async for text in result.stream_text(debounce_by=0.1):
                 yield text
     logger.info(f"Completed agent execution for session_id {input.session_id}")
@@ -267,15 +255,13 @@ async def company_summary_qa_agent(
     # Saving the entire conversation till now
     messages_json = history_messages_to_json(result.all_messages())
     chat_history.write(
-        pl.DataFrame(
-            {
-                "session_id": input.session_id,
-                "model": input.model,
-                "agent": "company-summary-qa",
-                "message_json": messages_json,
-                "timestamp": datetime.now(ZoneInfo("Asia/Kolkata")),
-            }
-        ),
+        pl.DataFrame({
+            "session_id": input.session_id,
+            "model": input.model,
+            "agent": "company-summary-qa",
+            "message_json": messages_json,
+            "timestamp": datetime.now(),
+        }),
         mode="overwrite",
     )
     logger.info(f"Saved chat history for session_id {input.session_id}")

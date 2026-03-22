@@ -114,7 +114,7 @@ async def _stream_structured_agent_run(
 
 
 # SECTION - FastAPI Router and Endpoints
-router = APIRouter(prefix="/api/agents", tags=[APITags.agent])
+router = APIRouter(prefix="/api/agent", tags=[APITags.agent])
 
 
 @router.post("/text-to-sql")

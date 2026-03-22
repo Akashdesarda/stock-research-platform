@@ -1,3 +1,6 @@
+import logging
+
+import duckdb
 from phoenix.client import AsyncClient as PhoenixAsyncClient
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
@@ -13,6 +16,7 @@ from stocksense.ai.utils import get_model
 from stocksense.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger("stocksense")
 
 # Phoenix setup
 setup_phoenix_tracing()
@@ -132,7 +136,8 @@ async def text_to_sql(
                     "The SQL query is valid but returns no data. Please modify the query to return some data."
                 )
             return True
-        except Exception as e:
+        except (duckdb.Error, ParseError) as e:
+            logger.warning(f"Error executing SQL query: {e}", exc_info=True)
             raise ModelRetry(f"Error executing SQL query: {e}")
 
     # returning the initialized agent at the end

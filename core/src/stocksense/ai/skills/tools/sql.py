@@ -1,4 +1,3 @@
-import io
 import logging
 from dataclasses import dataclass
 from typing import Self
@@ -167,15 +166,13 @@ class SQLQueryValidator:
     # TODO - add more validation methods as needed
 
 
-def check_sql_query_returns_data(
-    lazyframe_query_plan: bytes, query: str
-) -> bool:
+def check_sql_query_returns_data(data: pl.LazyFrame, query: str) -> bool:
     """Check if the SQL query returns an empty dataset
 
     Parameters
     ----------
-    lazyframe_query_plan : bytes
-        The serialized Polars LazyFrame representing the query plan or dataset.
+    data : pl.LazyFrame
+        The Polars LazyFrame representing the query plan or dataset.
     query : str
         The SQL query string to be executed against the registered table.
 
@@ -184,18 +181,16 @@ def check_sql_query_returns_data(
     bool
         True if the query result is not empty, False otherwise.
     """
-    df = pl.LazyFrame.deserialize(io.BytesIO(lazyframe_query_plan))
-
     # Parse the query and find all table names
     expression = parse_one(query, dialect="duckdb")
     table_names = {table.this.name for table in expression.find_all(exp.Table)}
 
     # Register the same dataframe for every table name found in the query
     for table_name in table_names:
-        duckdb.register(table_name, df)
+        duckdb.register(table_name, data)
 
     # Also register the default just in case
-    duckdb.register("stockdb", df)
+    duckdb.register("stockdb", data)
 
     result = duckdb.sql(query).pl(lazy=True)
     # inverting the logic because we want to return True if the query returns data

@@ -231,4 +231,6 @@ stockdb/temp_data/**
 # zed
 .zed/
 
+# others
+codebook.toml
 config.toml

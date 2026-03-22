@@ -1,13 +1,12 @@
 import json
 import re
-from dataclasses import dataclass
 
-from httpx import AsyncClient
 from phoenix.client import AsyncClient as PhoenixAsyncClient
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 
 from stocksense.ai import setup_phoenix_tracing
+from stocksense.ai.skills.context import CompanyDataContextDependency
 from stocksense.ai.utils import get_model
 from stocksense.config import get_settings
 
@@ -95,19 +94,6 @@ class CompanySummaryOutput(BaseModel):
             stock_performance=parts[4],
             summary_insight=parts[5],
         )
-
-
-@dataclass
-class CompanyDataContextDependency:
-    exchange: str
-    ticker: str
-    stockdb_api_base_url: str = (
-        f"{settings.common.base_url}:{settings.stockdb.port}/api"
-    )
-    http_client: AsyncClient = AsyncClient(
-        base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
-        timeout=None,
-    )
 
 
 async def company_summary(

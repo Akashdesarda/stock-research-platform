@@ -1,8 +1,10 @@
 import os
 from contextlib import contextmanager
 
+import pystache
 from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart
 from pydantic_ai.models import Model, infer_model
+from pydantic_ai.providers import infer_provider_class
 
 
 @contextmanager
@@ -19,34 +21,43 @@ def temporary_env_var(key: str, value: str):
             os.environ[key] = original_value
 
 
-def get_model(model_name: str, api_key: str) -> Model:
+def get_model(model_name: str, api_key: str, base_url: str | None = None) -> Model:
     """
-    Creates a model using infer_model, injecting the API key automatically.
-    Assumes standard naming convention: provider 'openai' -> env var 'OPENAI_API_KEY'.
+    Creates a model, explicitly passing connection settings for openai
+    to avoid connection and environment variable issues.
     """
-    # 1. Extract provider to guess the Env Var Name (e.g., 'openai' -> 'OPENAI_API_KEY')
+    # 1. Extract provider and model name
     if ":" in model_name:
-        provider_prefix = (
-            model_name
-            .split(":")[0]
-            # EG google-gla -> google (since google have multiple providers)
-            .split("-")[0]
-            .upper()
-        )
+        provider_name, actual_model_name = model_name.split(":", 1)
+        # EG - google-gla -> google (since google have multiple providers). this is currently only
+        # required for google ai studio models
+        provider_prefix = provider_name.split("-")[0].upper()
     else:
         # Fallback or default logic if needed
         raise ValueError(
             "No provider name given in model_name. E.G. --> groq:openai/gpt-oss-120b"
         )
 
-    env_var_name = f"{provider_prefix}_API_KEY"
+    try:
+        infer_provider_class(provider_name)
+        # 2. Inject key, Infer Model, then Clean up
+        env_var_name = f"{provider_prefix}_API_KEY"
+        with temporary_env_var(env_var_name, api_key):
+            # infer_model reads the env var we just set
+            model = infer_model(model_name)
 
-    # 2. Inject key, Infer Model, then Clean up
-    with temporary_env_var(env_var_name, api_key):
-        # infer_model reads the env var we just set
-        model = infer_model(model_name)
+    except ValueError:
+        # If the provider is unknown, but a base_url is provided, treat it as OpenAI-compatible
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
 
-    # TODO - Add logic to handle LLM specific customizations/initialization
+        if base_url is None:
+            raise ValueError(
+                f"Provider '{provider_name}' must have base_url provided to treat it as OpenAI-compatible."
+            )
+
+        provider = OpenAIProvider(api_key=api_key, base_url=base_url)
+        model = OpenAIChatModel(actual_model_name, provider=provider)
 
     return model
 
@@ -61,3 +72,8 @@ def get_thinking_parts(messages: list[ModelMessage]) -> str:
             )
 
     return "\n".join(thinking_content)
+
+
+def render_mustache_conditional_prompt(template: str, data: dict):
+    clean = {k: v for k, v in data.items() if v}
+    return pystache.render(template, clean)

@@ -1,10 +1,11 @@
 # This module will include all small one time agents
 import logging
 
+from openinference.semconv.trace import SpanAttributes
 from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent, AgentRunResult
 
-from stocksense.ai import setup_phoenix_tracing
+from stocksense.ai import setup_phoenix_tracing, track_agent_session
 from stocksense.ai.skills.context import DatasetDescriptionContextDependency
 from stocksense.ai.utils import (
     fetch_prompt_messages,
@@ -50,6 +51,7 @@ async def generate_dataset_description(
     model_name: str,
     api_key: str,
     base_url: str | None = None,
+    session_id: str | None = None,
 ) -> AgentRunResult[DatasetDescriptionOutput]:
     prompt_msgs = await fetch_prompt_messages("dataset-description", context.as_dict())
 
@@ -76,4 +78,23 @@ async def generate_dataset_description(
             template=prompt_msgs[2]["content"], data=context.as_dict()
         )
 
+    if session_id:
+        with track_agent_session(
+            name="dataset-description",
+            session_id=session_id,
+            input_prompt=prompt,
+            metadata={"model": model_name},  # REVIEW - more metadata to include here?
+        ) as span:
+            # Running the agent and getting the result
+            result = await agent.run(prompt, deps=context)
+            try:
+                # Adding info to current span for observability
+                span.set_attribute(
+                    SpanAttributes.OUTPUT_VALUE, result.output.model_dump_json()
+                )
+            except Exception:
+                span.set_attribute(SpanAttributes.OUTPUT_VALUE, str(result.output))
+            return result
+
+    # Running the agent and getting the result without tracking if session_id is not provided
     return await agent.run(prompt, deps=context)

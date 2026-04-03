@@ -1,12 +1,10 @@
 """Utilities for fetching and formatting prompts from Phoenix server."""
 
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import Any, TypedDict
+
+from phoenix.client import AsyncClient as PhoenixAsyncClient
 
 from stocksense.config import get_settings
-
-if TYPE_CHECKING:
-    from phoenix.client import AsyncClient as PhoenixAsyncClient
-
 
 # Phoenix client singleton
 settings = get_settings()

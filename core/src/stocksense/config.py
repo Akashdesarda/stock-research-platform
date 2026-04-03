@@ -41,7 +41,9 @@ def _get_local_data_directory() -> Path:
 
     if system == "windows":
         # Windows: Use AppData/Roaming
-        base_dir = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+        base_dir = Path(
+            os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
+        )
     elif system == "darwin":  # macOS
         # macOS: Use ~/Library/Application Support
         base_dir = Path.home() / "Library" / "Application Support"
@@ -148,11 +150,14 @@ def ensure_config_env(config_path: str | Path | None = None) -> Path:
 class Common(BaseModel):
     base_url: str
     available_llm_providers: list[str]
+    provider_base_urls: dict[str, str] | None = None
     GROQ_API_KEY: str
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str
     OLLAMA_API_KEY: str
     GOOGLE_API_KEY: str
+    OPENROUTER_API_KEY: str = ""
+    INCEPTION_API_KEY: str = ""
     phoenix_port: int
 
 
@@ -204,6 +209,13 @@ class Settings(BaseSettings):
             f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
             "",
         )
+
+    def get_model_base_url(self, model_name: str) -> str | None:
+        if not self.common.provider_base_urls:
+            return None
+
+        provider = model_name.split(":")[0].split("-")[0].lower()
+        return self.common.provider_base_urls.get(provider)
 
 
 # the Settings model

@@ -1,7 +1,6 @@
 import logging
 
 import duckdb
-from phoenix.client import AsyncClient as PhoenixAsyncClient
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 from sqlglot import ParseError
@@ -12,17 +11,12 @@ from stocksense.ai.skills.tools.sql import (
     SQLQueryValidator,
     check_sql_query_returns_data,
 )
-from stocksense.ai.utils import get_model
-from stocksense.config import get_settings
+from stocksense.ai.utils import fetch_system_prompt, fetch_user_prompt, get_model
 
-settings = get_settings()
 logger = logging.getLogger("stocksense")
 
 # Phoenix setup
 setup_phoenix_tracing()
-phoenix_client = PhoenixAsyncClient(
-    base_url=f"{settings.common.base_url}:{settings.common.phoenix_port}"
-)
 
 
 class TextToSQLOutput(BaseModel):
@@ -47,31 +41,23 @@ async def text_to_sql(
     async def add_system_prompt(
         ctx: RunContext[StockDBContextDependency],
     ) -> str:
-        prompt = await phoenix_client.prompts.get(prompt_identifier="text-to-sql")
-        # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
-        msg = prompt.format(
-            variables={"table_name": "", "columns_to_used": ""}
-        ).messages
-        for m in msg:
-            if m["role"] == "system":
-                return m["content"]
-        raise ValueError("No system prompt found in the retrieved prompt.")
+        # NOTE - System prompt is static and does not need to be formatted with variables
+        return await fetch_system_prompt(
+            prompt_identifier="text-to-sql",
+            variables={"table_name": "", "columns_to_used": ""},
+        )
 
     # Adding instruction to the agent
     @agent.instructions
     async def adding_tasks(ctx: RunContext[StockDBContextDependency]) -> str:
-        prompt = await phoenix_client.prompts.get(prompt_identifier="text-to-sql")
-        # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
-        msg = prompt.format(
+        # NOTE - Instructions are formatted with context variables
+        return await fetch_user_prompt(
+            prompt_identifier="text-to-sql",
             variables={
                 "table_name": ctx.deps.table_name,
                 "columns_to_used": ", ".join(ctx.deps.columns),
-            }
-        ).messages
-        for m in msg:
-            if m["role"] == "user":
-                return m["content"]
-        raise ValueError("No user prompt/instruction found in the retrieved prompt.")
+            },
+        )
 
     @agent.tool
     def verify_duckdb_sql_query(
@@ -96,17 +82,18 @@ async def text_to_sql(
         ModelRetry
             letting the LLM Model know whats the issue is
         """
+        logger.debug(f"Validating SQL query: {query}")
         validator = SQLQueryValidator(query=query)
         try:
             return (
-                validator
-                .verify_syntax()
+                validator.verify_syntax()
                 # TODO - improved column verification logic
                 # .verify_columns(ctx.deps.columns)
                 .verify_table_name(ctx.deps.table_name)
                 .run(optimize=False)
             )
         except (ValueError, ParseError) as e:
+            logger.warning(f"SQL query validation error: {e}", exc_info=True)
             raise ModelRetry(f"Invalid SQL query: {e}")
 
     @agent.tool
@@ -130,6 +117,7 @@ async def text_to_sql(
         ModelRetry
             letting the LLM Model know whats the issue is
         """
+        logger.debug(f"Checking if SQL query returns data: {query}")
         try:
             if not check_sql_query_returns_data(ctx.deps.history_data, query):
                 raise ModelRetry(

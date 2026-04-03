@@ -1,28 +1,22 @@
 import json
 import re
 
-from phoenix.client import AsyncClient as PhoenixAsyncClient
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 
 from stocksense.ai import setup_phoenix_tracing
 from stocksense.ai.skills.context import CompanyDataContextDependency
-from stocksense.ai.utils import get_model
+from stocksense.ai.utils import fetch_system_prompt, fetch_user_prompt, get_model
 from stocksense.config import get_settings
 
 settings = get_settings()
 
 # Phoenix setup
 setup_phoenix_tracing()
-phoenix_client = PhoenixAsyncClient(
-    base_url=f"{settings.common.base_url}:{settings.common.phoenix_port}"
-)
 
 
 class CompanySummaryOutput(BaseModel):
-    company_overview: str = Field(
-        ..., description="High level overview of the company"
-    )
+    company_overview: str = Field(..., description="High level overview of the company")
     business_summary: str = Field(
         ..., description="Summary regarding all the business the company does"
     )
@@ -75,11 +69,7 @@ class CompanySummaryOutput(BaseModel):
         ).strip()
 
         # Split on separator lines (--- alone on a line)
-        parts = [
-            p.strip()
-            for p in re.split(r"(?m)^\s*---\s*$", cleaned)
-            if p.strip()
-        ]
+        parts = [p.strip() for p in re.split(r"(?m)^\s*---\s*$", cleaned) if p.strip()]
 
         if len(parts) != 6:
             raise ValueError(
@@ -97,12 +87,11 @@ class CompanySummaryOutput(BaseModel):
 
 
 async def company_summary(
-    model_name: str, api_key: str
+    model_name: str, api_key: str, base_url: str | None = None
 ) -> Agent[CompanyDataContextDependency, CompanySummaryOutput]:
-
     # initialize the agent
     agent: Agent[CompanyDataContextDependency, CompanySummaryOutput] = Agent(
-        model=get_model(model_name, api_key),
+        model=get_model(model_name, api_key, base_url),
         name="company-summary",
         deps_type=CompanyDataContextDependency,
         output_type=CompanySummaryOutput,
@@ -113,16 +102,11 @@ async def company_summary(
     async def add_system_prompt(
         ctx: RunContext[CompanyDataContextDependency],
     ) -> str:
-
-        prompt = await phoenix_client.prompts.get(
-            prompt_identifier="company-summary"
-        )
         # NOTE - System prompt is static and does not need to be formatted with variables, but if needed, it can be done here.
-        msg = prompt.format(variables={"company_data": ""}).messages
-        for m in msg:
-            if m["role"] == "system":
-                return m["content"]
-        raise ValueError("No system prompt found in the retrieved prompt.")
+        msg = await fetch_system_prompt(
+            "company-summary", variables={"company_data": ""}
+        )
+        return msg
 
     # REVIEW - See if vector embeddings can be used here instead of putting the text in prompt.
     @agent.instructions
@@ -133,27 +117,22 @@ async def company_summary(
             f"/per-security/{ctx.deps.exchange}/{ctx.deps.ticker}/info"
         )
         ticker_info = _.json()
-        prompt = await phoenix_client.prompts.get(
-            prompt_identifier="company-summary"
+        msg = await fetch_user_prompt(
+            "company-summary", variables={"company_data": json.dumps(ticker_info)}
         )
-        msg = prompt.format(
-            variables={"company_data": json.dumps(ticker_info)}
-        ).messages
-        for m in msg:
-            if m["role"] == "user":
-                return m["content"]
-        raise ValueError(
-            "No user prompt/instruction found in the retrieved prompt."
-        )
+        return msg
 
     return agent
 
 
 def company_summary_qa(
-    model_name: str, api_key: str, company_summary: str | None
+    model_name: str,
+    api_key: str,
+    base_url: str | None = None,
+    company_summary: str | None = None,
 ) -> Agent[None, str]:
     agent = Agent(
-        model=get_model(model_name, api_key),
+        model=get_model(model_name, api_key, base_url),
         name="company-summary-qa",
         system_prompt="You are a helpful finance analyst assistant.",
         output_type=str,

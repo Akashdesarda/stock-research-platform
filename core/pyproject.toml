@@ -1,6 +1,6 @@
 [project]
 name = "Stocksense-Core"
-version = "0.8.1"
+version = "0.9.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Akash Desarda", email = "desardaakash@gmail.com" }]
@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.3.5",
     "orjson>=3.11.4",
     "polars[deltalake,pyarrow]>=1.35.2",
+    "pystache>=0.6.8",
     "rich>=14.2.0",
     "sqlglot>=27.29.0",
     "toml>=0.10.2",
@@ -45,3 +46,7 @@ dev = ["ipykernel>=7.1.0", "pytest>=9.0.0"]
 
 [tool.ty.rules]
 unresolved-attribute = "ignore"
+unresolved-import = "ignore"
+
+[tool.basedpyright]
+reportOperatorIssue = "none"

@@ -54,7 +54,7 @@ async def text_to_sql(
             prompt_identifier="text-to-sql",
             variables={
                 "table_name": ctx.deps.table_name,
-                "columns_to_used": " ,".join(ctx.deps.columns),
+                "columns_to_used": ", ".join(ctx.deps.columns),
             },
         )
 

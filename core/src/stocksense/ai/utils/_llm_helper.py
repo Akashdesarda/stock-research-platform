@@ -75,5 +75,5 @@ def get_thinking_parts(messages: list[ModelMessage]) -> str:
 
 
 def render_mustache_conditional_prompt(template: str, data: dict):
-    clean = {k: v for k, v in data.items() if v}
+    clean = {k: v for k, v in data.items() if v is not None}
     return pystache.render(template, clean)

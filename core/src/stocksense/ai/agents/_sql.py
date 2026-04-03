@@ -43,7 +43,8 @@ async def text_to_sql(
     ) -> str:
         # NOTE - System prompt is static and does not need to be formatted with variables
         return await fetch_system_prompt(
-            "text-to-sql", table_name="", columns_to_used=""
+            prompt_identifier="text-to-sql",
+            variables={"table_name": "", "columns_to_used": ""},
         )
 
     # Adding instruction to the agent

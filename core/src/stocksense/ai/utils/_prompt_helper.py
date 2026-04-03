@@ -58,7 +58,7 @@ async def _fetch_prompt(
     variables : dict, optional
         Variables to format the prompt with.
     **kwargs : Any
-        Additional Phoenix-specific parameters (e.g., version, lang).
+        Additional Phoenix-specific parameters to fetch prompt(e.g., version, lang).
 
     Returns
     -------

@@ -26,18 +26,16 @@ def get_model(model_name: str, api_key: str, base_url: str | None = None) -> Mod
     Creates a model, explicitly passing connection settings for openai
     to avoid connection and environment variable issues.
     """
-    # 1. Extract provider and model name
-    if ":" in model_name:
-        provider_name, actual_model_name = model_name.split(":", 1)
-        # EG - google-gla -> google (since google have multiple providers). this is currently only
-        # required for google ai studio models
-        provider_prefix = provider_name.split("-")[0].upper()
-    else:
+    if ":" not in model_name:
         # Fallback or default logic if needed
         raise ValueError(
             "No provider name given in model_name. E.G. --> groq:openai/gpt-oss-120b"
         )
 
+    provider_name, actual_model_name = model_name.split(":", 1)
+    # EG - google-gla -> google (since google have multiple providers). this is currently only
+    # required for google ai studio models
+    provider_prefix = provider_name.split("-")[0].upper()
     try:
         infer_provider_class(provider_name)
         # 2. Inject key, Infer Model, then Clean up
@@ -46,7 +44,7 @@ def get_model(model_name: str, api_key: str, base_url: str | None = None) -> Mod
             # infer_model reads the env var we just set
             model = infer_model(model_name)
 
-    except ValueError:
+    except ValueError as e:
         # If the provider is unknown, but a base_url is provided, treat it as OpenAI-compatible
         from pydantic_ai.models.openai import OpenAIChatModel
         from pydantic_ai.providers.openai import OpenAIProvider
@@ -54,7 +52,7 @@ def get_model(model_name: str, api_key: str, base_url: str | None = None) -> Mod
         if base_url is None:
             raise ValueError(
                 f"Provider '{provider_name}' must have base_url provided to treat it as OpenAI-compatible."
-            )
+            ) from e
 
         provider = OpenAIProvider(api_key=api_key, base_url=base_url)
         model = OpenAIChatModel(actual_model_name, provider=provider)

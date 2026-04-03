@@ -26,11 +26,13 @@ class TextToSQLOutput(BaseModel):
 
 
 async def text_to_sql(
-    model_name: str, api_key: str
+    model_name: str,
+    api_key: str,
+    base_url: str | None = None,
 ) -> Agent[StockDBContextDependency, TextToSQLOutput]:
     # initialize the agent
     agent: Agent[StockDBContextDependency, TextToSQLOutput] = Agent(
-        model=get_model(model_name, api_key),
+        model=get_model(model_name, api_key, base_url),
         name="text-to-sql",
         deps_type=StockDBContextDependency,
         output_type=TextToSQLOutput,

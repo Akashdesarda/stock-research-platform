@@ -60,13 +60,7 @@ class StockDBContextDependency:
 
 @dataclass
 class DatasetDescriptionContextDependency:
-    """Context that can be used as dependency injection by the Agent
-
-    Attributes
-    ----------
-    dataset_description: str
-        A description of the dataset, including the columns and their meanings.
-    """
+    """Context that can be used as dependency injection by the Agent"""
 
     exchange: str
     ticker_identifier: str | None = None

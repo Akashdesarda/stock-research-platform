@@ -41,9 +41,7 @@ def _get_local_data_directory() -> Path:
 
     if system == "windows":
         # Windows: Use AppData/Roaming
-        base_dir = Path(
-            os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
-        )
+        base_dir = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
     elif system == "darwin":  # macOS
         # macOS: Use ~/Library/Application Support
         base_dir = Path.home() / "Library" / "Application Support"
@@ -149,6 +147,7 @@ def ensure_config_env(config_path: str | Path | None = None) -> Path:
 # Model for the 'common' section
 class Common(BaseModel):
     base_url: str
+    phoenix_port: int
     available_llm_providers: list[str]
     provider_base_urls: dict[str, str] | None = None
     GROQ_API_KEY: str
@@ -158,16 +157,12 @@ class Common(BaseModel):
     GOOGLE_API_KEY: str
     OPENROUTER_API_KEY: str = ""
     INCEPTION_API_KEY: str = ""
-    phoenix_port: int
 
 
 # Model for the 'App' section
 class App(BaseModel):
     port: int
     backend_port: int
-    text_to_sql_model: str
-    company_summary_model: str
-    company_summary_qa_model: str
 
 
 # StockDB model for the 'stockdb' section
@@ -175,6 +170,10 @@ class StockDB(BaseModel):
     port: int
     data_base_path: Annotated[Path, AfterValidator(_resolve_data_path)]
     download_batch_size: int
+    text_to_sql_model: str
+    company_summary_model: str
+    company_summary_qa_model: str
+    dataset_description_model: str
 
 
 class Settings(BaseSettings):

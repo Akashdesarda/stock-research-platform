@@ -81,7 +81,7 @@ async def test_apply_strategy_to_registered_dataset(async_client: AsyncClient):
     assert response.status_code == 200
 
     # checking if data is returned
-    data = pl.LazyFrame(response.json())
+    data = pl.from_dicts(response.json()).lazy()
     assert not data.limit(1).collect().is_empty()
     assert "RSI_14" in data.collect_schema().names()
 

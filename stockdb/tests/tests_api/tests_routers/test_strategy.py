@@ -1,5 +1,6 @@
 from typing import AsyncGenerator
 
+import polars as pl
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -64,3 +65,41 @@ async def test_get_strategy_by_id(async_client: AsyncClient):
     data = response.json()
     assert "id" in data
     assert data["id"] == strategy_id
+
+
+@pytest.mark.asyncio
+async def test_apply_strategy_to_registered_dataset(async_client: AsyncClient):
+    payload = {
+        "strategy_id": "momentum.rsi",
+        "registered_dataset_id": "unit-test-sql-1",
+        "parameters": {"period": 14},
+    }
+
+    response = await async_client.post("/api/strategy/apply", json=payload)
+
+    # Asserting 200 since unit-test-sql-1 existence depends on test execution order
+    assert response.status_code == 200
+
+    # checking if data is returned
+    data = pl.LazyFrame(response.json())
+    assert not data.limit(1).collect().is_empty()
+    assert "RSI_14" in data.collect_schema().names()
+
+
+@pytest.mark.asyncio
+async def test_apply_strategy_to_nonexistent_registered_dataset(
+    async_client: AsyncClient,
+):
+    payload = {
+        "strategy_id": "momentum.rsi",
+        "registered_dataset_id": "nonexistent-dataset",
+        "parameters": {"period": 14},
+    }
+
+    response = await async_client.post("/api/strategy/apply", json=payload)
+
+    assert response.status_code == 400
+    assert (
+        response.json()["detail"]
+        == f"failed to get registered dataset: '{payload['registered_dataset_id']}'"
+    )

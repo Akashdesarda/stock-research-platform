@@ -35,7 +35,7 @@ def create_ticker_history_table():
         ticker_history.write_delta(
             settings.stockdb.data_base_path
             / f"{exchange.value}/ticker_history",
-            mode="ignore",
+            mode="overwrite",
             delta_write_options={
                 "writer_properties": deltalake.WriterProperties(
                     compression="ZSTD", compression_level=5
@@ -97,12 +97,12 @@ def create_cache_table():
     logger.info("Creating prompt cache table")
     prompt_cache_table.write_delta(
         settings.stockdb.data_base_path / "common/prompt_cache",
-        mode="ignore",
+        mode="overwrite",
         delta_write_options={
             "writer_properties": deltalake.WriterProperties(
                 compression="ZSTD", compression_level=5
             ),
-            # "schema_mode": "overwrite",
+            "schema_mode": "overwrite",
         },
     )
     dt = DeltaTable(settings.stockdb.data_base_path / "common/prompt_cache")
@@ -123,11 +123,12 @@ def create_chat_history_table():
     logger.info("Creating chat history table")
     chat_history_table.write_delta(
         settings.stockdb.data_base_path / "common/chat_history",
-        mode="ignore",
+        mode="overwrite",
         delta_write_options={
             "writer_properties": deltalake.WriterProperties(
                 compression="ZSTD", compression_level=5
             ),
+            "schema_mode": "overwrite",
         },
     )
     dt = DeltaTable(settings.stockdb.data_base_path / "common/chat_history")
@@ -161,11 +162,12 @@ def create_registered_data_table():
     logger.info("Creating registered data table")
     registered_data_table.write_delta(
         settings.stockdb.data_base_path / "common/registered_data",
-        mode="ignore",
+        mode="overwrite",
         delta_write_options={
             "writer_properties": deltalake.WriterProperties(
                 compression="ZSTD", compression_level=5
             ),
+            "schema_mode": "overwrite",
         },
     )
     dt = DeltaTable(settings.stockdb.data_base_path / "common/registered_data")
@@ -198,9 +200,12 @@ def main() -> None:
         "4": create_chat_history_table,
         "5": create_registered_data_table,
         "all": lambda: (
+            # NOTE - this should match the order in the above menu (dict)
             create_ticker_history_table(),
             create_exchange_equity_table(),
             create_cache_table(),
+            create_chat_history_table(),
+            create_registered_data_table(),
         ),
     }
 

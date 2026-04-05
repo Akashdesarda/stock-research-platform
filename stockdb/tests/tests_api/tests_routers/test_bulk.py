@@ -105,6 +105,24 @@ async def test_ticker_query_complex(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_tickers(async_client: AsyncClient):
+    response = await async_client.get("/api/bulk/list-tickers")
+    assert response.status_code == 200
+    data = response.json()
+    assert "nse" in data
+    assert isinstance(data["nse"], list) or data["nse"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_indexes(async_client: AsyncClient):
+    response = await async_client.get("/api/bulk/list-indexes")
+    assert response.status_code == 200
+    data = response.json()
+    assert "nse" in data
+    assert isinstance(data["nse"], list) or data["nse"] is None
+
+
+@pytest.mark.asyncio
 async def test_ticker_history_period(async_client: AsyncClient):
     input_body = {
         "exchange": "nse",
@@ -141,8 +159,7 @@ async def test_ticker_history_date_range(async_client: AsyncClient):
     assert set(tickers.to_series().to_list()) == {"TCS", "INFY"}
 
     dates = (
-        await result
-        .group_by("ticker")
+        await result.group_by("ticker")
         .agg(
             pl.len().alias("row_count"),
             pl.col("date").min().cast(pl.Datetime).cast(pl.Date).alias("min_date"),

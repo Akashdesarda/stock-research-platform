@@ -504,7 +504,7 @@ class DataRegistrationInput(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique identifier for the dataset. If not provided, a UUID will be generated.",
     )
-    name: str = Field(..., description="Name of the dataset to be registered")
+    name: str | None = Field(None, description="Name of the dataset to be registered")
     description: str | None = Field(
         None, description="Description of the dataset to be registered"
     )
@@ -512,8 +512,8 @@ class DataRegistrationInput(BaseModel):
         ...,
         description="Logical plan for the dataset to be rebuild dynamically based on user query",
     )
-    tags: list[str] | None = Field(
-        None,
+    tags: list[str] = Field(
+        ...,
         description="List of tags associated with the dataset for better discoverability",
     )
 
@@ -571,7 +571,7 @@ class TextToSQLAgent(BaseModel):
         description="Stock Exchange for which the SQL query needs to be generated",
         examples=[StockExchange.nse.value, StockExchange.nyse.value],
     )
-    session_id: str | None = Field(
+    session_id: str = Field(
         default_factory=lambda: str(uuid4()),
         description="Unique session ID for the agent run",
     )
@@ -633,7 +633,7 @@ class CompanySummaryAgentQA(BaseModel):
         None,
         description="The instruction wrt to current user prompt. Its optional & can be use to give specific instruction to agent for current prompt. ",
         examples=[
-            "What are the key financial metrics of TCS basedn on key financial data points?",
+            "What are the key financial metrics of TCS based on key financial data points?",
             "For summary of recent news about INFY use company summary.",
         ],
     )

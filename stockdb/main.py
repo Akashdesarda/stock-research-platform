@@ -24,7 +24,7 @@ STATIC_DIR = Path(__file__).parent / "static"  # points to stockdb/static
 app = FastAPI(
     debug=True,
     title="StockDB API",
-    version="1.3.4",
+    version="1.5.0",
     docs_url=None,
     redoc_url=None,
 )

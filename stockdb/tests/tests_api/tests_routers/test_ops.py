@@ -108,13 +108,6 @@ async def test_get_registered_data_not_found(async_client: AsyncClient):
     assert response.status_code == 404
 
 
-# @pytest.mark.asyncio
-# async def test_get_registered_data_serialize(async_client: AsyncClient):
-#     response = await async_client.get("/api/operation/data/unit-test-sql-1/serialize")
-#     assert response.status_code == 200
-#     assert isinstance(response.json(), str)
-
-
 @pytest.mark.asyncio
 async def test_hydrate_registered_data(async_client: AsyncClient):
     logical_plan = LogicalPlan(

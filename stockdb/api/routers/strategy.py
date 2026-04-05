@@ -1,13 +1,12 @@
 import logging
-from base64 import b64decode
 
-import httpx
-import polars as pl
 from fastapi import APIRouter, HTTPException, status
 from stocksense.config import get_settings
 from stocksense.strategy import TechnicalAnalysis, catalog
 
 from api.models import APITags, ApplyStrategyInput, RegisteredDataOutput
+from api.routers import _logical_plan_to_lf
+from api.routers.ops import get_registered_data
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -51,29 +50,26 @@ async def get_strategy_by_id(strategy_id: str) -> catalog.StrategyDescriptor:
 @router.post("/apply")
 async def apply_strategy_to_registered_dataset(input: ApplyStrategyInput) -> list[dict]:
     """Apply a strategy to a registered dataset and get the results"""
-    # getting the data
-    async with httpx.AsyncClient() as client:
-        _ = await client.get(
-            f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/data/{input.registered_dataset_id}"
-        )
-        if _.status_code != 200:
+    # getting the data directly via python function call
+    try:
+        dataset_info = await get_registered_data(input.registered_dataset_id)
+        dataset = RegisteredDataOutput.model_validate(dataset_info)
+    except HTTPException as e:
+        if e.status_code == status.HTTP_404_NOT_FOUND:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to get registered dataset with id '{input.registered_dataset_id}'",
-            )
+                detail=f"failed to get registered dataset: '{input.registered_dataset_id}'",
+            ) from e
+        raise
 
-        dataset = RegisteredDataOutput.model_validate(_.json())
-        logger.info(
-            f"using dataset:{dataset.name} last modified: {dataset.last_modified}"
-            f" to apply strategy: {input.strategy_id}"
-        )
+    logger.info(
+        f"using dataset:{dataset.name} last modified: {dataset.last_modified}"
+        f" to apply strategy: {input.strategy_id}"
+    )
 
-        _ = await client.get(
-            f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/data/{input.registered_dataset_id}/serialize"
-        )
-        logical_plan_bytes = b64decode(_.json())
-        data = pl.LazyFrame.deserialize(logical_plan_bytes)
-        logger.debug(f"successfully deserialized dataset: {dataset.name}")
+    # getting the data for the dataset by hydrating the logical plan directly
+    data = _logical_plan_to_lf(dataset.logical_plan)
+    logger.debug(f"successfully hydrated dataset: {dataset.name}")
 
     # getting the strategy accessor
     logger.debug(f"applying strategy: {input.strategy_id} to dataset: {dataset.name}")

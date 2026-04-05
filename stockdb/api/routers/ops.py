@@ -1,4 +1,3 @@
-from base64 import b64encode
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -198,32 +197,6 @@ async def get_registered_data(dataset_id: str) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No registered data found for dataset_id: {dataset_id}",
         )
-
-
-@router.get("/data/{dataset_id}/serialize")
-async def get_registered_data_bytes(dataset_id: str) -> str:
-    """Retrieve registered data as polars lazyframe serialized into base64 string based"""
-    registered_data = StockDataDB(
-        settings.stockdb.data_base_path / "common/registered_data"
-    )
-    result = (
-        await registered_data.polars_filter(pl.col("dataset_id") == dataset_id)
-        .select("logical_plan")
-        .collect_async()
-    )
-
-    if result.is_empty():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No registered data found for dataset_id: {dataset_id}",
-        )
-    logical_plan_dict = result.select(
-        "logical_plan"
-    ).item()  # to_dicts()[0]["logical_plan"]
-    logical_plan = LogicalPlan.model_validate(logical_plan_dict)
-    lf = _logical_plan_to_lf(logical_plan)
-
-    return b64encode(lf.serialize()).decode("utf-8")
 
 
 @router.post("/data/hydrate")

@@ -3,7 +3,7 @@ import logging
 import os
 import traceback
 from datetime import datetime, timedelta
-from pathlib import Path as Pathlib_Path
+from pathlib import Path
 
 import polars as pl
 from about_time import about_time
@@ -19,7 +19,7 @@ from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
-STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
+STATIC_DIR = Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
     debug=True,
@@ -98,8 +98,9 @@ async def _stockdb_data_health() -> dict:
             all_exchanges[exch] = "NO DATA"
             continue
         date_check = (
-            await stock_db
-            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
+            await stock_db.polars_filter(
+                pl.col("date").max().cast(pl.Date) < latest_data_date
+            )
             .select("close")
             .count()
             .collect_async()

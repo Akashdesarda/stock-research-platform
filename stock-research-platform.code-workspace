@@ -38,12 +38,32 @@
 				"defaultInterpreterPath": "${cwd}/stocksense-app/.venv/Scripts/python.exe"
 			},
 			{
-				"path": "",
+				"path": ".",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip"
+			},
+			{
+				"path": "core",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip"
+			},
+			{
+				"path": ".kilo/worktrees/cyclic-chips/snapshot",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip"
+			},
+			{
+				"path": ".kilo/worktrees/cyclic-chips/stockdb",
+				"envManager": "ms-python.python:venv",
+				"packageManager": "ms-python.python:pip"
+			},
+			{
+				"path": ".kilo/worktrees/cyclic-chips/stocksense-app",
 				"envManager": "ms-python.python:venv",
 				"packageManager": "ms-python.python:pip"
 			}
 		],
-		"python.defaultInterpreterPath": "python",
+		"python.defaultInterpreterPath": "/usr/bin/python3",
 		"testing.coverageToolbarEnabled": true,
 		"cSpell.words": [
 			"groq",

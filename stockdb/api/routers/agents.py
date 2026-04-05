@@ -6,14 +6,17 @@ from typing import Any, AsyncIterable
 import polars as pl
 from fastapi import APIRouter, HTTPException, status
 from httpx import AsyncClient
-from openinference.instrumentation import using_session
+from openinference.semconv.trace import SpanAttributes
 from pydantic_ai import ThinkingPart, ToolCallPart
+from stocksense.ai import track_agent_session
 from stocksense.ai.agents import (
-    CompanyDataContextDependency,
-    StockDBContextDependency,
     company_summary,
     company_summary_qa,
     text_to_sql,
+)
+from stocksense.ai.skills.context import (
+    CompanyDataContextDependency,
+    StockDBContextDependency,
 )
 from stocksense.ai.utils import (
     history_messages_to_json,
@@ -114,7 +117,7 @@ async def _stream_structured_agent_run(
 
 
 # SECTION - FastAPI Router and Endpoints
-router = APIRouter(prefix="/api/agents", tags=[APITags.agent])
+router = APIRouter(prefix="/api/agent", tags=[APITags.agent])
 
 
 @router.post("/text-to-sql")
@@ -125,21 +128,41 @@ async def text_to_sql_agent(
     history_data = StockDataDB(
         settings.stockdb.data_base_path / f"{input.exchange.value}/ticker_history"
     )
-    cols = history_data.table_data.collect_schema().names()
-    context = StockDBContextDependency(columns=cols)
-
+    context = StockDBContextDependency(
+        history_data.table_data, table_name=StockDataDB.table_name
+    )
     stream_state = StreamState()
-
     agent = await text_to_sql(
-        model_name=input.model, api_key=settings.get_model_api_keys(input.model)
+        model_name=input.model,
+        api_key=settings.get_model_api_keys(input.model),
+        base_url=settings.get_model_base_url(input.model),
     )
 
     try:
-        async with agent.run_stream(input.prompt, deps=context) as result:
-            async for stream_event in _stream_structured_agent_run(
-                result, stream_state
-            ):
-                yield stream_event
+        with track_agent_session(
+            name="text_to_sql",
+            session_id=input.session_id,
+            input_prompt=input.prompt,
+            metadata={
+                "exchange": input.exchange.value,
+                "model": input.model,
+            },
+        ) as span:
+            async with agent.run_stream(input.prompt, deps=context) as result:
+                async for stream_event in _stream_structured_agent_run(
+                    result, stream_state
+                ):
+                    # Immediately yield each stream event (thinking, tool calls, partial outputs) to the client as they come in
+                    yield stream_event
+
+                # Once the agent run is complete, get the final output for further usage
+                final_output = await result.get_output()
+
+                # Adding info to current span for observability
+                span.set_attribute(
+                    SpanAttributes.OUTPUT_VALUE,
+                    getattr(final_output, "sql_query", str(final_output)),
+                )
     except Exception as e:
         # Handle any exceptions that occur during the agent execution
         raise HTTPException(
@@ -153,27 +176,48 @@ async def company_summary_agent(
     input: CompanySummaryAgent,
 ) -> AsyncIterable[StreamEvent]:
     """Agent that generates a summary for a given company"""
+    prompt = _company_summary_prompt(input.exchange.value, input.ticker)
+    stream_state = StreamState()
     context = CompanyDataContextDependency(
         exchange=input.exchange.value,
         ticker=input.ticker,
     )
-    stream_state = StreamState()
-
     agent = await company_summary(
-        model_name=input.model, api_key=settings.get_model_api_keys(input.model)
+        model_name=input.model,
+        api_key=settings.get_model_api_keys(input.model),
+        base_url=settings.get_model_base_url(input.model),
     )
+
     try:
-        with using_session(input.session_id):
+        with track_agent_session(
+            name="company_summary",
+            session_id=input.session_id,
+            input_prompt=prompt,
+            metadata={
+                "ticker": input.ticker,
+                "exchange": input.exchange.value,
+                "model": input.model,
+            },
+        ) as span:
             async with agent.run_stream(
+                # WARNING - The prompt for this agent is fixed and cannot be customized by the user
+                # since the agent is specifically designed to generate company summary based on the given ticker and exchange.
                 "Give me detail information with respect to the given company data",
                 deps=context,
             ) as result:
                 async for stream_event in _stream_structured_agent_run(
                     result, stream_state
                 ):
+                    # Immediately yield each stream event (thinking, tool calls, partial outputs) to the client as they come in
                     yield stream_event
 
+                # Once the agent run is complete, get the final output for further usage
                 final_output = await result.get_output()
+
+                # Adding info to current span for observability
+                span.set_attribute(
+                    SpanAttributes.OUTPUT_VALUE, final_output.text_output()
+                )
 
         # Persist company summary as cache
         final_thinking = "".join(stream_state.thinking_parts).strip() or None
@@ -219,7 +263,7 @@ async def company_summary_qa_agent(
             json={
                 "prompt": _company_summary_prompt(input.exchange.value, input.ticker),
                 "agent": "company-summary",
-                "model": settings.app.company_summary_model,  # REVIEW - This is a bit brittle, we should ideally be able to specify the model used for caching at a more granular level instead of hardcoding it here.
+                "model": settings.stockdb.company_summary_model,  # REVIEW - This is a bit brittle, we should ideally be able to specify the model used for caching at a more granular level instead of hardcoding it here.
                 # "cache_tier": "tier2" # TODO - Add support when vector DB is implemented
             },
         )
@@ -244,12 +288,28 @@ async def company_summary_qa_agent(
     agent = company_summary_qa(
         model_name=input.model,
         api_key=settings.get_model_api_keys(input.model),
+        base_url=settings.get_model_base_url(input.model),
         company_summary=company_summary,
     )
-    with using_session(input.session_id):
+
+    with track_agent_session(
+        name="company_summary_qa",
+        session_id=input.session_id,
+        input_prompt=input.prompt,
+        metadata={
+            "ticker": input.ticker,
+            "exchange": input.exchange.value,
+            "model": input.model,
+        },
+    ) as span:
         async with agent.run_stream(input.prompt, message_history=messages) as result:
+            final_text = ""
             async for text in result.stream_text(debounce_by=0.1):
-                yield text
+                final_text = text
+                yield final_text
+
+            # Adding info to current span for observability
+            span.set_attribute(SpanAttributes.OUTPUT_VALUE, final_text)
     logger.info(f"Completed agent execution for session_id {input.session_id}")
 
     # Saving the entire conversation till now

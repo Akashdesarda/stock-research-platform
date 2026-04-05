@@ -2,11 +2,12 @@ import logging
 from datetime import datetime
 
 import polars as pl
-from api.models import StockExchange
 from rich.progress import track
 from rich.prompt import Prompt
 from stocksense.config import get_settings
 from stocksense.data import Exchange, StockDataDB
+
+from api.models import StockExchange
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -21,7 +22,6 @@ def get_all_tickers(exchange: str) -> list[str]:
 
 
 def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
-
     data = []
     for ticker in track(tickers, description="Downloading NSE equity data"):
         ticker_info = exch.nse.get_stock_info(ticker)
@@ -39,7 +39,9 @@ def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
         listing_date = None
         if listing_date_str != "NA":
             try:
-                listing_date = datetime.strptime(listing_date_str, "%d-%b-%Y").date()
+                listing_date = datetime.strptime(
+                    listing_date_str, "%d-%b-%Y"
+                ).date()
             except (ValueError, TypeError):
                 listing_date = None
         # Parse Index Symbol
@@ -53,13 +55,15 @@ def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
         # Parse Series
         series = metadata.get("series", None)
 
-        data.append({
-            "symbol": info.get("symbol"),
-            "company": info.get("companyName"),
-            "index_symbol": index,
-            "series": series,
-            "listing_date": listing_date,
-        })
+        data.append(
+            {
+                "symbol": info.get("symbol"),
+                "company": info.get("companyName"),
+                "index_symbol": index,
+                "series": series,
+                "listing_date": listing_date,
+            }
+        )
 
     return pl.LazyFrame(
         data,
@@ -92,5 +96,9 @@ if __name__ == "__main__":
     equity_table = StockDataDB(
         settings.stockdb.data_base_path / f"{selected_exch}/equity"
     )
-    result = equity_table.merge(equity_data.collect(), predicate="s.symbol = t.symbol")
-    logger.info(f"Equity data for {selected_exch} downloaded and merged successfully.")
+    result = equity_table.merge(
+        equity_data.collect(), predicate="s.symbol = t.symbol"
+    )
+    logger.info(
+        f"Equity data for {selected_exch} downloaded and merged successfully."
+    )

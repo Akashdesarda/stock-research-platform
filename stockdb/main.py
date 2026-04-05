@@ -3,13 +3,13 @@ import logging
 import os
 import traceback
 from datetime import datetime, timedelta
-from pathlib import Path as Pathlib_Path
+from pathlib import Path
 
 import polars as pl
 from about_time import about_time
 from api import setup
 from api.models import APITags, StockExchange
-from api.routers import bulk, ops, per_security, strategy
+from api.routers import agents, bulk, ops, per_security, strategy
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +19,7 @@ from stocksense.data import StockDataDB
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
-STATIC_DIR = Pathlib_Path(__file__).parent / "static"  # points to stockdb/static
+STATIC_DIR = Path(__file__).parent / "static"  # points to stockdb/static
 
 app = FastAPI(
     debug=True,
@@ -98,8 +98,9 @@ async def _stockdb_data_health() -> dict:
             all_exchanges[exch] = "NO DATA"
             continue
         date_check = (
-            await stock_db
-            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
+            await stock_db.polars_filter(
+                pl.col("date").max().cast(pl.Date) < latest_data_date
+            )
             .select("close")
             .count()
             .collect_async()
@@ -115,6 +116,7 @@ app.include_router(per_security.router)
 app.include_router(bulk.router)
 app.include_router(ops.router)
 app.include_router(strategy.router)
+app.include_router(agents.router)
 
 
 # Scalar interactive docs

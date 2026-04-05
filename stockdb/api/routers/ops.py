@@ -6,6 +6,8 @@ import polars as pl
 from deltalake import DeltaTable
 from fastapi import APIRouter, HTTPException, Path, status
 from pipeline.ticker_history_data_download import download_ticker_history
+from stocksense.ai.agents import generate_dataset_description
+from stocksense.ai.skills.context import DatasetDescriptionContextDependency
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 
@@ -77,8 +79,9 @@ async def daily_ticker_history_download(
             / f"{task_input.exchange.value}/ticker_history"
         )
         date_check = (
-            await stock_db
-            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
+            await stock_db.polars_filter(
+                pl.col("date").max().cast(pl.Date) < latest_data_date
+            )
             .select("close")
             .count()
             .collect_async()
@@ -91,15 +94,11 @@ async def daily_ticker_history_download(
         # REVIEW - IF we dont want to wait for result here, then fastapi background task should be used
         # background_tasks.add_task(download_ticker_history, exchange=task_input.exchange)
         if task_input.download_mode == TickerHistoryDownloadMode.incremental:
-            result = await download_ticker_history(exchange=task_input.exchange)
-            return result
+            return await download_ticker_history(exchange=task_input.exchange)
         if task_input.download_mode == TickerHistoryDownloadMode.full:
-            result = await download_ticker_history(
+            return await download_ticker_history(
                 exchange=task_input.exchange, full_download=True
             )
-            return result
-
-    # SECTION 2 - Manual mode
     elif task_input.task_mode == TaskMode.manual:
         # SECTION 2.1 - Manual mode with full data history download
         if task_input.download_mode == TickerHistoryDownloadMode.full:
@@ -208,8 +207,7 @@ async def get_registered_data_bytes(dataset_id: str) -> str:
         settings.stockdb.data_base_path / "common/registered_data"
     )
     result = (
-        await registered_data
-        .polars_filter(pl.col("dataset_id") == dataset_id)
+        await registered_data.polars_filter(pl.col("dataset_id") == dataset_id)
         .select("logical_plan")
         .collect_async()
     )
@@ -251,6 +249,11 @@ async def register_data(register: DataRegistrationInput):
     # 2nd priority to logical plan serialized in bytes
     else:
         try:
+            if not register.logical_plan.interval or not register.logical_plan.ticker:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="interval and ticker are required when sql_query is not provided",
+                )
             df = _build_history_lf_from_query(
                 data=sdb,
                 ticker=register.logical_plan.ticker,
@@ -274,6 +277,28 @@ async def register_data(register: DataRegistrationInput):
     registered_data = StockDataDB(
         settings.stockdb.data_base_path / "common/registered_data"
     )
+    # Note - If name & description are not provided then getting it from AI using the logical plan
+    if not register.name:
+        response = await generate_dataset_description(
+            context=DatasetDescriptionContextDependency(
+                exchange=register.logical_plan.exchange.value,
+                ticker_identifier=", ".join(register.tags),
+                interval=register.logical_plan.interval,
+                period=register.logical_plan.period,
+                start_date=register.logical_plan.start_date,
+                end_date=register.logical_plan.end_date,
+                sql_query=register.logical_plan.sql_query,
+            ),
+            model_name=settings.stockdb.dataset_description_model,
+            api_key=settings.get_model_api_keys(
+                settings.stockdb.dataset_description_model
+            ),
+            base_url=settings.get_model_base_url(
+                settings.stockdb.dataset_description_model
+            ),
+        )
+        register.name = response.output.name
+        register.description = response.output.description
     current_data_df = pl.DataFrame(
         [
             {
@@ -285,8 +310,10 @@ async def register_data(register: DataRegistrationInput):
                 "last_modified": datetime.now(),
             }
         ],
-        schema_overrides={
-            "logical_plan": pl.Struct({
+        schema_overrides={"tags": pl.List(pl.String)},
+    ).with_columns(
+        pl.col("logical_plan").cast(
+            pl.Struct({
                 "exchange": pl.String,
                 "ticker": pl.List(pl.String),
                 "interval": pl.String,
@@ -294,11 +321,9 @@ async def register_data(register: DataRegistrationInput):
                 "start_date": pl.Date,
                 "end_date": pl.Date,
                 "sql_query": pl.String,
-            }),
-            "tags": pl.List(pl.String),
-        },
+            })
+        )
     )
-    # .with_columns(pl.col("tags").cast(pl.List(pl.String)))
 
     # Merging on dataset_id
     registered_data.merge(current_data_df, predicate="s.dataset_id = t.dataset_id")

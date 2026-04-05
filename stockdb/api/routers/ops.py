@@ -250,8 +250,9 @@ async def register_data(register: DataRegistrationInput):
     else:
         try:
             if not register.logical_plan.interval or not register.logical_plan.ticker:
-                raise ValueError(
-                    "interval and ticker are required when sql_query is not provided"
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="interval and ticker are required when sql_query is not provided",
                 )
             df = _build_history_lf_from_query(
                 data=sdb,

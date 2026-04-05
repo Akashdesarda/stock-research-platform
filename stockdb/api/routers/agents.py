@@ -158,14 +158,11 @@ async def text_to_sql_agent(
                 # Once the agent run is complete, get the final output for further usage
                 final_output = await result.get_output()
 
-                try:
-                    # Adding info to current span for observability
-                    span.set_attribute(
-                        SpanAttributes.OUTPUT_VALUE,
-                        final_output.sql_query,
-                    )
-                except AttributeError:
-                    span.set_attribute(SpanAttributes.OUTPUT_VALUE, str(final_output))
+                # Adding info to current span for observability
+                span.set_attribute(
+                    SpanAttributes.OUTPUT_VALUE,
+                    getattr(final_output, "sql_query", str(final_output)),
+                )
     except Exception as e:
         # Handle any exceptions that occur during the agent execution
         raise HTTPException(
@@ -179,6 +176,7 @@ async def company_summary_agent(
     input: CompanySummaryAgent,
 ) -> AsyncIterable[StreamEvent]:
     """Agent that generates a summary for a given company"""
+    prompt = _company_summary_prompt(input.exchange.value, input.ticker)
     stream_state = StreamState()
     context = CompanyDataContextDependency(
         exchange=input.exchange.value,
@@ -194,7 +192,7 @@ async def company_summary_agent(
         with track_agent_session(
             name="company_summary",
             session_id=input.session_id,
-            input_prompt="Give me detail information with respect to the given company data",
+            input_prompt=prompt,
             metadata={
                 "ticker": input.ticker,
                 "exchange": input.exchange.value,
@@ -202,6 +200,8 @@ async def company_summary_agent(
             },
         ) as span:
             async with agent.run_stream(
+                # WARNING - The prompt for this agent is fixed and cannot be customized by the user
+                # since the agent is specifically designed to generate company summary based on the given ticker and exchange.
                 "Give me detail information with respect to the given company data",
                 deps=context,
             ) as result:
@@ -214,14 +214,10 @@ async def company_summary_agent(
                 # Once the agent run is complete, get the final output for further usage
                 final_output = await result.get_output()
 
-                try:
-                    # Adding info to current span for observability
-                    span.set_attribute(
-                        SpanAttributes.OUTPUT_VALUE,
-                        final_output.text_output(),
-                    )
-                except AttributeError:
-                    span.set_attribute(SpanAttributes.OUTPUT_VALUE, str(final_output))
+                # Adding info to current span for observability
+                span.set_attribute(
+                    SpanAttributes.OUTPUT_VALUE, final_output.text_output()
+                )
 
         # Persist company summary as cache
         final_thinking = "".join(stream_state.thinking_parts).strip() or None
@@ -267,7 +263,7 @@ async def company_summary_qa_agent(
             json={
                 "prompt": _company_summary_prompt(input.exchange.value, input.ticker),
                 "agent": "company-summary",
-                "model": settings.app.company_summary_model,  # REVIEW - This is a bit brittle, we should ideally be able to specify the model used for caching at a more granular level instead of hardcoding it here.
+                "model": settings.stockdb.company_summary_model,  # REVIEW - This is a bit brittle, we should ideally be able to specify the model used for caching at a more granular level instead of hardcoding it here.
                 # "cache_tier": "tier2" # TODO - Add support when vector DB is implemented
             },
         )
@@ -311,6 +307,7 @@ async def company_summary_qa_agent(
             async for text in result.stream_text(debounce_by=0.1):
                 final_text = text
                 yield final_text
+
             # Adding info to current span for observability
             span.set_attribute(SpanAttributes.OUTPUT_VALUE, final_text)
     logger.info(f"Completed agent execution for session_id {input.session_id}")

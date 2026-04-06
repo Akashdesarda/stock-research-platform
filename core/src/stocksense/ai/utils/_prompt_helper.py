@@ -24,7 +24,7 @@ def get_phoenix_client() -> PhoenixAsyncClient:
         from phoenix.client import AsyncClient as PhoenixAsyncClient
 
         _phoenix_client = PhoenixAsyncClient(
-            base_url=f"{settings.common.base_url}:{settings.common.phoenix_port}"
+            base_url=f"{settings.common.phoenix_url}:{settings.common.phoenix_port}"
         )
     return _phoenix_client
 
@@ -66,7 +66,9 @@ async def _fetch_prompt(
         The formatted prompt object from Phoenix.
     """
     client = get_phoenix_client()
-    prompt = await client.prompts.get(prompt_identifier=prompt_identifier, **kwargs)
+    prompt = await client.prompts.get(
+        prompt_identifier=prompt_identifier, **kwargs
+    )
     return prompt.format(variables=variables or {})
 
 
@@ -99,7 +101,9 @@ async def fetch_prompt_messages(
     """
     prompt = await _fetch_prompt(prompt_identifier, variables, **kwargs)
     messages = prompt.messages
-    return [FormattedPrompt(role=m["role"], content=m["content"]) for m in messages]
+    return [
+        FormattedPrompt(role=m["role"], content=m["content"]) for m in messages
+    ]
 
 
 async def fetch_system_prompt(
@@ -133,7 +137,9 @@ async def fetch_system_prompt(
     >>> system_prompt = await fetch_system_prompt("text-to-sql")
     >>> system_prompt = await fetch_system_prompt("text-to-sql", version=2, lang="es")
     """
-    messages = await fetch_prompt_messages(prompt_identifier, variables, **kwargs)
+    messages = await fetch_prompt_messages(
+        prompt_identifier, variables, **kwargs
+    )
     for msg in messages:
         if msg["role"] == "system":
             return msg["content"]
@@ -171,7 +177,9 @@ async def fetch_user_prompt(
     >>> user_prompt = await fetch_user_prompt("text-to-sql", table_name="users")
     >>> user_prompt = await fetch_user_prompt("text-to-sql", version=2, table_name="users")
     """
-    messages = await fetch_prompt_messages(prompt_identifier, variables, **kwargs)
+    messages = await fetch_prompt_messages(
+        prompt_identifier, variables, **kwargs
+    )
     for msg in messages:
         if msg["role"] == "user":
             return msg["content"]
@@ -212,7 +220,9 @@ async def fetch_prompt_by_index(
     >>> system_prompt = await fetch_prompt_by_index("dataset-description", 0)
     >>> user_instruction = await fetch_prompt_by_index("dataset-description", 1, sql_query="SELECT *")
     """
-    messages = await fetch_prompt_messages(prompt_identifier, variables, **kwargs)
+    messages = await fetch_prompt_messages(
+        prompt_identifier, variables, **kwargs
+    )
     if index < 0 or index >= len(messages):
         raise ValueError(
             f"Prompt index {index} out of range. Prompt has {len(messages)} messages."

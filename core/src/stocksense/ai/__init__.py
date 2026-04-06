@@ -1,19 +1,6 @@
 import json
 from contextlib import contextmanager
-from typing import Any, Generator
-
-from openinference.instrumentation import using_session
-from openinference.instrumentation.pydantic_ai import (
-    OpenInferenceSpanProcessor,
-)
-from openinference.semconv.trace import SpanAttributes
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-    OTLPSpanExporter,
-)
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.trace.span import Span
+from typing import Any
 
 from stocksense.config import get_settings
 
@@ -21,12 +8,22 @@ settings = get_settings()
 
 
 def setup_phoenix_tracing():
+    from openinference.instrumentation.pydantic_ai import (
+        OpenInferenceSpanProcessor,
+    )
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+        OTLPSpanExporter,
+    )
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
     # Set up the tracer provider
     tracer_provider = TracerProvider()
     trace.set_tracer_provider(tracer_provider)
 
     # Add the OpenInference span processor
-    endpoint = f"{settings.common.base_url}:{settings.common.phoenix_port}/v1/traces"
+    endpoint = f"{settings.common.phoenix_url}:{settings.common.phoenix_port}/v1/traces"
 
     exporter = OTLPSpanExporter(endpoint=endpoint)
 
@@ -40,11 +37,14 @@ def track_agent_session(
     session_id: str,
     input_prompt: str,
     metadata: dict[str, Any] | None = None,
-) -> Generator[Span, Any, None]:
+):
     """
     Reusable context manager to set up OpenTelemetry and OpenInference tracing
     for an agent session.
     """
+    from openinference.instrumentation import using_session
+    from openinference.semconv.trace import SpanAttributes
+    from opentelemetry import trace
 
     tracer = trace.get_tracer(__name__)
 

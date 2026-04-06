@@ -41,7 +41,9 @@ def _get_local_data_directory() -> Path:
 
     if system == "windows":
         # Windows: Use AppData/Roaming
-        base_dir = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+        base_dir = Path(
+            os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
+        )
     elif system == "darwin":  # macOS
         # macOS: Use ~/Library/Application Support
         base_dir = Path.home() / "Library" / "Application Support"
@@ -147,6 +149,7 @@ def ensure_config_env(config_path: str | Path | None = None) -> Path:
 # Model for the 'common' section
 class Common(BaseModel):
     base_url: str
+    phoenix_url: str
     phoenix_port: int
     available_llm_providers: list[str]
     provider_base_urls: dict[str, str] | None = None
@@ -161,12 +164,14 @@ class Common(BaseModel):
 
 # Model for the 'App' section
 class App(BaseModel):
+    ui_url: str
     port: int
     backend_port: int
 
 
 # StockDB model for the 'stockdb' section
 class StockDB(BaseModel):
+    stockdb_url: str
     port: int
     data_base_path: Annotated[Path, AfterValidator(_resolve_data_path)]
     download_batch_size: int
@@ -181,7 +186,7 @@ class Settings(BaseSettings):
     app: App
     stockdb: StockDB
 
-    model_config = SettingsConfigDict()
+    model_config = SettingsConfigDict(env_nested_delimiter="__")
 
     @classmethod
     def settings_customise_sources(
@@ -192,7 +197,10 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return (TomlConfigSettingsSource(settings_cls),)
+        return (
+            env_settings,
+            TomlConfigSettingsSource(settings_cls),
+        )
 
     def save_as_toml(self) -> None:
         """Save the current settings to a TOML file."""

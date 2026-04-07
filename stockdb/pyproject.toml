@@ -1,21 +1,21 @@
 [project]
 name = "StockSense-Stockdb"
-version = "1.5.0"
+version = "1.5.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alive-progress>=3.3.0",
-    "fastapi>=0.135.1",
+    "fastapi>=0.135.3",
     "orjson>=3.11.3",
-    "polars[cloudpickle,deltalake,pyarrow]>=1.33.0",
+    "polars[cloudpickle,deltalake,pyarrow]>=1.38.1",
     "pydantic-settings>=2.10.1",
     "pyyaml>=6.0.3",
     "rich>=14.3.1",
     "scalar-fastapi>=1.6.1",
     "scipy>=1.16.2",
     "stocksense-core[data,ai]",
-    "uvicorn>=0.37.0",
+    "uvicorn>=0.41.0",
 ]
 
 [dependency-groups]

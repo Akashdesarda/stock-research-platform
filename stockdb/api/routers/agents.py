@@ -315,13 +315,15 @@ async def company_summary_qa_agent(
     # Saving the entire conversation till now
     messages_json = history_messages_to_json(result.all_messages())
     chat_history.write(
-        pl.DataFrame({
-            "session_id": input.session_id,
-            "model": input.model,
-            "agent": "company-summary-qa",
-            "message_json": messages_json,
-            "timestamp": datetime.now(),
-        }),
+        pl.DataFrame(
+            {
+                "session_id": input.session_id,
+                "model": input.model,
+                "agent": "company-summary-qa",
+                "message_json": messages_json,
+                "timestamp": datetime.now(),
+            }
+        ),
         mode="overwrite",
     )
     logger.info(f"Saved chat history for session_id {input.session_id}")

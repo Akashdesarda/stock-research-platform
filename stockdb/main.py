@@ -7,15 +7,16 @@ from pathlib import Path
 
 import polars as pl
 from about_time import about_time
-from api import setup
-from api.models import APITags, StockExchange
-from api.routers import agents, bulk, ops, per_security, strategy
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from scalar_fastapi import get_scalar_api_reference
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
+
+from api import setup
+from api.models import APITags, StockExchange
+from api.routers import agents, bulk, ops, per_security, strategy
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -24,7 +25,7 @@ STATIC_DIR = Path(__file__).parent / "static"  # points to stockdb/static
 app = FastAPI(
     debug=True,
     title="StockDB API",
-    version="1.5.0",
+    version="1.5.1",
     docs_url=None,
     redoc_url=None,
 )

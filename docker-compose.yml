@@ -24,7 +24,7 @@ services:
         environment:
             CONFIG_FILE: /shared/assets/config.toml
             DOCKER_CONTAINER: "true" # Explicit Docker environment flag
-            COMMON__BASE_URL: "http://phoenix"
+            COMMON__PHOENIX_URL: "http://phoenix"
         depends_on:
             init_snapshot:
                 condition: service_completed_successfully

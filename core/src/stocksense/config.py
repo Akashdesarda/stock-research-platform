@@ -154,7 +154,7 @@ class Common(BaseModel):
 
 
 class AI(BaseModel):
-    provider_base_urls: dict[str, str] | None = None
+    provider_base_url: dict[str, str] | None = None
     GROQ_API_KEY: str
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str
@@ -215,17 +215,17 @@ class Settings(BaseSettings):
 
     def get_model_api_keys(self, model_name: str) -> str:
         return getattr(
-            self.common,
+            self.ai,
             f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
             "",
         )
 
     def get_model_base_url(self, model_name: str) -> str | None:
-        if not self.common.provider_base_urls:
+        if not self.ai.provider_base_url:
             return None
 
         provider = model_name.split(":")[0].split("-")[0].lower()
-        return self.common.provider_base_urls.get(provider)
+        return self.ai.provider_base_url.get(provider)
 
 
 # the Settings model

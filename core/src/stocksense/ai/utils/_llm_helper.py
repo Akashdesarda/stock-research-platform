@@ -2,7 +2,14 @@ import os
 from contextlib import contextmanager
 
 import pystache
-from pydantic_ai.messages import ModelMessage, ModelResponse, ThinkingPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ThinkingPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 from pydantic_ai.models import Model, infer_model
 from pydantic_ai.providers import infer_provider_class
 
@@ -21,7 +28,9 @@ def temporary_env_var(key: str, value: str):
             os.environ[key] = original_value
 
 
-def get_model(model_name: str, api_key: str, base_url: str | None = None) -> Model:
+def get_model(
+    model_name: str, api_key: str, base_url: str | None = None
+) -> Model:
     """
     Creates a model, explicitly passing connection settings for openai
     to avoid connection and environment variable issues.
@@ -66,10 +75,46 @@ def get_thinking_parts(messages: list[ModelMessage]) -> str:
     for message in messages:
         if isinstance(message, ModelResponse):
             thinking_content.extend(
-                part.content for part in message.parts if isinstance(part, ThinkingPart)
+                part.content
+                for part in message.parts
+                if isinstance(part, ThinkingPart)
             )
 
     return "\n".join(thinking_content)
+
+
+def get_tool_call_parts(messages: list[ModelMessage]) -> list[dict]:
+    """Extracts all tool calls and their corresponding returns from the message history."""
+    tool_interactions = []
+
+    for message in messages:
+        if isinstance(message, ModelResponse):
+            for part in message.parts:
+                if isinstance(part, ToolCallPart):
+                    tool_interactions.append(
+                        {
+                            "type": "call",
+                            "tool_name": part.tool_name,
+                            "tool_call_id": part.tool_call_id,
+                            "args": part.args.args_dict
+                            if hasattr(part.args, "args_dict")
+                            else getattr(part.args, "args_json", part.args),
+                        }
+                    )
+
+        elif isinstance(message, ModelRequest):
+            for part in message.parts:
+                if isinstance(part, ToolReturnPart):
+                    tool_interactions.append(
+                        {
+                            "type": "return",
+                            "tool_name": part.tool_name,
+                            "tool_call_id": part.tool_call_id,
+                            "content": part.content,
+                        }
+                    )
+
+    return tool_interactions
 
 
 def render_mustache_conditional_prompt(template: str, data: dict):

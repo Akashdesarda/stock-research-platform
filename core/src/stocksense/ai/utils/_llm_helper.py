@@ -109,6 +109,7 @@ def get_tool_call_parts(messages: list[ModelMessage]) -> list[dict]:
                         {
                             "type": "return",
                             "tool_name": part.tool_name,
+                            "tool_call_id": part.tool_call_id,
                             "content": part.content,
                         }
                     )

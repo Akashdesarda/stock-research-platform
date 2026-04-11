@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Annotated
 
@@ -25,6 +26,7 @@ from api.models import (
 from api.routers import _build_history_lf_from_query, _logical_plan_to_lf
 from pipeline.ticker_history_data_download import download_ticker_history
 
+logger = logging.getLogger("stocksense")
 settings = get_settings()
 
 router = APIRouter(prefix="/api/operation", tags=[APITags.ops])
@@ -171,6 +173,9 @@ async def cache_prompt_response(cache_data: PromptCacheInput) -> dict:
     prompt_cache_table.merge(
         current_cache_df.collect(),
         predicate="s.prompt_hash = t.prompt_hash",
+    )
+    logger.info(
+        f"Cached response for prompt hash: {cache_data.get_cache_key()} with TTL of {cache_data.ttl} days"
     )
 
     # TODO - Add Tier 2 - Vector DB Storage

@@ -1,9 +1,10 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import AsyncIterable
 
 import polars as pl
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from openinference.semconv.trace import SpanAttributes
 from stocksense.ai import track_agent_session
 from stocksense.ai.agents import (
@@ -47,6 +48,7 @@ router = APIRouter(prefix="/api/agent", tags=[APITags.agent])
 @router.post("/company-summary")
 async def company_summary_agent(
     input: CompanySummaryAgent,
+    background_tasks: BackgroundTasks,
 ) -> AgentStructuredResponse:
     """Agent that generates a summary for a given company"""
     prompt = _company_summary_prompt(input.exchange.value, input.ticker)
@@ -98,9 +100,12 @@ async def company_summary_agent(
             thinking=response.thinking,
             ttl=1,  # Cache for 1 day
         )
-        await cache_prompt_response(payload)
+
+        # Offload caching to background task to avoid blocking the API response
+        background_tasks.add_task(cache_prompt_response, payload)
+
         logger.debug(
-            f"Cached company summary for {input.ticker} on {input.exchange.value}"
+            f"Scheduled background caching of company summary for {input.ticker} on {input.exchange.value}"
         )
         return response
     except Exception as e:
@@ -194,16 +199,22 @@ async def company_summary_qa_agent(
 
     # Saving the entire conversation till now
     messages_json = history_messages_to_json(result.all_messages())
-    chat_history.write(
-        pl.DataFrame(
-            {
-                "session_id": input.session_id,
-                "model": input.model,
-                "agent": "company-summary-qa",
-                "message_json": messages_json,
-                "timestamp": datetime.now(),
-            }
-        ),
-        mode="overwrite",
-    )
-    logger.info(f"Saved chat history for session_id {input.session_id}")
+
+    # Offload saving conversation history to a background thread to prevent blocking
+    # the async event loop and to allow the generator to yield quickly.
+    def save_chat_history():
+        chat_history.write(
+            pl.DataFrame(
+                {
+                    "session_id": input.session_id,
+                    "model": input.model,
+                    "agent": "company-summary-qa",
+                    "message_json": messages_json,
+                    "timestamp": datetime.now(),
+                }
+            ),
+            mode="overwrite",
+        )
+        logger.info(f"Saved chat history for session_id {input.session_id}")
+
+    asyncio.create_task(asyncio.to_thread(save_chat_history))

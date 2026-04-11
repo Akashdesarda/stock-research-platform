@@ -95,9 +95,10 @@ def get_tool_call_parts(messages: list[ModelMessage]) -> list[dict]:
                         {
                             "type": "call",
                             "tool_name": part.tool_name,
+                            "tool_call_id": part.tool_call_id,
                             "args": part.args.args_dict
                             if hasattr(part.args, "args_dict")
-                            else part.args,
+                            else getattr(part.args, "args_json", part.args),
                         }
                     )
 

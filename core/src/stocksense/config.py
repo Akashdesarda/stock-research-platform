@@ -151,15 +151,21 @@ class Common(BaseModel):
     base_url: str
     phoenix_url: str
     phoenix_port: int
-    available_llm_providers: list[str]
+
+
+class AI(BaseModel):
     provider_base_urls: dict[str, str] | None = None
     GROQ_API_KEY: str
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str
     OLLAMA_API_KEY: str
     GOOGLE_API_KEY: str
-    OPENROUTER_API_KEY: str = ""
-    INCEPTION_API_KEY: str = ""
+    OPENROUTER_API_KEY: str
+    INCEPTION_API_KEY: str
+    text_to_sql_model: str
+    company_summary_model: str
+    company_summary_qa_model: str
+    dataset_description_model: str
 
 
 # Model for the 'App' section
@@ -175,14 +181,11 @@ class StockDB(BaseModel):
     port: int
     data_base_path: Annotated[Path, AfterValidator(_resolve_data_path)]
     download_batch_size: int
-    text_to_sql_model: str
-    company_summary_model: str
-    company_summary_qa_model: str
-    dataset_description_model: str
 
 
 class Settings(BaseSettings):
     common: Common
+    ai: AI
     app: App
     stockdb: StockDB
 

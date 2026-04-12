@@ -11,7 +11,7 @@ settings = get_settings()
 _phoenix_client: PhoenixAsyncClient | None = None
 
 
-def get_phoenix_client() -> PhoenixAsyncClient:
+async def get_phoenix_client() -> PhoenixAsyncClient:
     """Get or create the Phoenix client singleton.
 
     Returns
@@ -19,14 +19,22 @@ def get_phoenix_client() -> PhoenixAsyncClient:
     PhoenixAsyncClient
         The singleton Phoenix async client instance.
     """
-    global _phoenix_client
-    if _phoenix_client is None:
-        from phoenix.client import AsyncClient as PhoenixAsyncClient
+    try:
+        global _phoenix_client
+        if _phoenix_client is None:
+            from phoenix.client import AsyncClient as PhoenixAsyncClient
 
-        _phoenix_client = PhoenixAsyncClient(
-            base_url=f"{settings.common.phoenix_url}:{settings.common.phoenix_port}"
+            _phoenix_client = PhoenixAsyncClient(
+                base_url=f"{settings.common.phoenix_url}:{settings.common.phoenix_port}"
+            )
+            await _phoenix_client._client.get(
+                "/health"
+            )  # Test connection to Phoenix server
+        return _phoenix_client
+    except Exception as e:
+        raise ConnectionError(
+            f"Failed to connect to Phoenix server at {settings.common.phoenix_url}:{settings.common.phoenix_port}. Please ensure the Phoenix server is running and accessible. Original error: {e}"
         )
-    return _phoenix_client
 
 
 class FormattedPrompt(TypedDict):
@@ -65,7 +73,7 @@ async def _fetch_prompt(
     Any
         The formatted prompt object from Phoenix.
     """
-    client = get_phoenix_client()
+    client = await get_phoenix_client()
     prompt = await client.prompts.get(
         prompt_identifier=prompt_identifier, **kwargs
     )

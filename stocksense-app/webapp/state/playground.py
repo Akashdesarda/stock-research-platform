@@ -205,10 +205,11 @@ class DataState(TickerSelectionMixin, rx.State):
             await self._generate_sql_via_llm(self.ai_prompt)
 
         except Exception as e:
-            logger.exception("Error generating SQL")
+            logger.exception("Error generating SQL", exc_info=e)
             async with self:
                 self.ai_error = (
-                    "Failed to generate SQL query. Please try again."
+                    f"Failed to generate SQL query due to error: {e}. "
+                    "Please try again."
                 )
                 self.ai_status_message = ""
                 self.ai_status_steps.append(
@@ -266,8 +267,6 @@ class DataState(TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.error(f"Error during LLM generation: {e}")
             async with self:
-                self.ai_error = f"Error during LLM generation: {e}"
-                self.ai_status_message = ""
                 return
 
         # updating UI state with LLM response

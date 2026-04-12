@@ -225,7 +225,7 @@ class Settings(BaseSettings):
             return None
 
         provider = model_name.split(":")[0].split("-")[0].lower()
-        return self.common.provider_base_url.get(provider)
+        return self.ai.provider_base_url.get(provider)
 
 
 # the Settings model

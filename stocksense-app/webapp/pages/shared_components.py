@@ -2,11 +2,13 @@ import reflex as rx
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
 from webapp.components.layout import form_field
-from webapp.state.shared import TickerSelectionMixin, ChatMixin
+from webapp.state.shared import ChatMixin, TickerSelectionMixin
 from webapp.types import TickerChoice
 
 
-def _index_based_ticker_selection(state: type[TickerSelectionMixin]) -> rx.Component:
+def _index_based_ticker_selection(
+    state: type[TickerSelectionMixin],
+) -> rx.Component:
     return dropdown_select(
         label="Select Index",
         options=state.available_index,
@@ -17,7 +19,9 @@ def _index_based_ticker_selection(state: type[TickerSelectionMixin]) -> rx.Compo
     )
 
 
-def _desired_ticker_selection(state: type[TickerSelectionMixin]) -> rx.Component:
+def _desired_ticker_selection(
+    state: type[TickerSelectionMixin],
+) -> rx.Component:
     return rx.cond(
         state.desired_choice_as_multi_select,
         multi_select_dropdown(
@@ -104,13 +108,16 @@ def ticker_selector(state: type[TickerSelectionMixin]) -> rx.Component:
         spacing="4",
     )
 
+
 def chat_bubble(role: str, content: str) -> rx.Component:
     is_user = role == "user"
 
     return rx.hstack(
         rx.box(
             rx.markdown(content),
-            background_color=rx.cond(is_user, rx.color("accent"), "transparent"),
+            background_color=rx.cond(
+                is_user, rx.color("accent"), "transparent"
+            ),
             border_radius="10px",
             max_width="80%",
             margin="16px",
@@ -120,6 +127,7 @@ def chat_bubble(role: str, content: str) -> rx.Component:
         width="100%",
         # padding_y="0.25em",
     )
+
 
 def chat_window(state: type[ChatMixin]) -> rx.Component:
     return rx.box(
@@ -138,6 +146,7 @@ def chat_window(state: type[ChatMixin]) -> rx.Component:
         width="100%",
     )
 
+
 def chat_input(state: type[ChatMixin]) -> rx.Component:
     return rx.box(
         rx.hstack(
@@ -145,10 +154,16 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
                 value=state.prompt,
                 placeholder="Ask StockSense...",
                 on_change=state.set_prompt,
+                on_key_down=lambda key, modifiers: rx.cond(
+                    (key == "Enter") & ~modifiers["shift_key"],
+                    state.generate_answer.prevent_default,
+                    None,
+                ),
                 variant="soft",
-                radius="full",
+                border_radius="24px",
                 resize="none",
                 rows="1",
+                key=rx.cond(state.prompt == "", "empty", "filled"),
                 auto_height=True,
                 width="100%",
                 padding_x="1em",
@@ -173,8 +188,10 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
             width="100%",
             max_width="900px",
             align_items="center",
-            bg=rx.color("gray", 3),
-            radius="full",
+            bg=rx.color("gray", 2),
+            border=f"1px solid {rx.color('gray', 5)}",
+            box_shadow="0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+            border_radius="24px",
             padding_right="0.25em",
         ),
         position="sticky",

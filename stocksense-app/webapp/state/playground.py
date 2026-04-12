@@ -1,14 +1,13 @@
 import asyncio
 import logging
+import uuid
 
 import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
-from httpx import AsyncClient
-from stocksense.ai.agents import StockDBContextDependency, text_to_sql
-from stocksense.ai.models import get_thinking_parts
+from httpx import AsyncClient, DecodingError
 from stocksense.config import get_settings
-from stocksense.types import DataInterval, DataPeriod
+from stocksense.types import AgentStructuredResponse, DataInterval, DataPeriod
 
 from webapp.state.shared import TickerSelectionMixin
 
@@ -55,6 +54,14 @@ class DataState(TickerSelectionMixin, rx.State):
     fetch_data_ready: bool = False
     is_loading: bool = False
     _cancel_event: asyncio.Event = asyncio.Event()
+
+    def _client(self) -> AsyncClient:
+        """Return a configured httpx AsyncClient."""
+        return AsyncClient(
+            timeout=None,
+            follow_redirects=True,
+            base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
+        )
 
     @rx.event
     def set_interval(self, value: str):
@@ -124,26 +131,6 @@ class DataState(TickerSelectionMixin, rx.State):
         self.columns_def = []
         self.fetch_data_ready = False
 
-    @rx.event
-    async def put_cache(self):
-        """Putting the current AI prompt and generated SQL into the cache."""
-        # updating cache in stockdb as a event after generating the response
-        async with AsyncClient(timeout=None, follow_redirects=True) as client:
-            response = await client.put(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/prompt/cache",
-                json={
-                    "prompt": self.ai_prompt,
-                    "agent": "text-to-sql",
-                    "model": settings.app.text_to_sql_model,
-                    "response": self.ai_sql_query,
-                    "thinking": self.ai_thinking_part,
-                },
-            )
-            if response.status_code == 200:
-                logger.info("Successfully updated prompt cache in StockDB.")
-            else:
-                logger.error(f"Failed to update prompt cache: {response.text}")
-
     @rx.event(background=True)
     async def fetch_data(self):
         """Fetch data based on the current state settings."""
@@ -195,7 +182,9 @@ class DataState(TickerSelectionMixin, rx.State):
             if use_cache:
                 async with self:
                     self.ai_status_steps.append("Checking prompt cache...")
-                retrieved_cache = await self._try_fetch_cached_sql(self.ai_prompt)
+                retrieved_cache = await self._try_fetch_cached_sql(
+                    self.ai_prompt
+                )
                 if retrieved_cache is not None:
                     cached_sql, cached_thinking = retrieved_cache
                     async with self:
@@ -218,82 +207,75 @@ class DataState(TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.exception("Error generating SQL")
             async with self:
-                self.ai_error = "Failed to generate SQL query. Please try again."
+                self.ai_error = (
+                    "Failed to generate SQL query. Please try again."
+                )
                 self.ai_status_message = ""
-                self.ai_status_steps.append(f"Generation failed: {type(e).__name__}")
+                self.ai_status_steps.append(
+                    f"Generation failed: {type(e).__name__}"
+                )
 
         finally:
             async with self:
                 self.ai_is_generating = False
 
-    async def _try_fetch_cached_sql(self, prompt: str) -> tuple[str, str] | None:
+    async def _try_fetch_cached_sql(
+        self, prompt: str
+    ) -> tuple[str, str] | None:
         """Try to fetch cached SQL for a prompt"""
         try:
-            async with AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            async with self._client() as client:
                 response = await client.post(
-                    url=f"{settings.common.base_url}:{settings.stockdb.port}"
-                    f"/api/operation/prompt/search",
+                    url="/operation/prompt/search",
                     json={
                         "prompt": prompt,
                         "agent": "text-to-sql",
                         "cache_tier": "auto",
                     },
                 )
-
-            if response.status_code != 200:
-                logger.warning(
-                    f"Cannot fetch cached SQL due to HTTP status: {response.status_code}",
-                )
-                return None
-
-            try:
+            if response.status_code == 200:
                 payload = response.json() or {}
-            except Exception:
-                logger.info("Cache lookup returned non-JSON; treating as miss.")
-                return None
+                return payload.get("response", ""), payload.get("thinking", "")
+            else:
+                logger.warning(
+                    f"Cannot fetch cached SQL due to HTTP status: {response.status_code}"
+                )
+        except DecodingError:
+            logger.warning("Cache lookup returned non-JSON; treating as miss")
 
-            cached_sql = payload.get("response") or ""
-            cached_thinking = payload.get("thinking") or ""
-            return cached_sql, cached_thinking
-
-        except Exception:
-            logger.info("Cache lookup failed; proceeding without cache.")
-            return None
-
-    async def _generate_sql_via_llm(self, prompt: str) -> None:
-        columns = await self.get_ticker_history_columns()
+    async def _generate_sql_via_llm(self, prompt: str):
+        """Generate SQL using the LLM agent"""
         async with self:
-            if not columns:
-                self.ai_error = "Unable to fetch table schema from StockDB."
-                self.ai_status_message = ""
-                self.ai_status_steps.append("Schema fetch failed.")
-                return
-            self.ai_status_steps.append("Fetched schema context from StockDB.")
+            self.ai_status_steps.append(
+                f"Running model: {settings.ai.text_to_sql_model}."
+            )
 
-        model_name = settings.app.text_to_sql_model
-        api_key = getattr(
-            settings.common,
-            f"{model_name.split(':')[0].split('-')[0].upper()}_API_KEY",
-            "",
-        )
-        if not api_key:
+        # send the request
+        try:
+            async with self._client() as client:
+                response = await client.post(
+                    "/agent/text-to-sql",
+                    json={
+                        "prompt": prompt,
+                        "model": settings.ai.text_to_sql_model,
+                        "exchange": self.selected_exchange,
+                        "session_id": str(uuid.uuid4()),
+                    },
+                )
+                result = AgentStructuredResponse.model_validate(response.json())
+        except Exception as e:
+            logger.error(f"Error during LLM generation: {e}")
             async with self:
-                self.ai_error = "Missing API key for the text-to-SQL model."
+                self.ai_error = f"Error during LLM generation: {e}"
                 self.ai_status_message = ""
-                self.ai_status_steps.append("Missing API key; cannot run model.")
-            return
+                return
 
+        # updating UI state with LLM response
         async with self:
-            self.ai_status_steps.append(f"Running model: {model_name}.")
-
-        stockdb_ctx = StockDBContextDependency(columns=columns)
-        agent = text_to_sql(model_name=model_name, api_key=api_key)
-        result = await agent.run(prompt, deps=stockdb_ctx)
-
-        async with self:
-            self.ai_thinking_part = get_thinking_parts(result.new_messages())
-            self.ai_generated_sql = result.output.sql_query.strip()
-            self.ai_sql_query = result.output.sql_query.strip()
+            self.ai_thinking_part = result.thinking or ""
+            self.ai_generated_sql = result.content.get("sql_query", "")
+            self.ai_sql_query = result.content.get("sql_query", "")
+            # TODO - add tool calls to steps
             self.ai_status_steps.append("SQL query generated successfully.")
             self.ai_status_message = "SQL query generated successfully."
 
@@ -319,9 +301,9 @@ class DataState(TickerSelectionMixin, rx.State):
 
     async def _fetch_via_sql_api(self):
         """Fetch data using the SQL API"""
-        async with AsyncClient(timeout=None, follow_redirects=True) as client:
+        async with self._client() as client:
             response = await client.post(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/query",
+                url="/bulk/ticker/query",
                 json={
                     "exchange": self.selected_exchange,
                     "sql_query": self.sql_query,
@@ -338,46 +320,22 @@ class DataState(TickerSelectionMixin, rx.State):
         await self._process_results(data)
 
     async def _fetch_via_ticker_api(
-        self, tickers: list[str], history_params: dict[str, str | None]
+        self, tickers: list[str], history_params: dict
     ):
-        """Fetch data by iterating over tickers with throttling."""
-        sem = asyncio.Semaphore(10)  # Throttling to 10 concurrent requests
-
-        async def _inner_fetch(client: AsyncClient, ticker: str) -> dict:
-            async with sem:
-                if self._cancel_event.is_set():
-                    return {}
-                resp = await client.get(
-                    url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security"
-                    f"/{self.selected_exchange}/{ticker}/history",
-                    params=history_params,
-                )
-                return resp.json()
-
+        """Fetch data by using Bulk history API"""
         try:
-            async with AsyncClient(timeout=None, follow_redirects=True) as client:
-                async with asyncio.TaskGroup() as tg:
-                    tasks = []
-                    for ticker in tickers:
-                        if self._cancel_event.is_set():
-                            break
-                        tasks.append(tg.create_task(_inner_fetch(client, ticker)))
-
-                if self._cancel_event.is_set():
-                    return
-
-                results = [
-                    pl.LazyFrame(task.result())
-                    for task in tasks
-                    if not task.cancelled() and len(task.result()) > 0
-                ]
-
-                if results:
-                    data = pl.concat(results, how="vertical")
-                    await self._process_results(data)
-                else:
-                    async with self:
-                        self.is_loading = False
+            async with self._client() as client:
+                resp = await client.post(
+                    url="/bulk/ticker/history",
+                    json={
+                        "exchange": self.selected_exchange,
+                        "ticker": tickers,
+                        **history_params,
+                    },
+                )
+                resp.raise_for_status()
+                data = pl.LazyFrame(resp.json())
+                await self._process_results(data)
         except Exception as e:
             logger.error(f"Error fetching data: {e}")
             async with self:

@@ -5,14 +5,17 @@ from typing import AsyncIterable
 
 import polars as pl
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi.responses import StreamingResponse
 from openinference.semconv.trace import SpanAttributes
 from stocksense.ai import track_agent_session
 from stocksense.ai.agents import (
     company_summary,
     company_summary_qa,
+    text_to_sql,
 )
 from stocksense.ai.skills.context import (
     CompanyDataContextDependency,
+    StockDBContextDependency,
 )
 from stocksense.ai.utils import (
     get_thinking_parts,
@@ -30,6 +33,7 @@ from api.models import (
     CompanySummaryAgentQA,
     PromptCacheInput,
     PromptSearchInput,
+    TextToSQLAgent,
 )
 from api.routers.ops import cache_prompt_response, search_prompt_cache
 
@@ -43,6 +47,71 @@ def _company_summary_prompt(exchange: str, ticker: str) -> str:
 
 # SECTION - FastAPI Router and Endpoints
 router = APIRouter(prefix="/api/agent", tags=[APITags.agent])
+
+
+@router.post("/text-to-sql")
+async def text_to_sql_agent(
+    input: TextToSQLAgent, background_tasks: BackgroundTasks
+) -> AgentStructuredResponse:
+    """Agent that converts natural language query to SQL query for stock data"""
+    history_data = StockDataDB(
+        settings.stockdb.data_base_path
+        / f"{input.exchange.value}/ticker_history"
+    )
+    context = StockDBContextDependency(
+        history_data.table_data, table_name=StockDataDB.table_name
+    )
+    agent = await text_to_sql(
+        model_name=input.model,
+        api_key=settings.get_model_api_keys(input.model),
+        base_url=settings.get_model_base_url(input.model),
+    )
+    try:
+        with track_agent_session(
+            name="text-to-sql",
+            session_id=input.session_id,
+            input_prompt=input.prompt,
+            metadata={
+                "exchange": input.exchange.value,
+                "model": input.model,
+            },
+        ) as span:
+            result = await agent.run(input.prompt, deps=context)
+            response = AgentStructuredResponse(
+                content=result.output.model_dump(),
+                thinking=get_thinking_parts(result.all_messages()),
+                tool_calls=get_tool_call_parts(result.all_messages()),
+            )
+
+            # Adding info to current span for observability
+            span.set_attribute(
+                SpanAttributes.OUTPUT_VALUE, result.output.model_dump_json()
+            )
+
+        # Persist text-to-sql response as cache
+        payload = PromptCacheInput(
+            prompt=input.prompt,
+            agent="text-to-sql",
+            model=input.model,
+            response=result.output.sql_query,
+            thinking=response.thinking,
+            # not setting ttl
+        )
+        # Offload caching to background task to avoid blocking the API response
+        background_tasks.add_task(cache_prompt_response, payload)
+        logger.debug(
+            f"Scheduled background caching of text-to-sql response for prompt: {input.prompt}"
+        )
+
+        return response
+    except Exception as e:
+        logger.exception(
+            "Error occurred in running text-to-sql agent", exc_info=e
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while running the agent: {str(e)}",
+        ) from e
 
 
 @router.post("/company-summary")
@@ -64,7 +133,7 @@ async def company_summary_agent(
 
     try:
         with track_agent_session(
-            name="company_summary",
+            name="company-summary",
             session_id=input.session_id,
             input_prompt=prompt,
             metadata={
@@ -91,7 +160,6 @@ async def company_summary_agent(
             )
 
         # Persist company summary as cache
-
         payload = PromptCacheInput(
             prompt=_company_summary_prompt(input.exchange.value, input.ticker),
             agent="company-summary",
@@ -100,13 +168,12 @@ async def company_summary_agent(
             thinking=response.thinking,
             ttl=1,  # Cache for 1 day
         )
-
         # Offload caching to background task to avoid blocking the API response
         background_tasks.add_task(cache_prompt_response, payload)
-
         logger.debug(
             f"Scheduled background caching of company summary for {input.ticker} on {input.exchange.value}"
         )
+
         return response
     except Exception as e:
         logger.exception(
@@ -118,7 +185,7 @@ async def company_summary_agent(
         ) from e
 
 
-@router.post("/company-summary-qa")
+@router.post("/company-summary-qa", response_class=StreamingResponse)
 async def company_summary_qa_agent(
     input: CompanySummaryAgentQA,
 ) -> AsyncIterable[str]:
@@ -176,7 +243,7 @@ async def company_summary_qa_agent(
     )
 
     with track_agent_session(
-        name="company_summary_qa",
+        name="company-summary-qa",
         session_id=input.session_id,
         input_prompt=input.prompt,
         metadata={
@@ -189,16 +256,21 @@ async def company_summary_qa_agent(
             input.prompt, message_history=messages
         ) as result:
             final_text = ""
-            async for text in result.stream_text(debounce_by=0.1):
-                final_text = text
-                yield final_text
+            async for text in result.stream_text(delta=True, debounce_by=None):
+                final_text += text
+                yield text
 
             # Adding info to current span for observability
             span.set_attribute(SpanAttributes.OUTPUT_VALUE, final_text)
     logger.info(f"Completed agent execution for session_id {input.session_id}")
 
+    # Persist the final assistant response alongside streamed deltas.
+    messages_for_history = result.all_messages()
+    if not messages_for_history or messages_for_history[-1] != result.response:
+        messages_for_history.append(result.response)
+
     # Saving the entire conversation till now
-    messages_json = history_messages_to_json(result.all_messages())
+    messages_json = history_messages_to_json(messages_for_history)
 
     # Offload saving conversation history to a background thread to prevent blocking
     # the async event loop and to allow the generator to yield quickly.

@@ -2,7 +2,6 @@ import reflex as rx
 
 from webapp.components.inputs import (
     action_button,
-    multi_select_dropdown,
     number_input,
     save_button,
 )
@@ -33,17 +32,6 @@ def configuration() -> rx.Component:
                     on_change=ConfigurationState.update_base_url,
                 ),
                 help_text="Base URL for the APIs. Only change if you know what you are doing.",
-            ),
-            form_field(
-                label="Available LLM Providers",
-                control=multi_select_dropdown(
-                    label=None,
-                    options=ConfigurationState.common_available_llm_providers,
-                    value=ConfigurationState.llm_providers_to_use,
-                    on_change=ConfigurationState.update_llm_providers,
-                    placeholder="Select LLM Providers",
-                ),
-                help_text="Select the LLM providers that you want to enable.",
             ),
             form_field(
                 label="GROQ API Key",
@@ -90,7 +78,7 @@ def configuration() -> rx.Component:
                 control=number_input(
                     on_change=ConfigurationState.update_mlflow_port,
                     width="100%",
-                    value=ConfigurationState.common_mlflow_port,
+                    value=ConfigurationState.common_phoenix_port,
                 ),
                 help_text="Port number for MLflow tracking server.",
             ),
@@ -143,8 +131,8 @@ def configuration() -> rx.Component:
             form_field(
                 label="Text to SQL Model",
                 control=rx.input(
-                    value=ConfigurationState.app_text_to_sql_model,
-                    on_change=ConfigurationState.update_app_text_to_sql_model,
+                    value=ConfigurationState.ai_text_to_sql_model,
+                    on_change=ConfigurationState.update_text_to_sql_model,
                     width="100%",
                     radius="large",
                 ),
@@ -153,8 +141,8 @@ def configuration() -> rx.Component:
             form_field(
                 label="Company Summary Model",
                 control=rx.input(
-                    value=ConfigurationState.app_company_summary_model,
-                    on_change=ConfigurationState.update_app_company_summary_model,
+                    value=ConfigurationState.ai_company_summary_model,
+                    on_change=ConfigurationState.update_company_summary_model,
                     width="100%",
                     radius="large",
                 ),
@@ -163,8 +151,8 @@ def configuration() -> rx.Component:
             form_field(
                 label="Company Summary QA Model",
                 control=rx.input(
-                    value=ConfigurationState.app_company_summary_qa_model,
-                    on_change=ConfigurationState.update_app_company_summary_qa_model,
+                    value=ConfigurationState.ai_company_summary_qa_model,
+                    on_change=ConfigurationState.update_company_summary_qa_model,
                     width="100%",
                     radius="large",
                 ),

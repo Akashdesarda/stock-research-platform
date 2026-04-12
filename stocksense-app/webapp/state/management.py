@@ -14,18 +14,19 @@ class ConfigurationState(rx.State):
 
     # Common settings
     common_base_url: str = settings.common.base_url
-    common_available_llm_providers: list[str] = settings.common.available_llm_providers
-    # TODO - it doesn't proper use as of now. Fix it later.
-    llm_providers_to_use: list[str] = settings.common.available_llm_providers
-    common_available_llm_providers_csv: str = ", ".join(
-        settings.common.available_llm_providers
-    )
-    common_GROQ_API_KEY: str = settings.common.GROQ_API_KEY
-    common_OPENAI_API_KEY: str = settings.common.OPENAI_API_KEY
-    common_ANTHROPIC_API_KEY: str = settings.common.ANTHROPIC_API_KEY
-    common_OLLAMA_API_KEY: str = settings.common.OLLAMA_API_KEY
-    common_GOOGLE_API_KEY: str = settings.common.GOOGLE_API_KEY
-    common_mlflow_port: int = settings.common.mlflow_port
+    common_phoenix_port: int = settings.common.phoenix_port
+
+    # AI settings
+    # api keys
+    ai_GROQ_API_KEY: str = settings.ai.GROQ_API_KEY
+    ai_OPENAI_API_KEY: str = settings.ai.OPENAI_API_KEY
+    ai_ANTHROPIC_API_KEY: str = settings.ai.ANTHROPIC_API_KEY
+    ai_OLLAMA_API_KEY: str = settings.ai.OLLAMA_API_KEY
+    ai_GOOGLE_API_KEY: str = settings.ai.GOOGLE_API_KEY
+    # Aagent
+    ai_text_to_sql_model: str = settings.ai.text_to_sql_model
+    ai_company_summary_model: str = settings.ai.company_summary_model
+    ai_company_summary_qa_model: str = settings.ai.company_summary_qa_model
 
     # StockDB settings
     stockdb_port: int = settings.stockdb.port
@@ -34,9 +35,6 @@ class ConfigurationState(rx.State):
 
     # App settings
     app_port: int = settings.app.port
-    app_text_to_sql_model: str = settings.app.text_to_sql_model
-    app_company_summary_model: str = settings.app.company_summary_model
-    app_company_summary_qa_model: str = settings.app.company_summary_qa_model
 
     # UI helpers
     last_saved: str = ""
@@ -47,32 +45,28 @@ class ConfigurationState(rx.State):
         self.common_base_url = value
 
     @rx.event
-    def update_llm_providers(self, value: list[str]):
-        self.llm_providers_to_use = value
-
-    @rx.event
     def update_groq_api_key(self, value: str):
-        self.common_GROQ_API_KEY = value
+        self.ai_GROQ_API_KEY = value
 
     @rx.event
     def update_openai_api_key(self, value: str):
-        self.common_OPENAI_API_KEY = value
+        self.ai_OPENAI_API_KEY = value
 
     @rx.event
     def update_anthropic_api_key(self, value: str):
-        self.common_ANTHROPIC_API_KEY = value
+        self.ai_ANTHROPIC_API_KEY = value
 
     @rx.event
     def update_ollama_api_key(self, value: str):
-        self.common_OLLAMA_API_KEY = value
+        self.ai_OLLAMA_API_KEY = value
 
     @rx.event
     def update_google_api_key(self, value: str):
-        self.common_GOOGLE_API_KEY = value
+        self.ai_GOOGLE_API_KEY = value
 
     @rx.event
     def update_mlflow_port(self, value: int | str):
-        self.common_mlflow_port = int(value)
+        self.common_phoenix_port = int(value)
 
     @rx.event
     def update_stockdb_port(self, value: int | str):
@@ -87,16 +81,16 @@ class ConfigurationState(rx.State):
         self.app_port = int(value)
 
     @rx.event
-    def update_app_text_to_sql_model(self, value: str):
-        self.app_text_to_sql_model = value
+    def update_text_to_sql_model(self, value: str):
+        self.ai_text_to_sql_model = value
 
     @rx.event
-    def update_app_company_summary_model(self, value: str):
-        self.app_company_summary_model = value
+    def update_company_summary_model(self, value: str):
+        self.ai_company_summary_model = value
 
     @rx.event
-    def update_app_company_summary_qa_model(self, value: str):
-        self.app_company_summary_qa_model = value
+    def update_company_summary_qa_model(self, value: str):
+        self.ai_company_summary_qa_model = value
 
     @rx.event
     def apply_to_current_session(self) -> None:
@@ -105,21 +99,22 @@ class ConfigurationState(rx.State):
         settings = get_settings()
 
         settings.common.base_url = self.common_base_url
-        settings.common.available_llm_providers = self.common_available_llm_providers
-        settings.common.GROQ_API_KEY = self.common_GROQ_API_KEY
-        settings.common.OPENAI_API_KEY = self.common_OPENAI_API_KEY
-        settings.common.ANTHROPIC_API_KEY = self.common_ANTHROPIC_API_KEY
-        settings.common.OLLAMA_API_KEY = self.common_OLLAMA_API_KEY
-        settings.common.GOOGLE_API_KEY = self.common_GOOGLE_API_KEY
-        settings.common.mlflow_port = self.common_mlflow_port
+        settings.common.phoenix_port = self.common_phoenix_port
+
+        settings.ai.GROQ_API_KEY = self.ai_GROQ_API_KEY
+        settings.ai.OPENAI_API_KEY = self.ai_OPENAI_API_KEY
+        settings.ai.ANTHROPIC_API_KEY = self.ai_ANTHROPIC_API_KEY
+        settings.ai.OLLAMA_API_KEY = self.ai_OLLAMA_API_KEY
+        settings.ai.GOOGLE_API_KEY = self.ai_GOOGLE_API_KEY
+
+        settings.ai.text_to_sql_model = self.ai_text_to_sql_model
+        settings.ai.company_summary_model = self.ai_company_summary_model
+        settings.ai.company_summary_qa_model = self.ai_company_summary_qa_model
 
         settings.stockdb.port = self.stockdb_port
         settings.stockdb.download_batch_size = self.stockdb_download_batch_size
 
         settings.app.port = self.app_port
-        settings.app.text_to_sql_model = self.app_text_to_sql_model
-        settings.app.company_summary_model = self.app_company_summary_model
-        settings.app.company_summary_qa_model = self.app_company_summary_qa_model
 
         self.save_error = ""
 
@@ -129,22 +124,25 @@ class ConfigurationState(rx.State):
         try:
             # Update settings for runtime usage
             settings.common.base_url = self.common_base_url
-            settings.common.available_llm_providers = self.llm_providers_to_use
-            settings.common.GROQ_API_KEY = self.common_GROQ_API_KEY
-            settings.common.OPENAI_API_KEY = self.common_OPENAI_API_KEY
-            settings.common.ANTHROPIC_API_KEY = self.common_ANTHROPIC_API_KEY
-            settings.common.OLLAMA_API_KEY = self.common_OLLAMA_API_KEY
-            settings.common.GOOGLE_API_KEY = self.common_GOOGLE_API_KEY
-            settings.common.mlflow_port = self.common_mlflow_port
+            settings.ai.GROQ_API_KEY = self.ai_GROQ_API_KEY
+            settings.ai.OPENAI_API_KEY = self.ai_OPENAI_API_KEY
+            settings.ai.ANTHROPIC_API_KEY = self.ai_ANTHROPIC_API_KEY
+            settings.ai.OLLAMA_API_KEY = self.ai_OLLAMA_API_KEY
+            settings.ai.GOOGLE_API_KEY = self.ai_GOOGLE_API_KEY
+            settings.common.phoenix_port = self.common_phoenix_port
 
             settings.stockdb.port = self.stockdb_port
             # settings.stockdb.data_base_path = self.stockdb_data_base_path
-            settings.stockdb.download_batch_size = self.stockdb_download_batch_size
+            settings.stockdb.download_batch_size = (
+                self.stockdb_download_batch_size
+            )
 
             settings.app.port = self.app_port
-            settings.app.text_to_sql_model = self.app_text_to_sql_model
-            settings.app.company_summary_model = self.app_company_summary_model
-            settings.app.company_summary_qa_model = self.app_company_summary_qa_model
+            settings.ai.text_to_sql_model = self.ai_text_to_sql_model
+            settings.ai.company_summary_model = self.ai_company_summary_model
+            settings.ai.company_summary_qa_model = (
+                self.ai_company_summary_qa_model
+            )
 
             # update the config file
             settings.save_as_toml()
@@ -237,9 +235,15 @@ class TaskState(CommonMixin, rx.State):
                 "task_mode": self.task_mode,
                 "download_mode": self.download_mode,
                 "exchange": self.selected_exchange,
-                "ticker": self.selected_ticker if self.task_mode == "manual" else None,
-                "start_date": self.start_date if self.task_mode == "manual" else None,
-                "end_date": self.end_date if self.task_mode == "manual" else None,
+                "ticker": self.selected_ticker
+                if self.task_mode == "manual"
+                else None,
+                "start_date": self.start_date
+                if self.task_mode == "manual"
+                else None,
+                "end_date": self.end_date
+                if self.task_mode == "manual"
+                else None,
             }
 
             url = (
@@ -313,11 +317,11 @@ class TaskState(CommonMixin, rx.State):
                     detail = "Request failed."
                     try:
                         payload = response.json()
-                        detail = response.text  # str(payload.get("detail", detail))
-                    except Exception:  # pragma: no cover
+                        detail = response.text
+                    except Exception:
                         detail = response.text or detail
                     self.optimize_submit_error = detail
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             async with self:
                 self.optimize_submit_error = str(exc)
         finally:

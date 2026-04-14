@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import datetime
 from typing import AsyncIterable
@@ -188,6 +187,7 @@ async def company_summary_agent(
 @router.post("/company-summary-qa", response_class=StreamingResponse)
 async def company_summary_qa_agent(
     input: CompanySummaryAgentQA,
+    background_tasks: BackgroundTasks,
 ) -> AsyncIterable[str]:
     """Agent that answers questions about a given company based on its summary"""
     # Getting existing conversation history if present
@@ -289,4 +289,4 @@ async def company_summary_qa_agent(
         )
         logger.info(f"Saved chat history for session_id {input.session_id}")
 
-    asyncio.create_task(asyncio.to_thread(save_chat_history))
+    background_tasks.add_task(save_chat_history)

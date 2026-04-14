@@ -3,7 +3,7 @@ import re
 import uuid
 
 import reflex as rx
-from httpx import AsyncClient, DecodingError
+from httpx import AsyncClient
 from stocksense.ai.agents import (
     CompanySummaryOutput,
 )
@@ -217,16 +217,15 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
                         "cache_tier": "auto",
                     },
                 )
+            # Ensure non-2xx responses surface as HTTPStatusError
+            response.raise_for_status()
+            payload = response.json() or {}
+            return payload.get("response", ""), payload.get("thinking", "")
 
-            if response.status_code == 200:
-                payload = response.json() or {}
-                return payload.get("response", ""), payload.get("thinking", "")
-            else:
-                logger.warning(
-                    f"Cannot fetch cached SQL due to HTTP status: {response.status_code}"
-                )
-        except DecodingError:
-            logger.warning("Cache lookup returned non-JSON; treating as miss")
+        except Exception as e:
+            logger.error(
+                f"Cache lookup returned non-JSON due to {e}; treating as miss"
+            )
 
     async def _generate_summary_via_llm(self):
         """Generate company summary via LLM without using cache."""
@@ -246,6 +245,8 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, rx.State):
                         "session_id": self.current_session_id,
                     },
                 )
+                # Ensure non-2xx responses surface as HTTPStatusError
+                response.raise_for_status()
                 result = AgentStructuredResponse.model_validate(response.json())
         except Exception as e:
             logger.error(f"Error during LLM generation: {e}")

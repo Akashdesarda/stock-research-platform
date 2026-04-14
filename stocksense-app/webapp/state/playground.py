@@ -5,7 +5,7 @@ import uuid
 import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
-from httpx import AsyncClient, DecodingError
+from httpx import AsyncClient
 from stocksense.config import get_settings
 from stocksense.types import AgentStructuredResponse, DataInterval, DataPeriod
 
@@ -234,15 +234,15 @@ class DataState(TickerSelectionMixin, rx.State):
                         "cache_tier": "auto",
                     },
                 )
-            if response.status_code == 200:
-                payload = response.json() or {}
-                return payload.get("response", ""), payload.get("thinking", "")
-            else:
-                logger.warning(
-                    f"Cannot fetch cached SQL due to HTTP status: {response.status_code}"
-                )
-        except DecodingError:
-            logger.warning("Cache lookup returned non-JSON; treating as miss")
+            # Ensure non-2xx responses surface as HTTPStatusError
+            response.raise_for_status()
+            payload = response.json() or {}
+            return payload.get("response", ""), payload.get("thinking", "")
+
+        except Exception as e:
+            logger.error(
+                f"Cache lookup returned non-JSON due to {e}; treating as miss"
+            )
 
     async def _generate_sql_via_llm(self, prompt: str):
         """Generate SQL using the LLM agent"""
@@ -263,6 +263,9 @@ class DataState(TickerSelectionMixin, rx.State):
                         "session_id": str(uuid.uuid4()),
                     },
                 )
+                # Ensure non-2xx responses surface as HTTPStatusError
+                response.raise_for_status()
+
                 result = AgentStructuredResponse.model_validate(response.json())
         except Exception as e:
             logger.error(f"Error during LLM generation: {e}")

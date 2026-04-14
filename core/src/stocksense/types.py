@@ -1,4 +1,7 @@
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class DataPeriod(Enum):
@@ -45,3 +48,9 @@ class StockExchangeYahooIdentifier(Enum):
     bmv = ".M"
     tsx = ".C"
     euronext = ".F"
+
+
+class AgentStructuredResponse(BaseModel):
+    content: dict[str, Any]
+    thinking: str | None = None
+    tool_calls: list[dict[str, Any]] | None

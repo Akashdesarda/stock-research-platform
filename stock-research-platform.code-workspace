@@ -73,9 +73,11 @@
 			"talib",
 			"timeperiod"
 		],
-		"editor.fontFamily": "'Monaspace Krypton NF', monospace",
+		"editor.fontFamily": "'Monaspace Argon NF', monospace",
 		"ruff.format.preview": true,
-		"ruff.organizeImports": true
+		"ruff.organizeImports": true,
+		"terminal.integrated.fontFamily": "'Monaspace Argon NF'",
+		"terminal.integrated.fontLigatures.enabled": true
 	},
 	"tasks": {
 		"version": "2.0.0",

@@ -145,9 +145,13 @@ def data() -> rx.Component:
                         ),
                         rx.center(  # OR separator
                             rx.vstack(
-                                rx.text("OR", size="1", weight="bold", color="gray"),
+                                rx.text(
+                                    "OR", size="1", weight="bold", color="gray"
+                                ),
                                 rx.separator(
-                                    orientation="vertical", size="4", height="40px"
+                                    orientation="vertical",
+                                    size="4",
+                                    height="40px",
                                 ),
                                 align="center",
                                 justify="end",
@@ -202,7 +206,8 @@ def data() -> rx.Component:
                     ),
                 ),
                 rx.cond(  # callout for sql query + other params both set
-                    (DataState.sql_query != "") & (DataState.selected_ticker != []),
+                    (DataState.sql_query != "")
+                    & (DataState.selected_ticker != []),
                     rx.callout(
                         "SQL Query will be prioritized over other selection parameters.",
                         icon="info",
@@ -227,7 +232,8 @@ def data() -> rx.Component:
                     rx.fragment(),
                 ),
                 _submit_workflow(
-                    disabled=(DataState.selected_exchange == "") | DataState.is_loading
+                    disabled=(DataState.selected_exchange == "")
+                    | DataState.is_loading
                 ),
                 width="100%",
                 spacing="4",
@@ -287,7 +293,9 @@ def data() -> rx.Component:
                                 rx.foreach(
                                     DataState.ai_status_steps,
                                     lambda step: rx.hstack(
-                                        rx.icon("check", size=16, color="green"),
+                                        rx.icon(
+                                            "check", size=16, color="green"
+                                        ),
                                         rx.text(step, size="2", color="gray"),
                                         spacing="2",
                                         align="center",
@@ -317,7 +325,9 @@ def data() -> rx.Component:
                         rx.vstack(
                             rx.text("Generated SQL", size="2", weight="medium"),
                             rx.markdown(
-                                "```sql\n" + DataState.ai_generated_sql + "\n```"
+                                "```sql\n"
+                                + DataState.ai_generated_sql
+                                + "\n```"
                             ),
                             form_field(
                                 label="Edit SQL before running",
@@ -337,7 +347,6 @@ def data() -> rx.Component:
                                 on_click=[
                                     DataState.submit_ai,
                                     DataState.fetch_data,
-                                    DataState.put_cache,
                                 ],
                                 disabled=(DataState.selected_exchange == "")
                                 | DataState.is_loading
@@ -370,7 +379,9 @@ def data() -> rx.Component:
 
     return page_layout(
         rx.vstack(
-            section_header("Data Explorer", "Explore stock data and analytics."),
+            section_header(
+                "Data Explorer", "Explore stock data and analytics."
+            ),
             tabs,
             _results_view(),
             spacing="4",

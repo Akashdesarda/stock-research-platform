@@ -1,10 +1,10 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Annotated
 
 import polars as pl
 from deltalake import DeltaTable
 from fastapi import APIRouter, HTTPException, Path, status
-from pipeline.ticker_history_data_download import download_ticker_history
 from stocksense.ai.agents import generate_dataset_description
 from stocksense.ai.skills.context import DatasetDescriptionContextDependency
 from stocksense.config import get_settings
@@ -24,7 +24,9 @@ from api.models import (
     TickerHistoryDownloadMode,
 )
 from api.routers import _build_history_lf_from_query, _logical_plan_to_lf
+from pipeline.ticker_history_data_download import download_ticker_history
 
+logger = logging.getLogger("stocksense")
 settings = get_settings()
 
 router = APIRouter(prefix="/api/operation", tags=[APITags.ops])
@@ -130,10 +132,15 @@ async def search_prompt_cache(query: PromptSearchInput) -> PromptCacheOutput:
 
     result = await prompt_cache_table.polars_filter(
         (pl.col("prompt_hash") == key)
-        & (pl.col("last_modified") + pl.duration(days=pl.col("ttl")) > datetime.now())
+        & (
+            pl.col("last_modified") + pl.duration(days=pl.col("ttl"))
+            > datetime.now()
+        )
     ).collect_async()
     if not result.is_empty():
-        return PromptCacheOutput(**result.select("response", "thinking").to_dicts()[0])
+        return PromptCacheOutput(
+            **result.select("response", "thinking").to_dicts()[0]
+        )
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -150,20 +157,25 @@ async def cache_prompt_response(cache_data: PromptCacheInput) -> dict:
         settings.stockdb.data_base_path / "common/prompt_cache"
     )
 
-    current_cache_df = pl.LazyFrame({
-        "prompt_hash": cache_data.get_cache_key(),
-        "prompt": cache_data.prompt,
-        "response": cache_data.response,
-        "thinking": cache_data.thinking,
-        "agent": cache_data.agent,
-        "model": cache_data.model,
-        "ttl": cache_data.ttl,
-        "last_modified": datetime.now(),
-    })
+    current_cache_df = pl.LazyFrame(
+        {
+            "prompt_hash": cache_data.get_cache_key(),
+            "prompt": cache_data.prompt,
+            "response": cache_data.response,
+            "thinking": cache_data.thinking,
+            "agent": cache_data.agent,
+            "model": cache_data.model,
+            "ttl": cache_data.ttl,
+            "last_modified": datetime.now(),
+        }
+    )
 
     prompt_cache_table.merge(
         current_cache_df.collect(),
         predicate="s.prompt_hash = t.prompt_hash",
+    )
+    logger.info(
+        f"Cached response for prompt hash: {cache_data.get_cache_key()} with TTL of {cache_data.ttl} days"
     )
 
     # TODO - Add Tier 2 - Vector DB Storage
@@ -222,7 +234,10 @@ async def register_data(register: DataRegistrationInput):
     # 2nd priority to logical plan serialized in bytes
     else:
         try:
-            if not register.logical_plan.interval or not register.logical_plan.ticker:
+            if (
+                not register.logical_plan.interval
+                or not register.logical_plan.ticker
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="interval and ticker are required when sql_query is not provided",
@@ -286,18 +301,22 @@ async def register_data(register: DataRegistrationInput):
         schema_overrides={"tags": pl.List(pl.String)},
     ).with_columns(
         pl.col("logical_plan").cast(
-            pl.Struct({
-                "exchange": pl.String,
-                "ticker": pl.List(pl.String),
-                "interval": pl.String,
-                "period": pl.String,
-                "start_date": pl.Date,
-                "end_date": pl.Date,
-                "sql_query": pl.String,
-            })
+            pl.Struct(
+                {
+                    "exchange": pl.String,
+                    "ticker": pl.List(pl.String),
+                    "interval": pl.String,
+                    "period": pl.String,
+                    "start_date": pl.Date,
+                    "end_date": pl.Date,
+                    "sql_query": pl.String,
+                }
+            )
         )
     )
 
     # Merging on dataset_id
-    registered_data.merge(current_data_df, predicate="s.dataset_id = t.dataset_id")
+    registered_data.merge(
+        current_data_df, predicate="s.dataset_id = t.dataset_id"
+    )
     return {"message": "Data registered successfully"}

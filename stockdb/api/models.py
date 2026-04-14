@@ -178,7 +178,11 @@ class TickerHistoryQuery(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -214,7 +218,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
         StockExchange.nse,
         description="Stock Exchange to download ticker history for",
     )
-    task_mode: TaskMode = Field(TaskMode.auto, description="Mode of task execution")
+    task_mode: TaskMode = Field(
+        TaskMode.auto, description="Mode of task execution"
+    )
     download_mode: TickerHistoryDownloadMode = Field(
         TickerHistoryDownloadMode.incremental,
         description="Download mode. `full` mode downloads complete history. `incremental` mode downloads only latest/missing data.",
@@ -249,7 +255,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             )
         if self.task_mode == TaskMode.manual:
             if self.start_date is None or self.end_date is None:
-                raise ValueError("start_date and end_date are required in manual mode")
+                raise ValueError(
+                    "start_date and end_date are required in manual mode"
+                )
             if self.start_date > self.end_date:
                 raise ValueError("start_date must be less than end_date")
         return self
@@ -278,7 +286,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t,
                 exchange=self.exchange.name,
-                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
+                exch_id=getattr(
+                    StockExchangeYahooIdentifier, self.exchange.name
+                ),
             )
             for t in self.ticker
         ]
@@ -341,7 +351,11 @@ class BulkTickerHistoryInput(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -351,7 +365,9 @@ class BulkTickerHistoryInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t.upper(),  # ticker symbol must be always Upper case
                 exchange=self.exchange.name,
-                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
+                exch_id=getattr(
+                    StockExchangeYahooIdentifier, self.exchange.name
+                ),
             )
             for t in self.ticker
         ]
@@ -465,21 +481,29 @@ class LogicalPlan(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
     @model_validator(mode="after")
     def check_sql_or_query_params(self):
         # When sql_query is provided, other query parameters should not be provided and vice versa.
-        if self.sql_query is not None and any([
-            self.ticker,
-            self.interval,
-            self.period,
-            self.start_date,
-            self.end_date,
-        ]):
-            raise ValueError("sql_query cannot be provided with other query parameters")
+        if self.sql_query is not None and any(
+            [
+                self.ticker,
+                self.interval,
+                self.period,
+                self.start_date,
+                self.end_date,
+            ]
+        ):
+            raise ValueError(
+                "sql_query cannot be provided with other query parameters"
+            )
 
         # When sql_query is not provided, ticker and interval are required. Also, either period or
         # start_date & end_date should be provided.
@@ -504,7 +528,9 @@ class DataRegistrationInput(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique identifier for the dataset. If not provided, a UUID will be generated.",
     )
-    name: str | None = Field(None, description="Name of the dataset to be registered")
+    name: str | None = Field(
+        None, description="Name of the dataset to be registered"
+    )
     description: str | None = Field(
         None, description="Description of the dataset to be registered"
     )
@@ -539,7 +565,6 @@ class ThinkingChunk(BaseModel):
 
 
 class ToolCallChunk(BaseModel):
-    type: Literal["tool_call"] = "tool_call"
     tool_name: str
     args: dict | None = None
 
@@ -547,6 +572,12 @@ class ToolCallChunk(BaseModel):
 class ResultChunk(BaseModel):
     type: Literal["result"] = "result"
     content: Any
+
+
+class AgentStructuredResponse(BaseModel):
+    content: dict[str, Any]
+    thinking: str | None = None
+    tool_calls: list[dict[str, Any]] | None
 
 
 class TextToSQLAgent(BaseModel):
@@ -596,7 +627,7 @@ class CompanySummaryAgent(BaseModel):
         description="The ticker symbol of the company for which summary needs to be generated",
         examples=["TCS", "INFY"],
     )
-    session_id: str | None = Field(
+    session_id: str = Field(
         default_factory=lambda: str(uuid4()),
         description="Unique session ID for the agent run",
     )
@@ -637,7 +668,7 @@ class CompanySummaryAgentQA(BaseModel):
             "For summary of recent news about INFY use company summary.",
         ],
     )
-    session_id: str | None = Field(
+    session_id: str = Field(
         default_factory=lambda: str(uuid4()),
         description="Unique session ID for the agent run",
     )

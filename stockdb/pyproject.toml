@@ -41,7 +41,6 @@ stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platfo
 
 [tool.ty.rules]
 unresolved-attribute = "ignore"
-unresolved-attributes = "ignore"
 
 [tool.pyrefly]
 project-includes = ["**/*.py*", "**/*.ipynb"]

@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.3.5",
     "orjson>=3.11.4",
     "polars[deltalake,pyarrow]>=1.38.1",
+    "duckdb>=1.5.1",
     "pystache>=0.6.8",
     "rich>=14.2.0",
     "sqlglot>=30.4.2",
@@ -18,7 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 data = [
-    "duckdb>=1.5.1",
     "nsetools>=2.0.1",
     "scipy>=1.16.3",
     "ta-lib>=0.6.8",

@@ -277,12 +277,12 @@ async def register_data(register: DataRegistrationInput):
                 end_date=register.logical_plan.end_date,
                 sql_query=register.logical_plan.sql_query,
             ),
-            model_name=settings.stockdb.dataset_description_model,
+            model_name=settings.ai.dataset_description_model,
             api_key=settings.get_model_api_keys(
-                settings.stockdb.dataset_description_model
+                settings.ai.dataset_description_model
             ),
             base_url=settings.get_model_base_url(
-                settings.stockdb.dataset_description_model
+                settings.ai.dataset_description_model
             ),
         )
         register.name = response.output.name

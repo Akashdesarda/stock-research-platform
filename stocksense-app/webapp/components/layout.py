@@ -99,7 +99,9 @@ def bordered_container(
     )
 
 
-def stat_card(label: str, value: str, trend: str | None = None, icon: str = "activity"):
+def stat_card(
+    label: str, value: str, trend: str | None = None, icon: str = "activity"
+):
     """Displays a key metric with an optional trend indicator."""
     return rx.card(
         rx.vstack(
@@ -111,7 +113,9 @@ def stat_card(label: str, value: str, trend: str | None = None, icon: str = "act
             ),
             rx.hstack(
                 rx.heading(value, size="6"),
-                rx.badge(trend, color_scheme="green") if trend else rx.fragment(),
+                rx.badge(trend, color_scheme="green")
+                if trend
+                else rx.fragment(),
                 justify="between",
                 width="100%",
                 align="end",
@@ -137,7 +141,9 @@ def status_indicator(
         matchers: Dict mapping value to (badge_text, badge_color).
         default: Fallback (badge_text, badge_color) if no match.
     """
-    badge_component = rx.badge(default[0], color_scheme=default[1], variant="surface")
+    badge_component = rx.badge(
+        default[0], color_scheme=default[1], variant="surface"
+    )
 
     # Build the nested rx.cond structure
     for match_value, (badge_text, badge_color) in matchers.items():
@@ -157,14 +163,16 @@ def status_indicator(
 
 
 def section_header(
-    title: str, subtitle: str | None = None, action_button: rx.Component | None = None
+    title: str | rx.Var,
+    subtitle: str | rx.Var | None = None,
+    action_button: rx.Component | None = None,
 ) -> rx.Component:
     """A standardized header for page sections."""
     return rx.hstack(
         rx.vstack(
             rx.heading(title, size="6"),
             rx.text(subtitle, size="2", color=rx.color("gray", 11))
-            if subtitle
+            if subtitle is not None
             else rx.fragment(),
             spacing="1",
         ),

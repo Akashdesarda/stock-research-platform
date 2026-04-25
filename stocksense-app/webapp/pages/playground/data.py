@@ -8,6 +8,7 @@ from webapp.components.inputs import (
     date_range_picker,
     dropdown_select,
     submit_button,
+    tags_input,
     text_area,
 )
 from webapp.components.layout import (
@@ -20,22 +21,106 @@ from webapp.pages.shared_components import ticker_selector
 from webapp.state.playground import DataState
 
 
+def _register_dataset_dialog() -> rx.Component:
+    """Dialog (Modal) for registering a new dataset."""
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.button(
+                rx.icon("save", size=16),
+                "Register Dataset",
+                size="3",
+            )
+        ),
+        rx.dialog.content(
+            rx.dialog.title("Register Dataset"),
+            rx.dialog.description(
+                "Register this dataset for regular future use."
+            ),
+            rx.vstack(
+                form_field(
+                    label="Dataset Name",
+                    control=rx.input(
+                        placeholder="Enter name (optional)",
+                        value=DataState.dataset_name,
+                        on_change=DataState.set_dataset_name,
+                    ),
+                    help_text="Leave blank to let AI generate a name based on the data.",
+                ),
+                form_field(
+                    label="Description",
+                    control=text_area(
+                        placeholder="Enter description (optional)",
+                        value=DataState.dataset_description,
+                        on_change=DataState.set_dataset_description,
+                        rows=3,
+                    ),
+                    help_text="Leave blank to let AI generate a description based on the data.",
+                ),
+                form_field(
+                    label="Tags",
+                    control=tags_input(
+                        label=None,
+                        value=DataState.dataset_tags,
+                        on_change=DataState.set_dataset_tags,
+                    ),
+                    help_text="Press Enter to add tags for categorization.",
+                ),
+                rx.hstack(
+                    rx.dialog.close(
+                        rx.button("Cancel", variant="soft", color_scheme="gray")
+                    ),
+                    rx.dialog.close(
+                        rx.button(
+                            "Register", on_click=DataState.register_dataset
+                        )
+                    ),
+                    spacing="3",
+                    justify="end",
+                    width="100%",
+                ),
+                spacing="4",
+                width="100%",
+            ),
+        ),
+    )
+
+
 def _results_view() -> rx.Component:
     """Shared view for displaying fetched data results."""
     return rx.cond(
-        DataState.preview_enabled & DataState.fetch_data_ready,
+        DataState.fetch_data_ready,
         rx.vstack(
             rx.separator(size="4", width="100%"),
-            rx.text("Data Preview", size="4", weight="medium"),
-            rxe.ag_grid(
-                id="data_preview_grid",
-                row_data=DataState.data,
-                column_defs=DataState.columns_def,
-                pagination=True,
-                pagination_page_size=10,
-                pagination_page_size_selector=[10, 40, 100],
+            section_header(
+                rx.cond(
+                    DataState.preview_enabled,
+                    "Data Preview",
+                    "Data Fetched Successfully",
+                ),
+                rx.cond(
+                    DataState.preview_enabled,
+                    "Preview the fetched data before registering.",
+                    "You can now register this dataset.",
+                ),
+            ),
+            rx.cond(
+                DataState.preview_enabled,
+                rxe.ag_grid(
+                    id="data_preview_grid",
+                    row_data=DataState.data,
+                    column_defs=DataState.columns_def,
+                    pagination=True,
+                    pagination_page_size=10,
+                    pagination_page_size_selector=[10, 40, 100],
+                    width="100%",
+                    height="500px",
+                ),
+                rx.fragment(),
+            ),
+            rx.hstack(
+                _register_dataset_dialog(),
+                rx.spacer(),
                 width="100%",
-                height="500px",
             ),
             width="100%",
             spacing="4",

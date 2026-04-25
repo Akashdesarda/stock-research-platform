@@ -55,6 +55,11 @@ class DataState(TickerSelectionMixin, rx.State):
     is_loading: bool = False
     _cancel_event: asyncio.Event = asyncio.Event()
 
+    # Registered dataset state
+    dataset_name: str = ""
+    dataset_description: str = ""
+    dataset_tags: list[str] = []
+
     def _client(self) -> AsyncClient:
         """Return a configured httpx AsyncClient."""
         return AsyncClient(
@@ -131,6 +136,18 @@ class DataState(TickerSelectionMixin, rx.State):
         self.columns_def = []
         self.fetch_data_ready = False
 
+    @rx.event
+    def set_dataset_name(self, value: str):
+        self.dataset_name = value
+
+    @rx.event
+    def set_dataset_description(self, value: str):
+        self.dataset_description = value
+
+    @rx.event
+    def set_dataset_tags(self, value: list[str]):
+        self.dataset_tags = value
+
     @rx.event(background=True)
     async def fetch_data(self):
         """Fetch data based on the current state settings."""
@@ -141,6 +158,10 @@ class DataState(TickerSelectionMixin, rx.State):
             self.fetch_data_ready = False
             self.ai_error = ""
             self.data = []
+            if self.index_choice:
+                self.dataset_tags = [self.index_choice]
+            else:
+                self.dataset_tags = []
             self._cancel_event.clear()
             tickers = self.selected_ticker
             use_sql = bool(self.sql_query.strip())
@@ -219,6 +240,51 @@ class DataState(TickerSelectionMixin, rx.State):
         finally:
             async with self:
                 self.ai_is_generating = False
+
+    @rx.event
+    async def register_dataset(self):
+        """Register the resultant data as a dataset for regular future use"""
+        if self.sql_query:
+            logical_pan = {
+                "exchange": self.selected_exchange,
+                "sql_query": self.sql_query,
+            }
+        else:
+            logical_pan = {
+                "exchange": self.selected_exchange,
+                "ticker": self.selected_ticker or None,
+                "interval": self.interval or None,
+                "period": None
+                if (self.date_start and self.date_end)
+                else (self.period or None),
+                "start_date": self.date_start or None,
+                "end_date": self.date_end or None,
+            }
+        payload = {
+            "dataset_id": str(uuid.uuid4()),
+            "name": self.dataset_name if len(self.dataset_name) > 0 else None,
+            "description": self.dataset_description
+            if len(self.dataset_description) > 0
+            else None,
+            "logical_plan": logical_pan,
+            "tags": self.dataset_tags,
+        }
+        try:
+            async with self._client() as client:
+                response = await client.put(
+                    url="/operation/data/register", json=payload
+                )
+                response.raise_for_status()
+                return rx.toast.info(
+                    "dataset has been registered successfully.",
+                    position="bottom-right",
+                )
+        except Exception as e:
+            logger.error(f"Error registering dataset: {e}")
+            return rx.toast.error(
+                f"Failed to register dataset due to error: {e}",
+                position="bottom-right",
+            )
 
     async def _try_fetch_cached_sql(
         self, prompt: str

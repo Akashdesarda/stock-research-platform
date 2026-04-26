@@ -13,6 +13,8 @@ from webapp.components.inputs import (
 )
 from webapp.components.layout import (
     bordered_container,
+    dialog_actions,
+    dialog_form,
     form_field,
     page_layout,
     section_header,
@@ -23,65 +25,43 @@ from webapp.state.playground import DataState
 
 def _register_dataset_dialog() -> rx.Component:
     """Dialog (Modal) for registering a new dataset."""
-    return rx.dialog.root(
-        rx.dialog.trigger(
-            rx.button(
-                rx.icon("save", size=16),
-                "Register Dataset",
-                size="3",
-            )
-        ),
-        rx.dialog.content(
-            rx.dialog.title("Register Dataset"),
-            rx.dialog.description(
-                "Register this dataset for regular future use."
-            ),
-            rx.vstack(
-                form_field(
-                    label="Dataset Name",
-                    control=rx.input(
-                        placeholder="Enter name (optional)",
-                        value=DataState.dataset_name,
-                        on_change=DataState.set_dataset_name,
-                    ),
-                    help_text="Leave blank to let AI generate a name based on the data.",
-                ),
-                form_field(
-                    label="Description",
-                    control=text_area(
-                        placeholder="Enter description (optional)",
-                        value=DataState.dataset_description,
-                        on_change=DataState.set_dataset_description,
-                        rows=3,
-                    ),
-                    help_text="Leave blank to let AI generate a description based on the data.",
-                ),
-                form_field(
-                    label="Tags",
-                    control=tags_input(
-                        label=None,
-                        value=DataState.dataset_tags,
-                        on_change=DataState.set_dataset_tags,
-                    ),
-                    help_text="Press Enter to add tags for categorization.",
-                ),
-                rx.hstack(
-                    rx.dialog.close(
-                        rx.button("Cancel", variant="soft", color_scheme="gray")
-                    ),
-                    rx.dialog.close(
-                        rx.button(
-                            "Register", on_click=DataState.register_dataset
-                        )
-                    ),
-                    spacing="3",
-                    justify="end",
-                    width="100%",
-                ),
-                spacing="4",
-                width="100%",
+    return dialog_form(
+        form_field(
+            label="Dataset Name",
+            control=text_area(
+                placeholder="Enter name OR leave blank for AI-generated name",
+                value=DataState.dataset_name,
+                on_change=DataState.set_dataset_name,
+                rows=1,
             ),
         ),
+        form_field(
+            label="Description",
+            control=text_area(
+                placeholder="Enter description OR leave blank for AI-generated description",
+                value=DataState.dataset_description,
+                on_change=DataState.set_dataset_description,
+                rows=3,
+            ),
+        ),
+        form_field(
+            label="Tags",
+            control=tags_input(
+                label=None,
+                value=DataState.dataset_tags,
+                on_change=DataState.set_dataset_tags,
+            ),
+            help_text="Press Enter to add tags for categorization.",
+        ),
+        title="Register Dataset",
+        description="Register this dataset for regular future use.",
+        actions=dialog_actions(
+            on_submit=DataState.register_dataset,
+            on_cancel=DataState.close_register_dialog,
+            submit_label="Submit",
+        ),
+        open=DataState.register_dialog_open,
+        on_open_change=DataState.close_register_dialog,
     )
 
 
@@ -118,10 +98,16 @@ def _results_view() -> rx.Component:
                 rx.fragment(),
             ),
             rx.hstack(
-                _register_dataset_dialog(),
+                rx.button(
+                    rx.icon("save", size=16),
+                    "Register Dataset",
+                    size="3",
+                    on_click=DataState.open_register_dialog,
+                ),
                 rx.spacer(),
                 width="100%",
             ),
+            _register_dataset_dialog(),
             width="100%",
             spacing="4",
         ),

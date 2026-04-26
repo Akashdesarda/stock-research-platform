@@ -9,9 +9,8 @@ from webapp.pages.management import (
     management,
 )
 from webapp.pages.management import task as management_task
-from webapp.pages.playground import (
-    data as playground_data,
-)
+from webapp.pages.playground import data as playground_data
+from webapp.pages.playground import dataset as playground_dataset
 from webapp.pages.playground import (
     playground,
 )
@@ -22,9 +21,18 @@ from webapp.pages.playground import (
 app = rx.App()
 app.add_page(home, route="/", title="StockSense")
 app.add_page(playground, route="/playground", title="Playground")
-app.add_page(playground_data, route="/playground/data", title="Playground: Data")
 app.add_page(
-    playground_strategy, route="/playground/strategy", title="Playground: Strategy"
+    playground_data, route="/playground/data", title="Playground: Data"
+)
+app.add_page(
+    playground_dataset,
+    route="/playground/dataset",
+    title="Playground: Dataset",
+)
+app.add_page(
+    playground_strategy,
+    route="/playground/strategy",
+    title="Playground: Strategy",
 )
 app.add_page(ai, route="/ai", title="AI")
 app.add_page(ai_chat, route="/ai/chat", title="AI Chat")

@@ -15,6 +15,7 @@ _BUTTON_KINDS: dict[str, dict[str, str]] = {
     "ghost": {"variant": "ghost"},
     "danger": {"color_scheme": "red"},
     "success": {"color_scheme": "green"},
+    "outline": {"variant": "outline"},
 }
 
 
@@ -91,6 +92,12 @@ def remove_button(**props) -> rx.Component:
 
 def delete_button(**props) -> rx.Component:
     return action_button("Delete", left_icon="trash-2", kind="danger", **props)
+
+
+def refresh_button(**props) -> rx.Component:
+    return action_button(
+        "Refresh", left_icon="refresh-cw", kind="outline", **props
+    )
 
 
 def dropdown_select(

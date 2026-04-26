@@ -185,6 +185,86 @@ def section_header(
     )
 
 
+def dialog_actions(
+    *,
+    on_submit=None,
+    on_cancel=None,
+    submit_label: str = "Submit",
+    cancel_label: str = "Cancel",
+    wrap_submit_in_close: bool = False,
+    wrap_cancel_in_close: bool = False,
+) -> rx.Component:
+    """Reusable dialog action row with consistent cancel/submit buttons."""
+    submit_component = rx.button(
+        submit_label,
+        radius="large",
+        color_scheme="blue",
+        size="2",
+        on_click=on_submit,
+    )
+    cancel_component = rx.button(
+        cancel_label,
+        radius="large",
+        color_scheme="red",
+        size="2",
+        variant="soft",
+        on_click=on_cancel,
+    )
+
+    if wrap_submit_in_close:
+        submit_component = rx.dialog.close(submit_component)
+
+    if wrap_cancel_in_close:
+        cancel_component = rx.dialog.close(cancel_component)
+
+    return rx.hstack(
+        cancel_component,
+        submit_component,
+        spacing="3",
+        justify="end",
+        width="100%",
+    )
+
+
+def dialog_form(
+    *fields: rx.Component,
+    title: str | rx.Var,
+    description: str | rx.Var | None = None,
+    trigger: rx.Component | None = None,
+    actions: rx.Component | None = None,
+    max_width: str = "560px",
+    **root_props,
+) -> rx.Component:
+    """Reusable dialog root + content layout for consistent modal forms."""
+    children = []
+
+    if trigger is not None:
+        children.append(rx.dialog.trigger(trigger))
+
+    children.append(
+        rx.dialog.content(
+            rx.dialog.title(title),
+            rx.cond(
+                description is None,
+                rx.fragment(),
+                rx.dialog.description(description),
+            ),
+            rx.vstack(
+                *fields,
+                actions or rx.fragment(),
+                spacing="4",
+                width="100%",
+            ),
+            max_width=max_width,
+        )
+    )
+
+    return rx.dialog.root(
+        *children,
+        **root_props,
+    )
+
+
 def responsive_grid(
     *children,
     columns=None,

@@ -23,7 +23,6 @@ APP_NAV: list[NavGroup] = [
         icon="joystick",
         links=[
             NavLink("Data", "/playground/data", "database"),
-            NavLink("Dataset", "/playground/dataset", "table"),
             NavLink("Strategy", "/playground/strategy", "candlestick_chart"),
         ],
     ),

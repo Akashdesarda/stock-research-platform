@@ -10,7 +10,6 @@ from webapp.pages.management import (
 )
 from webapp.pages.management import task as management_task
 from webapp.pages.playground import data as playground_data
-from webapp.pages.playground import dataset as playground_dataset
 from webapp.pages.playground import (
     playground,
 )
@@ -23,11 +22,6 @@ app.add_page(home, route="/", title="StockSense")
 app.add_page(playground, route="/playground", title="Playground")
 app.add_page(
     playground_data, route="/playground/data", title="Playground: Data"
-)
-app.add_page(
-    playground_dataset,
-    route="/playground/dataset",
-    title="Playground: Dataset",
 )
 app.add_page(
     playground_strategy,

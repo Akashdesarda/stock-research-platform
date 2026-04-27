@@ -15,6 +15,7 @@ _BUTTON_KINDS: dict[str, dict[str, str]] = {
     "ghost": {"variant": "ghost"},
     "danger": {"color_scheme": "red"},
     "success": {"color_scheme": "green"},
+    "outline": {"variant": "outline"},
 }
 
 
@@ -60,15 +61,21 @@ def submit_button(**props) -> rx.Component:
 
 
 def next_button(**props) -> rx.Component:
-    return action_button("Next", right_icon="arrow-right", kind="primary", **props)
+    return action_button(
+        "Next", right_icon="arrow-right", kind="primary", **props
+    )
 
 
 def back_button(**props) -> rx.Component:
-    return action_button("Back", left_icon="arrow-left", kind="secondary", **props)
+    return action_button(
+        "Back", left_icon="arrow-left", kind="secondary", **props
+    )
 
 
 def proceed_button(**props) -> rx.Component:
-    return action_button("Proceed", right_icon="arrow-right", kind="primary", **props)
+    return action_button(
+        "Proceed", right_icon="arrow-right", kind="primary", **props
+    )
 
 
 def cancel_button(**props) -> rx.Component:
@@ -85,6 +92,12 @@ def remove_button(**props) -> rx.Component:
 
 def delete_button(**props) -> rx.Component:
     return action_button("Delete", left_icon="trash-2", kind="danger", **props)
+
+
+def refresh_button(**props) -> rx.Component:
+    return action_button(
+        "Refresh", left_icon="refresh-cw", kind="outline", **props
+    )
 
 
 def dropdown_select(
@@ -257,7 +270,9 @@ def number_input(
     # Only show step buttons if value is a plain Python value (not a reactive Var)
     # to avoid issues with arithmetic operations on reactive variables
     show_step_buttons = (
-        step is not None and isinstance(value, (int, float)) and on_change is not None
+        step is not None
+        and isinstance(value, (int, float))
+        and on_change is not None
     )
 
     if not show_step_buttons:
@@ -391,4 +406,24 @@ def date_range_picker(
             width=width,
             spacing="2",
         ),
+    )
+
+
+def tags_input(
+    label: str | None,
+    value: list[str] | rx.Var | None = None,
+    on_change: EventType[Any] | Callable | None = None,
+    **props,
+):
+    """Tag input using Reflex Enterprise MultiSelect component."""
+    return rxe.mantine.tags_input(
+        label=label,
+        value=value,
+        placeholder="Enter tags",
+        on_change=on_change,
+        allow_duplicates=False,
+        error="",
+        size="md",
+        radius="xl",
+        **props,
     )

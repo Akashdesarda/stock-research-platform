@@ -3235,7 +3235,7 @@ wheels = [
 
 [[package]]
 name = "stocksense-core"
-version = "0.9.1"
+version = "0.10.0"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
@@ -3246,6 +3246,7 @@ dependencies = [
     { name = "pystache" },
     { name = "rich" },
     { name = "sqlglot" },
+    { name = "ta-lib" },
     { name = "toml" },
 ]
 
@@ -3262,7 +3263,6 @@ ai = [
 data = [
     { name = "nsetools" },
     { name = "scipy" },
-    { name = "ta-lib" },
     { name = "yfinance" },
 ]
 
@@ -3291,7 +3291,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.2.0" },
     { name = "scipy", marker = "extra == 'data'", specifier = ">=1.16.3" },
     { name = "sqlglot", specifier = ">=30.4.2" },
-    { name = "ta-lib", marker = "extra == 'data'", specifier = ">=0.6.8" },
+    { name = "ta-lib", specifier = ">=0.6.8" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "yfinance", marker = "extra == 'data'", specifier = ">=1.2.1" },
 ]

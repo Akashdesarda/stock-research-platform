@@ -76,8 +76,19 @@
 		"editor.fontFamily": "'Monaspace Argon NF', monospace",
 		"ruff.format.preview": true,
 		"ruff.organizeImports": true,
-		"terminal.integrated.fontFamily": "'Monaspace Argon NF'",
-		"terminal.integrated.fontLigatures.enabled": true
+		"mcp": {
+			"servers": {
+				"llama_index_docs": {
+					"url": "https://developers.llamaindex.ai/mcp",
+					"type": "http"
+				},
+				"agno": {
+					"url": "https://docs.agno.com/mcp",
+					"type": "http"
+				}
+			},
+			"inputs": []
+		}
 	},
 	"tasks": {
 		"version": "2.0.0",
@@ -114,7 +125,7 @@
 					"$python"
 				]
 			}
-		],
+		]
 	},
 	"launch": {
 		"version": "0.2.0",
@@ -125,7 +136,6 @@
 				"request": "launch",
 				"program": "${workspaceFolder}/webapp/.venv/Scripts/streamlit.exe",
 				"args": [
-					// "uv",
 					"run",
 					"${workspaceFolder}/webapp/main.py"
 				],

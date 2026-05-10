@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Iterable
 
 from . import (
     CatalogCategory,
@@ -108,10 +107,10 @@ def filter_strategies(
     *,
     parent: ParentCatalog | str | None = None,
     category: CatalogCategory | str | None = None,
-    tags: Iterable[str] | None = None,
-    market_regimes: Iterable[MarketRegime | str] | None = None,
-    time_horizons: Iterable[TimeHorizon | str] | None = None,
-    required_columns: Iterable[str] | None = None,
+    tags: list[str] | None = None,
+    market_regimes: list[MarketRegime | str] | None = None,
+    time_horizons: list[TimeHorizon | str] | None = None,
+    required_columns: list[str] | None = None,
 ) -> tuple[StrategyDescriptor, ...]:
     """Filter strategies using the compiled registry indexes."""
 

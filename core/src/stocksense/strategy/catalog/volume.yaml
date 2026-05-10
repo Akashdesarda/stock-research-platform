@@ -1,6 +1,6 @@
 # Curated volume strategy metadata for AI-assisted strategy selection.
 name: Volume Strategy Catalog
-parent: Technical Analysis
+parent: technical analysis
 strategies:
   obv:
     id: volume.obv

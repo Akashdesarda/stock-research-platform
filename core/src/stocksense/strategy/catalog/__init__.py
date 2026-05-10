@@ -121,7 +121,15 @@ def list_strategies() -> list[StrategyDescriptor]:
 def list_strategies_by_parent(parent: str | ParentCatalog) -> list[StrategyDescriptor]:
     """List all strategies in the catalog that belong to a specific parent"""
     if isinstance(parent, str):
-        parent = ParentCatalog(parent)
+        normalized_parent = parent.strip().lower()
+        try:
+            parent = ParentCatalog(normalized_parent)
+        except ValueError as exc:
+            valid_values = ", ".join(p.value for p in ParentCatalog)
+            raise ValueError(
+                f"Invalid parent catalog '{parent}'. "
+                f"Expected one of: {valid_values}"
+            ) from exc
 
     catalogs = list_catalog()
     strategies = []

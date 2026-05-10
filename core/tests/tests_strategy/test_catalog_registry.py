@@ -1,16 +1,17 @@
 from stocksense.strategy.catalog import (
     CatalogCategory,
     MarketRegime,
+    ParentCatalog,
     TimeHorizon,
     list_catalog,
     list_strategies,
+    list_strategies_by_parent,
 )
 from stocksense.strategy.catalog.registry import (
     StrategyRegistry,
     build_registry,
     filter_strategies,
     get_registry,
-    list_strategies_by_parent,
 )
 
 
@@ -33,12 +34,10 @@ def test_build_registry_indexes_catalogs_by_parent():
     registry = build_registry()
 
     for parent, catalogs in registry.by_parent.items():
-        assert all(catalog.parent.value == parent for catalog in catalogs)
+        assert all(catalog.parent == parent for catalog in catalogs)
 
-    assert set(registry.by_parent) == {
-        catalog.parent.value for catalog in registry.catalogs
-    }
-    assert "technical analysis" in registry.by_parent
+    assert set(registry.by_parent) == {catalog.parent for catalog in registry.catalogs}
+    assert ParentCatalog.technical_analysis in registry.by_parent
 
 
 def test_build_registry_indexes_strategies_by_id_and_category():
@@ -90,7 +89,7 @@ def test_list_strategies_by_parent_returns_matching_strategies():
     strategies = list_strategies_by_parent("technical analysis")
 
     assert strategies
-    assert strategies == tuple(list_strategies())
+    assert strategies == list(list_strategies())
 
 
 def test_filter_strategies_returns_intersection_of_registry_indexes():

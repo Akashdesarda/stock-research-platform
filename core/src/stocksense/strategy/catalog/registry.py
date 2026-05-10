@@ -11,7 +11,6 @@ from . import (
     TimeHorizon,
     list_catalog,
     list_strategies,
-    list_strategies_by_parent,
 )
 
 
@@ -21,7 +20,7 @@ class StrategyRegistry:
 
     catalogs: tuple[StrategyCatalog, ...]
     strategies: tuple[StrategyDescriptor, ...]
-    by_parent: dict[str, tuple[StrategyCatalog, ...]]
+    by_parent: dict[ParentCatalog, tuple[StrategyCatalog, ...]]
     by_id: dict[str, StrategyDescriptor]
     by_category: dict[CatalogCategory, tuple[StrategyDescriptor, ...]]
     by_tag: dict[str, tuple[StrategyDescriptor, ...]]
@@ -33,11 +32,11 @@ class StrategyRegistry:
 def build_registry() -> StrategyRegistry:
     """Build a compiled registry from the loaded strategy catalogs."""
 
-    catalogs = list_catalog()
+    catalogs = tuple(list_catalog())
     strategies = tuple(list_strategies())
-    by_parent_lists: dict[str, list[StrategyCatalog]] = {}
+    by_parent_lists: dict[ParentCatalog, list[StrategyCatalog]] = {}
     for catalog in catalogs:
-        by_parent_lists.setdefault(catalog.parent.value, []).append(catalog)
+        by_parent_lists.setdefault(catalog.parent, []).append(catalog)
 
     by_parent = {
         parent: tuple(parent_catalogs)
@@ -120,8 +119,13 @@ def filter_strategies(
     strategies: tuple[StrategyDescriptor, ...] = registry.strategies
 
     if parent is not None:
+        if isinstance(parent, str):
+            parent = ParentCatalog(parent.strip().lower())
+        parent_catalogs = registry.by_parent.get(parent, ())
         parent_strategy_ids = {
-            strategy.id for strategy in list_strategies_by_parent(parent)
+            strategy.id
+            for catalog in parent_catalogs
+            for strategy in catalog.strategies.values()
         }
         strategies = tuple(
             strategy for strategy in strategies if strategy.id in parent_strategy_ids

@@ -133,7 +133,7 @@ def filter_strategies(
 
     if category is not None:
         if isinstance(category, str):
-            category = CatalogCategory(category)
+            category = CatalogCategory(category.strip().lower())
         category_strategy_ids = {
             strategy.id for strategy in registry.by_category.get(category, ())
         }

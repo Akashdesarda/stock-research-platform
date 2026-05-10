@@ -9,7 +9,16 @@ from pydantic import BaseModel
 CATALOG_DIR = Path(__file__).resolve().parent
 
 
+class ParentCatalog(Enum):
+    technical_analysis = "technical analysis"
+    # fundamental_analysis = "fundamental analysis"
+    # sentiment_analysis = "sentiment analysis"
+    # machine_learning = "machine learning"
+    # alternative_data = "alternative data"
+
+
 class CatalogCategory(Enum):
+    # Technical Analysis Categories
     trend = "trend"
     momentum = "momentum"
     volatility = "volatility"
@@ -76,7 +85,7 @@ class StrategyCatalog(BaseModel):
     """A catalog of trading strategies, loaded from YAML files."""
 
     name: str
-    parent: str
+    parent: ParentCatalog
     strategies: dict[str, StrategyDescriptor]
 
 
@@ -106,6 +115,19 @@ def list_strategies() -> list[StrategyDescriptor]:
     strategies = []
     for catalog in catalogs:
         strategies.extend(catalog.strategies.values())
+    return strategies
+
+
+def list_strategies_by_parent(parent: str | ParentCatalog) -> list[StrategyDescriptor]:
+    """List all strategies in the catalog that belong to a specific parent"""
+    if isinstance(parent, str):
+        parent = ParentCatalog(parent)
+
+    catalogs = list_catalog()
+    strategies = []
+    for catalog in catalogs:
+        if catalog.parent == parent:
+            strategies.extend(catalog.strategies.values())
     return strategies
 
 

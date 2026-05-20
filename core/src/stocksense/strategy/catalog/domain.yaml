@@ -1,0 +1,124 @@
+name: Analysis Domain Catalog
+domains:
+  technical_analysis:
+    id: technical analysis
+    summary: >
+      Uses OHLCV market data, price action, volume, indicators, and derived signals
+      to analyze trend, momentum, volatility, volume participation, and price structure.
+    use_if:
+      - user asks about price trend, momentum, volatility, support/resistance, overbought/oversold, breakouts, reversals, or volume confirmation
+      - user provides or references OHLC or OHLCV data
+      - user asks what indicators or technical strategy should be applied
+    avoid_when:
+      - user asks about company revenue, earnings, valuation, balance sheet, or financial statements
+      - user asks about news, social media, analyst sentiment, or macro narrative without price-data analysis
+      - user asks to evaluate strategy profitability over historical trades, unless combined with backtesting
+    categories:
+      trend:
+        summary: >
+          Determines trend direction, trend strength, trend continuation, or trend reversal.
+        use_if:
+          - user asks whether price is bullish, bearish, trending, reversing, or continuing
+          - user asks for moving averages, MACD, ADX, DMI, or crossover analysis
+        example_queries:
+          - Is this stock in an uptrend?
+          - Is the trend weakening?
+          - Did the moving averages turn bullish?
+      momentum:
+        summary: >
+          Measures speed and exhaustion of recent price movement using oscillators.
+        use_if:
+          - user asks whether stock is overbought or oversold
+          - user asks about momentum exhaustion, short-term turning points, RSI, stochastic, or MFI
+        example_queries:
+          - Is this stock overbought?
+          - Is momentum fading?
+          - Should I use RSI here?
+      volatility:
+        summary: >
+          Measures price range expansion, contraction, and risk context.
+        use_if:
+          - user asks how volatile the stock is
+          - user asks about ATR, risk sizing, stop loss distance, or breakout volatility
+        example_queries:
+          - How volatile is this stock?
+          - What ATR-based stop should I consider?
+          - Is volatility expanding?
+      volume:
+        summary: >
+          Evaluates whether price movement is supported by volume or participation.
+        use_if:
+          - user asks whether a move is supported by volume
+          - user asks about accumulation, distribution, OBV, money flow, or participation
+        example_queries:
+          - Is this rally supported by volume?
+          - Is there accumulation?
+          - Is volume confirming the breakout?
+      overlap:
+        summary: >
+          Uses price overlays such as bands and moving-average envelopes to frame price stretch.
+        use_if:
+          - user asks whether price is stretched relative to recent range
+          - user asks about Bollinger Bands, envelopes, bands, or mean-reversion context
+        example_queries:
+          - Is price stretched above its normal range?
+          - Is this a Bollinger Band squeeze?
+          - Is price near the upper band?
+
+#  fundamental_analysis:
+#    id: fundamental analysis
+#    name: Fundamental Analysis
+#    summary: >
+#      Uses company financials, valuation, earnings, balance sheet, cash flow,
+#      growth, margins, and business quality to analyze investment merit.
+#    use_if:
+#      - user asks about valuation, revenue, earnings, margins, debt, profitability, or financial health
+#      - user asks whether a company is fundamentally strong or undervalued
+#    avoid_when:
+#      - user only provides OHLCV data and asks about price movement
+#    required_data:
+#      - financial statements
+#      - company fundamentals
+#    optional_data:
+#      - analyst estimates
+#      - sector benchmarks
+#    categories: {}
+#
+#  sentiment_analysis:
+#    id: sentiment analysis
+#    name: Sentiment Analysis
+#    summary: >
+#      Uses news, social media, analyst commentary, filings, market narratives,
+#      and text data to evaluate market perception.
+#    use_if:
+#      - user asks about market sentiment, news impact, social media mood, analyst views, or narrative
+#      - user provides articles, posts, headlines, or text snippets
+#    avoid_when:
+#      - user only asks for indicator-based OHLCV analysis
+#    required_data:
+#      - text data
+#    optional_data:
+#      - news timestamps
+#      - source credibility
+#    categories: {}
+#
+#  backtesting:
+#    id: backtesting
+#    name: Backtesting
+#    summary: >
+#      Tests a trading rule or strategy over historical data to estimate historical
+#      performance, drawdown, win rate, return, and risk metrics.
+#    use_if:
+#      - user asks whether a strategy would have worked historically
+#      - user asks about performance, win rate, drawdown, Sharpe ratio, returns, or historical simulation
+#      - user provides explicit entry and exit rules
+#    avoid_when:
+#      - user asks only which indicator to inspect without requesting performance testing
+#    required_data:
+#      - historical OHLCV data
+#      - strategy rules
+#    optional_data:
+#      - transaction costs
+#      - slippage assumptions
+#      - benchmark data
+#    categories: {}

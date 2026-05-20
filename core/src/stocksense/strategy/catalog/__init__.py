@@ -1,32 +1,12 @@
 from enum import Enum
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
 
 import yaml
 from pydantic import BaseModel
 
 CATALOG_DIR = Path(__file__).resolve().parent
-
-
-class ParentCatalog(Enum):
-    technical_analysis = "technical analysis"
-    # fundamental_analysis = "fundamental analysis"
-    # sentiment_analysis = "sentiment analysis"
-    # machine_learning = "machine learning"
-    # alternative_data = "alternative data"
-
-
-class CatalogCategory(Enum):
-    # Technical Analysis Categories
-    trend = "trend"
-    momentum = "momentum"
-    volatility = "volatility"
-    volume = "volume"
-    overlap = "overlap"
-    cycle = "cycle"
-    pattern = "pattern"
-    stats = "stats"
 
 
 class MarketRegime(Enum):
@@ -48,6 +28,53 @@ class TimeHorizon(Enum):
     long_term = "long term"
 
 
+# SECTION - 1. Analysis Domain Catalog
+class AnalysisDomainTypes(Enum):
+    technical_analysis = "technical analysis"
+    # fundamental_analysis = "fundamental analysis"
+    # sentiment_analysis = "sentiment analysis"
+    # machine_learning = "machine learning"
+    # alternative_data = "alternative data"
+
+
+class AnalysisDomainCategoryDescriptor(BaseModel):
+    """Metadata for a child category under a analysis domain."""
+
+    summary: str
+    use_if: list[str]
+    example_queries: list[str] | None = None
+
+
+class AnalysisDomainDescriptor(BaseModel):
+    """A descriptor for a Analysis Domain catalog, containing metadata and configuration details."""
+
+    id: AnalysisDomainTypes
+    summary: str
+    use_if: list[str]
+    avoid_when: list[str]
+    categories: dict[str, AnalysisDomainCategoryDescriptor]
+
+
+class AnalysisDomainIndex(BaseModel):
+    """Top-level analysis domain index."""
+
+    name: str
+    domains: dict[str, AnalysisDomainDescriptor]
+
+
+# SECTION - 2. Strategy Catalog
+class StrategyCategoryTypes(Enum):
+    # Technical Analysis Categories
+    trend = "trend"
+    momentum = "momentum"
+    volatility = "volatility"
+    volume = "volume"
+    overlap = "overlap"
+    cycle = "cycle"
+    pattern = "pattern"
+    stats = "stats"
+
+
 class StrategyDecisionGuidance(BaseModel):
     """Guidance for making trading decisions based on the strategy's output."""
 
@@ -61,7 +88,7 @@ class StrategyDescriptor(BaseModel):
     # Identify
     id: str
     name: str
-    category: CatalogCategory
+    category: StrategyCategoryTypes
     # Description
     summary: str
     purpose: list[str]
@@ -81,11 +108,11 @@ class StrategyDescriptor(BaseModel):
     llm_hint: str
 
 
-class StrategyCatalog(BaseModel):
+class StrategyCatalogIndex(BaseModel):
     """A catalog of trading strategies, loaded from YAML files."""
 
     name: str
-    parent: ParentCatalog
+    domain: AnalysisDomainTypes
     strategies: dict[str, StrategyDescriptor]
 
 
@@ -96,14 +123,26 @@ def catalog_files() -> list[Path]:
 
 
 @lru_cache()
-def list_catalog() -> tuple[StrategyCatalog, ...]:
+def list_analysis_domains() -> AnalysisDomainIndex:
+    """List available analysis domains for high-level routing."""
+    domain_yaml_path = CATALOG_DIR / "domain.yaml"
+    with domain_yaml_path.open() as f:
+        data = yaml.safe_load(f)
+
+    return AnalysisDomainIndex.model_validate(data)
+
+
+@lru_cache()
+def list_strategy_catalogs() -> tuple[StrategyCatalogIndex, ...]:
     """List all strategies available in the catalog"""
 
     descriptors = []
     for file in catalog_files():
+        if file.stem == "domain":
+            continue
         with file.open() as f:
             data = yaml.safe_load(f)
-            descriptor = StrategyCatalog.model_validate(data)
+            descriptor = StrategyCatalogIndex.model_validate(data)
             descriptors.append(descriptor)
     return tuple(descriptors)
 
@@ -111,51 +150,52 @@ def list_catalog() -> tuple[StrategyCatalog, ...]:
 def list_strategies() -> list[StrategyDescriptor]:
     """List all strategies available in the catalog"""
 
-    catalogs = list_catalog()
+    catalogs = list_strategy_catalogs()
     strategies = []
     for catalog in catalogs:
         strategies.extend(catalog.strategies.values())
     return strategies
 
 
-def list_strategies_by_parent(parent: str | ParentCatalog) -> list[StrategyDescriptor]:
-    """List all strategies in the catalog that belong to a specific parent"""
-    if isinstance(parent, str):
-        normalized_parent = parent.strip().lower()
+def list_strategies_by_domain(
+    domain: str | AnalysisDomainTypes,
+) -> list[StrategyDescriptor]:
+    """List all strategies in the catalog that belong to a specific domain"""
+    if isinstance(domain, str):
+        normalized_domain = domain.strip().lower()
         try:
-            parent = ParentCatalog(normalized_parent)
+            domain = AnalysisDomainTypes(normalized_domain)
         except ValueError as exc:
-            valid_values = ", ".join(p.value for p in ParentCatalog)
+            valid_values = ", ".join(p.value for p in AnalysisDomainTypes)
             raise ValueError(
-                f"Invalid parent catalog '{parent}'. "
-                f"Expected one of: {valid_values}"
+                f"Invalid analysis domain '{domain}'. Expected one of: {valid_values}"
             ) from exc
 
-    catalogs = list_catalog()
+    catalogs = list_strategy_catalogs()
     strategies = []
     for catalog in catalogs:
-        if catalog.parent == parent:
+        if catalog.domain == domain:
             strategies.extend(catalog.strategies.values())
     return strategies
 
 
 def list_strategies_by_category(
-    category: CatalogCategory | str,
+    category: StrategyCategoryTypes | str,
 ) -> list[StrategyDescriptor]:
     """List all strategies in the catalog that belong to a specific category"""
 
     if isinstance(category, str):
-        category = CatalogCategory(category)
+        category = StrategyCategoryTypes(category)
 
     strategies = list_strategies()
     return [s for s in strategies if s.category == category]
 
 
-def get_catalog_strategy_id_map() -> dict[CatalogCategory, list[str]]:
+def get_strategy_catalog_id_map() -> dict[StrategyCategoryTypes, list[str]]:
     """Get a mapping of catalog categories to the IDs of strategies that belong to each category"""
 
-    catalogs = list_catalog()
-    category_map: dict[CatalogCategory, list[str]] = {}
+    catalogs = list_strategy_catalogs()
+    category_map: dict[StrategyCategoryTypes, list[str]] = {}
     for catalog in catalogs:
         for strategy in catalog.strategies.values():
             category_map.setdefault(strategy.category, []).append(strategy.id)

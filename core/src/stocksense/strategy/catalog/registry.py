@@ -2,14 +2,16 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from . import (
-    CatalogCategory,
+    StrategyCategoryTypes,
     MarketRegime,
-    ParentCatalog,
-    StrategyCatalog,
+    AnalysisDomainTypes,
+    StrategyCatalogIndex,
     StrategyDescriptor,
     TimeHorizon,
-    list_catalog,
+    list_analysis_domains,
+    list_strategy_catalogs,
     list_strategies,
+    AnalysisDomainIndex,
 )
 
 
@@ -17,11 +19,12 @@ from . import (
 class StrategyRegistry:
     """Compiled runtime view of the strategy catalog."""
 
-    catalogs: tuple[StrategyCatalog, ...]
+    domains: AnalysisDomainIndex
+    strategy_catalogs: tuple[StrategyCatalogIndex, ...]
     strategies: tuple[StrategyDescriptor, ...]
-    by_parent: dict[ParentCatalog, tuple[StrategyCatalog, ...]]
+    by_domain: dict[AnalysisDomainTypes, tuple[StrategyCatalogIndex, ...]]
+    by_strategy_category: dict[StrategyCategoryTypes, tuple[StrategyDescriptor, ...]]
     by_id: dict[str, StrategyDescriptor]
-    by_category: dict[CatalogCategory, tuple[StrategyDescriptor, ...]]
     by_tag: dict[str, tuple[StrategyDescriptor, ...]]
     by_market_regime: dict[MarketRegime, tuple[StrategyDescriptor, ...]]
     by_time_horizon: dict[TimeHorizon, tuple[StrategyDescriptor, ...]]
@@ -31,20 +34,21 @@ class StrategyRegistry:
 def build_registry() -> StrategyRegistry:
     """Build a compiled registry from the loaded strategy catalogs."""
 
-    catalogs = tuple(list_catalog())
+    domains = list_analysis_domains()
+    catalogs = tuple(list_strategy_catalogs())
     strategies = tuple(list_strategies())
-    by_parent_lists: dict[ParentCatalog, list[StrategyCatalog]] = {}
+    by_domain_lists: dict[AnalysisDomainTypes, list[StrategyCatalogIndex]] = {}
     for catalog in catalogs:
-        by_parent_lists.setdefault(catalog.parent, []).append(catalog)
+        by_domain_lists.setdefault(catalog.domain, []).append(catalog)
 
-    by_parent = {
-        parent: tuple(parent_catalogs)
-        for parent, parent_catalogs in by_parent_lists.items()
+    by_domain_index = {
+        domain: tuple(domain_catalogs)
+        for domain, domain_catalogs in by_domain_lists.items()
     }
 
     by_id = {strategy.id: strategy for strategy in strategies}
 
-    by_category_lists: dict[CatalogCategory, list[StrategyDescriptor]] = {}
+    by_category_lists: dict[StrategyCategoryTypes, list[StrategyDescriptor]] = {}
     for strategy in strategies:
         by_category_lists.setdefault(strategy.category, []).append(strategy)
 
@@ -84,11 +88,12 @@ def build_registry() -> StrategyRegistry:
     }
 
     return StrategyRegistry(
-        catalogs=catalogs,
+        domains=domains,
+        strategy_catalogs=catalogs,
         strategies=strategies,
-        by_parent=by_parent,
+        by_domain=by_domain_index,
         by_id=by_id,
-        by_category=by_category,
+        by_strategy_category=by_category,
         by_tag=by_tag,
         by_market_regime=by_market_regime,
         by_time_horizon=by_time_horizon,
@@ -105,8 +110,8 @@ def get_registry() -> StrategyRegistry:
 
 def filter_strategies(
     *,
-    parent: ParentCatalog | str | None = None,
-    category: CatalogCategory | str | None = None,
+    domain: AnalysisDomainTypes | str | None = None,
+    category: StrategyCategoryTypes | str | None = None,
     tags: list[str] | None = None,
     market_regimes: list[MarketRegime | str] | None = None,
     time_horizons: list[TimeHorizon | str] | None = None,
@@ -117,24 +122,24 @@ def filter_strategies(
     registry = get_registry()
     strategies: tuple[StrategyDescriptor, ...] = registry.strategies
 
-    if parent is not None:
-        if isinstance(parent, str):
-            parent = ParentCatalog(parent.strip().lower())
-        parent_catalogs = registry.by_parent.get(parent, ())
-        parent_strategy_ids = {
+    if domain is not None:
+        if isinstance(domain, str):
+            domain = AnalysisDomainTypes(domain.strip().lower())
+        domain_catalogs = registry.by_domain.get(domain, ())
+        domain_strategy_ids = {
             strategy.id
-            for catalog in parent_catalogs
+            for catalog in domain_catalogs
             for strategy in catalog.strategies.values()
         }
         strategies = tuple(
-            strategy for strategy in strategies if strategy.id in parent_strategy_ids
+            strategy for strategy in strategies if strategy.id in domain_strategy_ids
         )
 
     if category is not None:
         if isinstance(category, str):
-            category = CatalogCategory(category.strip().lower())
+            category = StrategyCategoryTypes(category.strip().lower())
         category_strategy_ids = {
-            strategy.id for strategy in registry.by_category.get(category, ())
+            strategy.id for strategy in registry.by_strategy_category.get(category, ())
         }
         strategies = tuple(
             strategy for strategy in strategies if strategy.id in category_strategy_ids

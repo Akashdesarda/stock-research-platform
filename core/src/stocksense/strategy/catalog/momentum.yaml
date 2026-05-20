@@ -1,6 +1,6 @@
 # Curated momentum strategy metadata for AI-assisted strategy selection.
 name: Momentum Strategy Catalog
-parent: technical analysis
+domain: technical analysis
 strategies:
   rsi:
     id: momentum.rsi

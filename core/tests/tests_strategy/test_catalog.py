@@ -1,12 +1,15 @@
 import pytest
 from stocksense.strategy.catalog import (
-    CatalogCategory,
+    StrategyCategoryTypes,
+    AnalysisDomainTypes,
     catalog_files,
-    get_catalog_strategy_id_map,
+    get_strategy_catalog_id_map,
     get_strategy_by_id,
-    list_catalog,
+    list_analysis_domains,
+    list_strategy_catalogs,
     list_strategies,
     list_strategies_by_category,
+    list_strategies_by_domain,
 )
 
 
@@ -16,9 +19,8 @@ def test_strategy_catalog_files_exist():
 
 
 def test_strategy_catalog_loads_all_yaml_files():
-    catalogs = list_catalog()
-    assert catalogs
-    assert len(catalogs) == len(catalog_files())
+    catalogs = list_strategy_catalogs()
+    assert len(catalogs) == len(catalog_files()) - 1
 
     strategies = list_strategies()
     assert strategies
@@ -46,12 +48,12 @@ def test_strategy_catalog_required_fields_are_present():
         assert descriptor.llm_hint
 
 
-@pytest.mark.parametrize("category", [CatalogCategory.trend, "trend"])
+@pytest.mark.parametrize("category", [StrategyCategoryTypes.trend, "trend"])
 def test_list_strategies_by_category_returns_only_matching_strategies(category):
     strategies = list_strategies_by_category(category)
 
     assert strategies
-    assert all(strategy.category == CatalogCategory.trend for strategy in strategies)
+    assert all(strategy.category == StrategyCategoryTypes.trend for strategy in strategies)
 
 
 def test_list_strategies_by_category_rejects_unknown_category():
@@ -59,8 +61,28 @@ def test_list_strategies_by_category_rejects_unknown_category():
         list_strategies_by_category("unknown")
 
 
+def test_list_analysis_domains_returns_all_domains():
+    index = list_analysis_domains()
+    assert index.domains
+    assert any(domain.id == AnalysisDomainTypes.technical_analysis for domain in index.domains.values())
+
+
+@pytest.mark.parametrize("domain", [AnalysisDomainTypes.technical_analysis, "technical analysis"])
+def test_list_strategies_by_domain_returns_only_matching_strategies(domain):
+    strategies = list_strategies_by_domain(domain)
+
+    assert strategies
+    # Since all current strategies are technical analysis
+    assert len(strategies) == len(list_strategies())
+
+
+def test_list_strategies_by_domain_rejects_unknown_domain():
+    with pytest.raises(ValueError):
+        list_strategies_by_domain("unknown")
+
+
 def test_get_catalog_strategy_id_map_matches_loaded_strategies():
-    category_map = get_catalog_strategy_id_map()
+    category_map = get_strategy_catalog_id_map()
     strategies = list_strategies()
 
     assert category_map

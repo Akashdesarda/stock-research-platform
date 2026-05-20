@@ -1,6 +1,6 @@
 # Curated overlap-study metadata for AI-assisted strategy selection.
 name: Overlap Study Strategy Catalog
-parent: technical analysis
+domain: technical analysis
 strategies:
   bbands:
     id: overlap.bbands

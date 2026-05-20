@@ -1,6 +1,6 @@
 # Curated volatility strategy metadata for AI-assisted strategy selection.
 name: Volatility Strategy Catalog
-parent: technical analysis
+domain: technical analysis
 strategies:
   atr:
     id: volatility.atr

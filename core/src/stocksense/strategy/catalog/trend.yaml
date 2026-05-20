@@ -1,7 +1,7 @@
 # Curated trend strategy metadata for AI-assisted strategy selection.
 # Contributors should keep field names stable so the Python loader can validate them.
 name: Trend Strategy Catalog
-parent: technical analysis
+domain: technical analysis
 strategies:
   sma_crossover:
     id: trend.sma_crossover

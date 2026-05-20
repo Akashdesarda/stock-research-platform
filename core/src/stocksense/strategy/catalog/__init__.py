@@ -1,6 +1,7 @@
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
 
 import yaml
 from pydantic import BaseModel
@@ -121,6 +122,7 @@ def catalog_files() -> list[Path]:
     return list(CATALOG_DIR.glob("*.yaml"))
 
 
+@lru_cache()
 def list_analysis_domains() -> AnalysisDomainIndex:
     """List available analysis domains for high-level routing."""
     domain_yaml_path = CATALOG_DIR / "domain.yaml"
@@ -130,6 +132,7 @@ def list_analysis_domains() -> AnalysisDomainIndex:
     return AnalysisDomainIndex.model_validate(data)
 
 
+@lru_cache()
 def list_strategy_catalogs() -> tuple[StrategyCatalogIndex, ...]:
     """List all strategies available in the catalog"""
 

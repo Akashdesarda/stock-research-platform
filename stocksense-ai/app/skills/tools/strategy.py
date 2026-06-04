@@ -107,7 +107,7 @@ class StrategyDiscoveryTools(Toolkit):
             valid = ", ".join(d.value for d in AnalysisDomainTypes)
             raise RetryAgentRun(f"Domain cannot be empty. Valid values: {valid}.")
         try:
-            chosen = AnalysisDomainTypes(domain.strip().lower())
+            chosen = AnalysisDomainTypes(normalized)
         except ValueError:
             valid = ", ".join(d.value for d in AnalysisDomainTypes)
             # Letting the model know about its mistake

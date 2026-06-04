@@ -41,9 +41,7 @@ def _get_local_data_directory() -> Path:
 
     if system == "windows":
         # Windows: Use AppData/Roaming
-        base_dir = Path(
-            os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
-        )
+        base_dir = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
     elif system == "darwin":  # macOS
         # macOS: Use ~/Library/Application Support
         base_dir = Path.home() / "Library" / "Application Support"
@@ -162,10 +160,13 @@ class AI(BaseModel):
     GOOGLE_API_KEY: str
     OPENROUTER_API_KEY: str
     INCEPTION_API_KEY: str
+    SARVAM_API_KEY: str
+    ICA_API_KEY: str
     text_to_sql_model: str
     company_summary_model: str
     company_summary_qa_model: str
     dataset_description_model: str
+    strategy_selector_model: str
 
 
 # Model for the 'App' section

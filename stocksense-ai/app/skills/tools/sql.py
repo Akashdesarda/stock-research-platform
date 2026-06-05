@@ -116,9 +116,11 @@ def verify_sql_query_returns_data(query: str, run_context: RunContext) -> str:
     """
     logger.debug(f"Checking if SQL query returns data: {query}")
     try:
+        dependencies = run_context.dependencies or {}
+        # NOTE - using NSE as default exchange for now
+        exchange = dependencies.get("exchange", "nse")
         history_data = StockDataDB(
-            settings.stockdb.data_base_path
-            / f"{run_context.dependencies.get('exchange')}/ticker_history"
+            settings.stockdb.data_base_path / f"{exchange}/ticker_history"
         )
         if not _check_sql_query_returns_data(history_data.table_data.collect(), query):
             raise RetryAgentRun(

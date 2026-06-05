@@ -1,7 +1,7 @@
 [project]
 name = "stocksense-ai"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "stocksense-core",
     "agno[os]>=2.6.5",
@@ -17,13 +17,11 @@ dependencies = [
     "google-genai>=2.7.0",
     "pyyaml>=6.0.1",
     "jinja2>=3.1.2",
+    "httpx2>=2.4.0",
 ]
 
 [dependency-groups]
-dev = [
-    "ipykernel>=7.2.0",
-    "pytest>=9.0.3",
-]
+dev = ["ipykernel>=7.2.0", "pytest>=9.0.3"]
 
 [tool.uv.sources]
 stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }
@@ -32,3 +30,5 @@ stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platfo
 invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
+[tool.pyrefly]
+project-includes = ["**/*.py*", "**/*.ipynb"]

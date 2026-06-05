@@ -27,9 +27,7 @@ def get_model(
         "openai": OpenAIChat,
         "groq": Groq,
         "anthropic": Claude,
-        "claude": Claude,
         "google": Gemini,
-        "gemini": Gemini,
         "openrouter": OpenRouter,
     }
 

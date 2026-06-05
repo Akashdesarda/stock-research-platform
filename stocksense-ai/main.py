@@ -2,12 +2,14 @@ from agno.db.postgres import PostgresDb, AsyncPostgresDb
 from agno.os import AgentOS
 from agno.os.settings import AgnoAPISettings
 from app.agents import text_to_sql, strategy_selector
-
 from scalar_fastapi import get_scalar_api_reference
+from stocksense.config import get_settings
 
 
+settings = get_settings()
 db = PostgresDb(
-    db_url="postgresql+psycopg://stocksense:0330@localhost:5432/agno", id="traces"
+    db_url=f"postgresql+psycopg://stocksense:{settings.common.postgres_passwd}@{settings.common.postgres_url}:5432/agno",
+    id="traces",
 )
 
 agent_os = AgentOS(

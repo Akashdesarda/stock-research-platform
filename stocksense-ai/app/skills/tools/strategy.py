@@ -315,8 +315,7 @@ class StockDBTools(Toolkit):
             str: The current company context
         """
         session_state = _ensure_session_state(run_context)
-        if run_context.dependencies is None:
-            run_context.dependencies = {}
+        dependencies = run_context.dependencies or {}
 
         # 1st check in session state
         exch = session_state.get(EXCHANGE_KEY)
@@ -326,8 +325,8 @@ class StockDBTools(Toolkit):
             return f"Current company context: Exchange={exch}, Ticker={tkr}"
 
         # 2nd check in dependencies
-        exch = run_context.dependencies.get("exchange")
-        tkr = run_context.dependencies.get("ticker")
+        exch = dependencies.get("exchange")
+        tkr = dependencies.get("ticker")
         # Adding in session state if found in dependencies
         if exch and tkr:
             session_state[EXCHANGE_KEY] = exch.lower()

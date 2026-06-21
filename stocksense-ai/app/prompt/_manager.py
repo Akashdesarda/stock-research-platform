@@ -1,12 +1,12 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 from jinja2 import Environment, StrictUndefined, Undefined
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("stocksense")
 
 
 @dataclass

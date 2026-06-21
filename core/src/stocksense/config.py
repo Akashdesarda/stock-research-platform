@@ -149,6 +149,8 @@ class Common(BaseModel):
     base_url: str
     phoenix_url: str
     phoenix_port: int
+    postgres_url: str
+    postgres_passwd: str
 
 
 class AI(BaseModel):

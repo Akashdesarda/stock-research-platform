@@ -478,6 +478,10 @@ class StockDBTools(Toolkit):
 
             return data
         except HTTPStatusError as e:
+            try:
+                err_detail = response.json()
+            except Exception:
+                err_detail = response.text or str(e)
             raise RetryAgentRun(
-                f"Failed to get company information due to: {response.json()}"
+                f"Failed to get company information due to: {err_detail}"
             ) from e

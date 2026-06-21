@@ -367,8 +367,8 @@ class StockDBTools(Toolkit):
         Returns:
             list[str]: A list of exchanges.
         """
-        _ = await self._aclient.get("/per-security/")
-        return _.json()
+        response = await self._aclient.get("/per-security/")
+        return response.json()
 
     async def get_company_exchange_and_ticker(
         self, company_name: str

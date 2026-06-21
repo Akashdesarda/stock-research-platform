@@ -17,6 +17,21 @@ from stocksense.strategy.catalog.registry import (
 
 settings = get_settings()
 
+
+def _ensure_session_state(run_context: RunContext) -> dict[str, Any]:
+    """Ensure session_state is initialized and return it.
+
+    Args:
+        run_context: The agent's run context
+
+    Returns:
+        The initialized session_state dictionary
+    """
+    if run_context.session_state is None:
+        run_context.session_state = {}
+    return run_context.session_state
+
+
 # required keys for discovery
 _ANALYSIS_DOMAIN_DISCOVERY_FIELDS = {
     "domains": {
@@ -116,22 +131,23 @@ class StrategyDiscoveryTools(Toolkit):
             raise RetryAgentRun(f"Domain cannot be empty. Valid values: {valid}.")
         try:
             chosen = AnalysisDomainTypes(normalized)
-        except ValueError:
+        except ValueError as e:
             valid = ", ".join(d.value for d in AnalysisDomainTypes)
             # Letting the model know about its mistake
-            raise RetryAgentRun(f"Invalid domain '{domain}'. Valid values: {valid}.")
+            raise RetryAgentRun(
+                f"Invalid domain '{domain}'. Valid values: {valid}."
+            ) from e
 
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
-        current = run_context.session_state.get(SELECTED_DOMAIN_KEY)
+        current = session_state.get(SELECTED_DOMAIN_KEY)
         if current == chosen.value:
             return f"Analysis domain already set to '{chosen.value}'."
 
         # Clear downstream selections if the user pivots
-        run_context.session_state[SELECTED_DOMAIN_KEY] = chosen.value
-        run_context.session_state.pop(SELECTED_CATEGORY_KEY, None)
-        run_context.session_state.pop(SELECTED_STRATEGY_KEY, None)
+        session_state[SELECTED_DOMAIN_KEY] = chosen.value
+        session_state.pop(SELECTED_CATEGORY_KEY, None)
+        session_state.pop(SELECTED_STRATEGY_KEY, None)
         return f"Analysis domain set to '{chosen.value}'."
 
     def list_strategy_categories(
@@ -147,10 +163,9 @@ class StrategyDiscoveryTools(Toolkit):
         Returns:
             A list of category descriptors with summary, use_if, example_queries, etc.
         """
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
-        domain_value = run_context.session_state.get(SELECTED_DOMAIN_KEY)
+        domain_value = session_state.get(SELECTED_DOMAIN_KEY)
         if domain_value is None:
             raise RetryAgentRun(
                 "No analysis domain selected yet. Call select_analysis_domain first."
@@ -176,23 +191,22 @@ class StrategyDiscoveryTools(Toolkit):
         Returns:
             A message confirming the selected category
         """
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
-        if SELECTED_DOMAIN_KEY not in run_context.session_state:
+        if SELECTED_DOMAIN_KEY not in session_state:
             raise RetryAgentRun("Select an analysis domain first.")
 
         try:
             chosen = StrategyCategoryTypes(category.strip().lower())
-        except ValueError:
+        except ValueError as e:
             valid = ", ".join(c.value for c in StrategyCategoryTypes)
             # Letting the model know about its mistake
             raise RetryAgentRun(
                 f"Invalid category '{category}'. Valid values: {valid}."
-            )
+            ) from e
 
-        run_context.session_state[SELECTED_CATEGORY_KEY] = chosen.value
-        run_context.session_state.pop(SELECTED_STRATEGY_KEY, None)
+        session_state[SELECTED_CATEGORY_KEY] = chosen.value
+        session_state.pop(SELECTED_STRATEGY_KEY, None)
         return f"Strategy category set to '{chosen.value}'."
 
     def list_strategies_in_selection(
@@ -209,11 +223,10 @@ class StrategyDiscoveryTools(Toolkit):
             A list of serialized dictionary representations of filtered
             strategies or a string error message if applicable.
         """
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
-        domain_value = run_context.session_state.get(SELECTED_DOMAIN_KEY)
-        category_value = run_context.session_state.get(SELECTED_CATEGORY_KEY)
+        domain_value = session_state.get(SELECTED_DOMAIN_KEY)
+        category_value = session_state.get(SELECTED_CATEGORY_KEY)
 
         if domain_value is None or category_value is None:
             # Letting the model know about its mistake
@@ -247,10 +260,9 @@ class StrategyDiscoveryTools(Toolkit):
         if strategy_id not in self._registry.by_id:
             raise RetryAgentRun(f"Unknown strategy_id '{strategy_id}'.")
 
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
-        run_context.session_state[SELECTED_STRATEGY_KEY] = strategy_id
+        session_state[SELECTED_STRATEGY_KEY] = strategy_id
         return f"Strategy '{strategy_id}' selected."
 
     def get_strategy_details(self, strategy_id: str) -> dict[str, Any] | str:
@@ -302,14 +314,13 @@ class StockDBTools(Toolkit):
         Returns:
             str: The current company context
         """
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
         if run_context.dependencies is None:
             run_context.dependencies = {}
 
         # 1st check in session state
-        exch = run_context.session_state.get(EXCHANGE_KEY)
-        tkr = run_context.session_state.get(TICKER_KEY)
+        exch = session_state.get(EXCHANGE_KEY)
+        tkr = session_state.get(TICKER_KEY)
 
         if exch and tkr:
             return f"Current company context: Exchange={exch}, Ticker={tkr}"
@@ -319,8 +330,8 @@ class StockDBTools(Toolkit):
         tkr = run_context.dependencies.get("ticker")
         # Adding in session state if found in dependencies
         if exch and tkr:
-            run_context.session_state[EXCHANGE_KEY] = exch.lower()
-            run_context.session_state[TICKER_KEY] = tkr.lower()
+            session_state[EXCHANGE_KEY] = exch.lower()
+            session_state[TICKER_KEY] = tkr.lower()
             return f"Current company context: Exchange={exch}, Ticker={tkr}"
         else:
             raise RetryAgentRun(
@@ -344,11 +355,10 @@ class StockDBTools(Toolkit):
         Returns:
             str: Confirmation message
         """
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
-        run_context.session_state[EXCHANGE_KEY] = exchange.lower()
-        run_context.session_state[TICKER_KEY] = ticker.lower()
+        session_state[EXCHANGE_KEY] = exchange.lower()
+        session_state[TICKER_KEY] = ticker.lower()
         return f"Company context set to {ticker.upper()} on {exchange.upper()}"
 
     async def list_exchange(self) -> list[str]:
@@ -423,12 +433,11 @@ class StockDBTools(Toolkit):
         Returns:
             dict[str, Any]: The company data.
         """
-        if run_context.session_state is None:
-            run_context.session_state = {}
+        session_state = _ensure_session_state(run_context)
 
         # Explicit args win; otherwise fall back to session context
-        exchange = exchange or run_context.session_state.get(EXCHANGE_KEY)
-        ticker = ticker or run_context.session_state.get(TICKER_KEY)
+        exchange = exchange or session_state.get(EXCHANGE_KEY)
+        ticker = ticker or session_state.get(TICKER_KEY)
 
         if not exchange or not ticker:
             raise RetryAgentRun(
@@ -441,7 +450,7 @@ class StockDBTools(Toolkit):
         cache_key = f"{exchange}:{ticker}"
 
         # Short-circuit: return cached data without another API/token round-trip
-        cache = run_context.session_state.get(COMPANY_INFO_KEY) or {}
+        cache = session_state.get(COMPANY_INFO_KEY) or {}
         if cache_key in cache:
             # Data already in conversation history — return a pointer, not the payload
             return {
@@ -465,7 +474,7 @@ class StockDBTools(Toolkit):
 
             # Data will remain in history; marking only as cached in session state
             cache[cache_key] = True
-            run_context.session_state[COMPANY_INFO_KEY] = cache
+            session_state[COMPANY_INFO_KEY] = cache
 
             return data
         except HTTPStatusError as e:

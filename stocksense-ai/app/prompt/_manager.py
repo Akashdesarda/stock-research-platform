@@ -40,10 +40,11 @@ class PromptManager:
 
                 if "versions" in prompts:
                     versioned = {}
-                    default_version = prompts.get("default_version", next(iter(prompts["versions"]), None))
+                    versions_dict = prompts.get("versions") or {}
+                    default_version = prompts.get("default_version", next(iter(versions_dict), None))
                     if default_version is not None:
                         versioned["_default_version"] = default_version
-                    versioned["_versions"] = prompts.get("versions") or {}
+                    versioned["_versions"] = versions_dict
                     self._prompt_registry[agent_name] = versioned
                 else:
                     self._prompt_registry[agent_name] = prompts

@@ -39,8 +39,5 @@ module-root = ""
 [tool.uv.sources]
 stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }
 
-[tool.ty.rules]
-unresolved-attribute = "ignore"
-
 [tool.pyrefly]
 project-includes = ["**/*.py*", "**/*.ipynb"]

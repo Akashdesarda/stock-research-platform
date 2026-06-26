@@ -40,9 +40,8 @@ module-name = "stocksense"
 [dependency-groups]
 dev = ["ipykernel>=7.1.0", "pytest>=9.0.0"]
 
-[tool.ty.rules]
-unresolved-attribute = "ignore"
-unresolved-import = "ignore"
-
-[tool.basedpyright]
-reportOperatorIssue = "none"
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]

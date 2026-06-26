@@ -34,14 +34,14 @@ services:
         image: ghcr.io/akashdesarda/stock-research-platform
         pull_policy: always
         ports:
-            - "8080:8080"
+            - "9000:9000"
         volumes:
             - shared-data:/shared
         environment:
             CONFIG_FILE: /shared/assets/config.toml
             DOCKER_CONTAINER: "true" # Explicit Docker environment flag
-            COMMON__POSTGRES_URL: "http://postgres"
-            STOCKDB__STOCKDB_URL: "http://phoenix"
+            COMMON__POSTGRES_URL: "postgres"
+            STOCKDB__STOCKDB_URL: "http://stockdb-api"
         tty: true
     # 4. PostgreSQL database shared by application services
     postgres:

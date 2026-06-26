@@ -74,7 +74,13 @@ class PromptManager:
                 raise ValueError(
                     f"No default_version configured for versioned agent '{agent_name}'"
                 )
-            return prompts["_versions"][default_version]
+            versions = prompts["_versions"]
+            if default_version not in versions:
+                raise ValueError(
+                    f"Default version '{default_version}' not found for agent '{agent_name}'. "
+                    f"Available: {sorted(versions.keys())}"
+                )
+            return versions[default_version]
 
         return prompts
 

@@ -66,7 +66,7 @@ uv run reflex run
 # App will be available at http://localhost:3000
 ```
 
-#### 3. StockSense AI Application
+#### 4. StockSense AI Application
 
 ```bash
 cd stocksense-ai/

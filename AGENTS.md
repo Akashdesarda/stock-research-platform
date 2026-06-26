@@ -8,7 +8,7 @@ This file provides guidance to agents when working with code in this repository.
 
 ### Architecture
 
-The platform consists of four main components:
+The platform consists of five main components:
 
 1. **Core Library** (`core/`): Shared business logic, data access layer, AI utilities, and technical analysis strategies
 2. **StockDB API** (`stockdb/`): FastAPI-based REST API service for stock data operations and bulk processing

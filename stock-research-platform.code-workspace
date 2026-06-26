@@ -12,58 +12,6 @@
 			"docs",
 			"core"
 		],
-		"python-envs.pythonProjects": [
-			{
-				"path": "stockdb",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip",
-				"defaultInterpreterPath": "${cwd}/stockdb/.venv/Scripts/python.exe"
-			},
-			{
-				"path": "snapshot",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip",
-				"defaultInterpreterPath": "${cwd}/snapshot/.venv/Scripts/python.exe"
-			},
-			{
-				"path": "webapp",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip",
-				"defaultInterpreterPath": "${cwd}/webapp/.venv/Scripts/python.exe"
-			},
-			{
-				"path": "stocksense-app",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip",
-				"defaultInterpreterPath": "${cwd}/stocksense-app/.venv/Scripts/python.exe"
-			},
-			{
-				"path": ".",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip"
-			},
-			{
-				"path": "core",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip"
-			},
-			{
-				"path": ".kilo/worktrees/cyclic-chips/snapshot",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip"
-			},
-			{
-				"path": ".kilo/worktrees/cyclic-chips/stockdb",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip"
-			},
-			{
-				"path": ".kilo/worktrees/cyclic-chips/stocksense-app",
-				"envManager": "ms-python.python:venv",
-				"packageManager": "ms-python.python:pip"
-			}
-		],
-		"python.defaultInterpreterPath": "/usr/bin/python3",
 		"testing.coverageToolbarEnabled": true,
 		"cSpell.words": [
 			"groq",

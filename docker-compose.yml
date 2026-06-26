@@ -31,7 +31,7 @@ services:
         tty: true
     # 3. Stocksense AI
     stocksense-ai:
-        image: ghcr.io/akashdesarda/stock-research-platform
+        image: ghcr.io/akashdesarda/stock-research-platform/stocksense-ai:latest
         pull_policy: always
         ports:
             - "9000:9000"

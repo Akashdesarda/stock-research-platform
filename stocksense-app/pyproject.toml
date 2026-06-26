@@ -14,6 +14,12 @@ dependencies = [
 [tool.uv.sources]
 stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }
 
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",

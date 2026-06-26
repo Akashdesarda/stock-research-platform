@@ -1,6 +1,6 @@
 [project]
 name = "Stocksense-Core"
-version = "0.11.1"
+version = "0.11.2"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Akash Desarda", email = "desardaakash@gmail.com" }]
@@ -40,9 +40,8 @@ module-name = "stocksense"
 [dependency-groups]
 dev = ["ipykernel>=7.1.0", "pytest>=9.0.0"]
 
-[tool.ty.rules]
-unresolved-attribute = "ignore"
-unresolved-import = "ignore"
-
-[tool.basedpyright]
-reportOperatorIssue = "none"
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]

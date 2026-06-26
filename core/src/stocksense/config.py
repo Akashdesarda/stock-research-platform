@@ -1,3 +1,4 @@
+import contextlib
 import os
 import platform
 from pathlib import Path
@@ -20,15 +21,12 @@ def _is_running_in_docker() -> bool:
         return True
 
     # Best-effort heuristic using cgroups (works in many Docker/K8s setups).
-    try:
+    with contextlib.suppress(OSError):
         cgroup = Path("/proc/1/cgroup")
         if cgroup.exists():
             txt = cgroup.read_text(errors="ignore")
             if "docker" in txt or "kubepods" in txt or "containerd" in txt:
                 return True
-    except OSError:
-        pass
-
     return False
 
 
@@ -147,13 +145,12 @@ def ensure_config_env(config_path: str | Path | None = None) -> Path:
 # Model for the 'common' section
 class Common(BaseModel):
     base_url: str
-    phoenix_url: str
-    phoenix_port: int
     postgres_url: str
     postgres_passwd: str
 
 
 class AI(BaseModel):
+    ai_url: str
     port: int
     provider_base_url: dict[str, str] | None = None
     GROQ_API_KEY: str

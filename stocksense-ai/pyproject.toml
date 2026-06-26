@@ -26,9 +26,5 @@ dev = ["ipykernel>=7.2.0", "pytest>=9.0.3"]
 [tool.uv.sources]
 stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }
 
-[tool.ty.rules]
-invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
-
 [tool.pyrefly]
 project-includes = ["**/*.py*", "**/*.ipynb"]

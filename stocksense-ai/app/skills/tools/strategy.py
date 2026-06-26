@@ -317,6 +317,9 @@ class StockDBTools(Toolkit):
         session_state = _ensure_session_state(run_context)
         dependencies = run_context.dependencies or {}
 
+        # NOTE - Dependency state is deliberately kept as 2nd so that during run if LLM updates
+        # session state, it is reflected in the tool output.
+
         # 1st check in session state
         exch = session_state.get(EXCHANGE_KEY)
         tkr = session_state.get(TICKER_KEY)
@@ -394,12 +397,13 @@ class StockDBTools(Toolkit):
         df = pl.DataFrame(flattened)
         words = company_name.lower().split()
         if (
-            result := df
-            .filter(
-                pl.all_horizontal([
-                    pl.col("company_name").str.to_lowercase().str.contains(word)
-                    for word in words
-                ])
+            result := df.filter(
+                pl.all_horizontal(
+                    [
+                        pl.col("company_name").str.to_lowercase().str.contains(word)
+                        for word in words
+                    ]
+                )
             )
             .select(["exchange", "ticker", "company_name"])
             .to_dicts()

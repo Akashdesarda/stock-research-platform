@@ -35,26 +35,74 @@ class PromptManager:
                     logger.error(
                         f"Prompt file for agent {agent_name} must contain a YAML mapping at root. Got: {type(prompts).__name__}"
                     )
-                    prompts = {}
+                    self._prompt_registry[agent_name] = {}
+                    continue
 
-                self._prompt_registry[agent_name] = prompts
+                if "versions" in prompts:
+                    versioned = {}
+                    default_version = prompts.get("default_version", next(iter(prompts["versions"]), None))
+                    if default_version is not None:
+                        versioned["_default_version"] = default_version
+                    versioned["_versions"] = prompts.get("versions") or {}
+                    self._prompt_registry[agent_name] = versioned
+                else:
+                    self._prompt_registry[agent_name] = prompts
             except Exception:
                 logger.exception(
                     f"Error loading prompts for agent {agent_name} from {file_path}"
                 )
                 self._prompt_registry[agent_name] = {}
 
-    def get_prompt(self, agent_name: str, prompt_key: str, **kwargs: Any) -> str:
+    def _resolve_prompts(self, agent_name: str, version: str | None = None) -> dict[str, Any]:
+        prompts = self._prompt_registry.get(agent_name, {})
+        if not prompts:
+            raise ValueError(f"Agent not found: {agent_name}")
+
+        if version is not None:
+            versions = prompts.get("_versions", {})
+            if version not in versions:
+                raise ValueError(
+                    f"Version '{version}' not found for agent '{agent_name}'. "
+                    f"Available: {sorted(versions.keys()) or 'none (not a versioned agent)'}"
+                )
+            return versions[version]
+
+        if "_versions" in prompts:
+            default_version = prompts.get("_default_version")
+            if default_version is None:
+                raise ValueError(
+                    f"No default_version configured for versioned agent '{agent_name}'"
+                )
+            return prompts["_versions"][default_version]
+
+        return prompts
+
+    def get_prompt(
+        self, agent_name: str, prompt_key: str, version: str | None = None, **kwargs: Any
+    ) -> str:
         """
         Retrieves a prompt and renders it with the provided keyword arguments.
+
+        For versioned prompt files, pass `version` to select a specific version.
+        If `version` is omitted, the default version is used for versioned agents,
+        or the flat prompt is returned for non-versioned agents.
         """
-        prompts = self._prompt_registry.get(agent_name, {})
+        prompts = self._resolve_prompts(agent_name, version)
         template_str = prompts.get(prompt_key, "")
         if not isinstance(template_str, str) or not template_str:
-            raise ValueError(f"Prompt not found: {agent_name}.{prompt_key}")
+            raise ValueError(
+                f"Prompt not found: {agent_name}.{prompt_key}"
+                + (f" (version={version})" if version else "")
+            )
 
         template = self._jinja_env.from_string(template_str)
         return template.render(**kwargs)
+
+    def get_available_versions(self, agent_name: str) -> list[str]:
+        """Return available versions for an agent, or an empty list if not versioned."""
+        prompts = self._prompt_registry.get(agent_name, {})
+        versions = prompts.get("_versions", {})
+        return sorted(versions.keys())
 
     def clear_cache(self, agent_name: str | None = None) -> None:
         if agent_name is None:

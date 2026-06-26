@@ -1,6 +1,9 @@
 from agno.os import AgentOS
 from app.agents import company_summary, strategy_selector, text_to_sql
 from app.utils import postgres_db
+from stocksense.config import get_settings
+
+settings = get_settings()
 
 agent_os = AgentOS(
     name="StockSense",
@@ -9,6 +12,7 @@ agent_os = AgentOS(
     tracing=True,
     # settings=AgnoAPISettings(docs_enabled=False),
 )
+
 app = agent_os.get_app()
 
 
@@ -20,3 +24,9 @@ app = agent_os.get_app()
 #         title=app.title,
 #         # scalar_favicon_url="/static/chart-growth-invest.svg",
 #     )
+if __name__ == "__main__":
+    agent_os.serve(
+        app=app,
+        host="0.0.0.0",
+        port=settings.ai.port,
+    )

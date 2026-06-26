@@ -6,6 +6,7 @@ on:
     paths:
       - "stockdb/**"
       - "snapshot/**"
+      - "stocksense-ai/**"
       # Optional: run when this workflow file changes
       - ".github/workflows/ci-docker-build.yml"
   workflow_dispatch:
@@ -28,6 +29,7 @@ jobs:
     env:
       REGISTRY: ghcr.io
       REPO: akashdesarda/stock-research-platform
+      IMAGE_TAG_TS: ${{ github.run_id }}-${{ github.sha }}
 
     steps:
       - name: Checkout repository
@@ -44,6 +46,8 @@ jobs:
               - 'stockdb/**'
             snapshot:
               - 'snapshot/**'
+            stocksense-ai:              
+              - 'stocksense-ai/**'
 
       # Only log in when we are going to push (skip on PRs)
       - name: Log in to GitHub Container Registry
@@ -61,7 +65,7 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Build and (conditionally) push srp-stockdb-api
+      - name: Build and (conditionally) push stockdb-api
         if: steps.changes.outputs.stockdb == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -69,12 +73,12 @@ jobs:
           file: ./stockdb/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:latest
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:${{ env.IMAGE_TAG_TS }}
+            ${{ env.REGISTRY }}/${{ env.REPO }}/stockdb-api:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/stockdb-api:${{ env.IMAGE_TAG_TS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and (conditionally) push srp-snapshot-data
+      - name: Build and (conditionally) push snapshot-data
         if: steps.changes.outputs.snapshot == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -82,7 +86,20 @@ jobs:
           file: ./snapshot/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:latest
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:${{ env.IMAGE_TAG_TS }}
+            ${{ env.REGISTRY }}/${{ env.REPO }}/snapshot-data:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/snapshot-data:${{ env.IMAGE_TAG_TS }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and (conditionally) push stocksense-ai
+        if: steps.changes.outputs.stocksense-ai == 'true' || github.event.inputs.force_build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./stocksense-ai/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO }}/stocksense-ai:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/stocksense-ai:${{ env.IMAGE_TAG_TS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

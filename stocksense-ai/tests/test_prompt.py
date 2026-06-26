@@ -36,13 +36,13 @@ def test_load_valid_yaml_prompts(prompt_manager, tmp_path):
 def test_load_invalid_yaml_prompt(prompt_manager, tmp_path, caplog):
     """Test loading an invalid YAML prompt."""
     invalid_file = tmp_path / "invalid.yaml"
-    invalid_file.write_text("invalid_yaml::: bad_format")
+    invalid_file.write_text("just a plain string")
 
     prompt_manager._load_all_prompts()
 
     assert "invalid" in prompt_manager._prompt_registry
     assert prompt_manager._prompt_registry["invalid"] == {}
-    assert "Error loading prompts" in caplog.text
+    assert "must contain a YAML mapping" in caplog.text
 
 
 def test_get_prompt_valid_key(prompt_manager, tmp_path):
@@ -156,3 +156,135 @@ def test_reload_prompts(prompt_manager, tmp_path):
     prompt_manager.reload()
     assert "initial_key" not in prompt_manager._prompt_registry["reload_test"]
     assert "updated_key" in prompt_manager._prompt_registry["reload_test"]
+
+
+def test_load_versioned_prompts(prompt_manager, tmp_path):
+    """Test loading versioned YAML prompts."""
+    test_file = tmp_path / "versioned.yaml"
+    test_file.write_text(
+        """
+        default_version: v2
+        versions:
+          v1:
+            welcome: |
+              Hello {{ name }} (v1).
+          v2:
+            welcome: |
+              Hello {{ name }} (v2).
+        """
+    )
+    prompt_manager._load_all_prompts()
+    assert "versioned" in prompt_manager._prompt_registry
+    assert "_versions" in prompt_manager._prompt_registry["versioned"]
+    assert "_default_version" in prompt_manager._prompt_registry["versioned"]
+
+
+def test_get_prompt_default_version(prompt_manager, tmp_path):
+    """Test retrieving prompt from default version when no version is specified."""
+    test_file = tmp_path / "versioned.yaml"
+    test_file.write_text(
+        """
+        default_version: v2
+        versions:
+          v1:
+            welcome: |
+              Hello {{ name }} (v1).
+          v2:
+            welcome: |
+              Hello {{ name }} (v2).
+        """
+    )
+    prompt_manager._load_all_prompts()
+    result = prompt_manager.get_prompt("versioned", "welcome", name="World")
+    assert result == "Hello World (v2)."
+
+
+def test_get_prompt_specific_version(prompt_manager, tmp_path):
+    """Test retrieving prompt from a specific version."""
+    test_file = tmp_path / "versioned.yaml"
+    test_file.write_text(
+        """
+        default_version: v2
+        versions:
+          v1:
+            welcome: |
+              Hello {{ name }} (v1).
+          v2:
+            welcome: |
+              Hello {{ name }} (v2).
+        """
+    )
+    prompt_manager._load_all_prompts()
+    result = prompt_manager.get_prompt("versioned", "welcome", version="v1", name="World")
+    assert result == "Hello World (v1)."
+
+
+def test_get_prompt_missing_version(prompt_manager, tmp_path):
+    """Test error when requesting a non-existent version."""
+    test_file = tmp_path / "versioned.yaml"
+    test_file.write_text(
+        """
+        versions:
+          v1:
+            welcome: Hello.
+        """
+    )
+    prompt_manager._load_all_prompts()
+    with pytest.raises(ValueError, match="Version 'v9' not found for agent 'versioned'"):
+        prompt_manager.get_prompt("versioned", "welcome", version="v9")
+
+
+def test_get_prompt_versioned_missing_key(prompt_manager, tmp_path):
+    """Test missing key error for versioned prompts."""
+    test_file = tmp_path / "versioned.yaml"
+    test_file.write_text(
+        """
+        versions:
+          v1:
+            welcome: Hello.
+        """
+    )
+    prompt_manager._load_all_prompts()
+    with pytest.raises(ValueError, match="Prompt not found: versioned.missing_key"):
+        prompt_manager.get_prompt("versioned", "missing_key")
+
+
+def test_get_available_versions(prompt_manager, tmp_path):
+    """Test listing available versions for versioned and non-versioned agents."""
+    flat = tmp_path / "flat.yaml"
+    flat.write_text("description: Flat prompt.")
+    versioned = tmp_path / "versioned.yaml"
+    versioned.write_text(
+        """
+        default_version: stable
+        versions:
+          alpha:
+            desc: Alpha
+          beta:
+            desc: Beta
+          stable:
+            desc: Stable
+        """
+    )
+    prompt_manager._load_all_prompts()
+    assert prompt_manager.get_available_versions("flat") == []
+    assert prompt_manager.get_available_versions("versioned") == ["alpha", "beta", "stable"]
+
+
+def test_versioned_agent_auto_select_first_version(prompt_manager, tmp_path):
+    """Test auto-selecting first version when default_version is not specified."""
+    test_file = tmp_path / "versioned.yaml"
+    test_file.write_text(
+        """
+        versions:
+          v1:
+            welcome: |
+              Hello (v1).
+          v2:
+            welcome: |
+              Hello (v2).
+        """
+    )
+    prompt_manager._load_all_prompts()
+    result = prompt_manager.get_prompt("versioned", "welcome")
+    assert result == "Hello (v1)."

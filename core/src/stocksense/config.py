@@ -154,6 +154,7 @@ class Common(BaseModel):
 
 
 class AI(BaseModel):
+    port: int
     provider_base_url: dict[str, str] | None = None
     GROQ_API_KEY: str
     OPENAI_API_KEY: str
@@ -166,7 +167,6 @@ class AI(BaseModel):
     ICA_API_KEY: str
     text_to_sql_model: str
     company_summary_model: str
-    company_summary_qa_model: str
     dataset_description_model: str
     strategy_selector_model: str
 

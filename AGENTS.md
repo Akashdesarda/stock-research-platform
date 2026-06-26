@@ -25,7 +25,7 @@ The platform consists of four main components:
 - **Web Framework**: Reflex (Python-based reactive web framework)
 - **API Framework**: FastAPI with Scalar documentation
 - **Observability**: Agno's native observability for AI/LLM tracing
-- **Database**: Deltalake (primary), PostgreSQL 17 (only limited to Agno)
+- **Database**: Delta Lake (primary), PostgreSQL 17 (only limited to Agno)
 - **Containerization**: Docker with Docker Compose orchestration
 
 ## Building and Running

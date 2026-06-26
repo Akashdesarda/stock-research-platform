@@ -154,7 +154,6 @@ class Common(BaseModel):
 
 
 class AI(BaseModel):
-    ui_url: str
     port: int
     provider_base_url: dict[str, str] | None = None
     GROQ_API_KEY: str

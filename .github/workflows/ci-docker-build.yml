@@ -65,7 +65,7 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Build and (conditionally) push srp-stockdb-api
+      - name: Build and (conditionally) push stockdb-api
         if: steps.changes.outputs.stockdb == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -73,12 +73,12 @@ jobs:
           file: ./stockdb/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:latest
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-stockdb-api:${{ env.IMAGE_TAG_TS }}
+            ${{ env.REGISTRY }}/${{ env.REPO }}/stockdb-api:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/stockdb-api:${{ env.IMAGE_TAG_TS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and (conditionally) push srp-snapshot-data
+      - name: Build and (conditionally) push snapshot-data
         if: steps.changes.outputs.snapshot == 'true' || github.event.inputs.force_build == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -86,8 +86,8 @@ jobs:
           file: ./snapshot/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:latest
-            ${{ env.REGISTRY }}/${{ env.REPO }}/srp-snapshot-data:${{ env.IMAGE_TAG_TS }}
+            ${{ env.REGISTRY }}/${{ env.REPO }}/snapshot-data:latest
+            ${{ env.REGISTRY }}/${{ env.REPO }}/snapshot-data:${{ env.IMAGE_TAG_TS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

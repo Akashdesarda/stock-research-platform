@@ -234,3 +234,5 @@ stockdb/temp_data/**
 # others
 codebook.toml
 config.toml
+.bob
+.kilo

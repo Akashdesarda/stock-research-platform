@@ -14,7 +14,7 @@ dependencies = [
     "rich>=14.3.1",
     "scalar-fastapi>=1.6.1",
     "scipy>=1.16.2",
-    "stocksense-core[data,ai]",
+    "stocksense-core[data]",
     "uvicorn>=0.41.0",
 ]
 

@@ -1,12 +1,6 @@
-import json
-from contextlib import contextmanager
 from datetime import date, datetime
-from typing import Any
 
 import polars as pl
-from openinference.instrumentation import using_session
-from openinference.semconv.trace import SpanAttributes
-from opentelemetry import trace
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.types import DataInterval, DataPeriod
@@ -63,7 +57,8 @@ def _build_history_lf_from_query(
         interval_value = "1w"
 
     return (
-        result.sort([
+        result
+        .sort([
             "ticker",
             "date",
         ])  # dynamic grouping requires ascending data within each ticker

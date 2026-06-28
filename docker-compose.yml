@@ -40,6 +40,7 @@ services:
         environment:
             CONFIG_FILE: /shared/assets/config.toml
             DOCKER_CONTAINER: "true" # Explicit Docker environment flag
+            COMMON__SQLITE_PATH: "/shared/sqlite/agno.db"
             COMMON__POSTGRES_URL: "postgres"
             STOCKDB__STOCKDB_URL: "http://stockdb-api"
         tty: true
@@ -71,4 +72,4 @@ volumes:
         driver_opts:
             type: none
             o: bind
-            device: ${HOME}/.local/share/stock-research-platform
+            device: ~/.local/share/stock-research-platform

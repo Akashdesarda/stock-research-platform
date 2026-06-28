@@ -1,6 +1,8 @@
+from pathlib import Path
 from urllib.parse import quote_plus
 
 from agno.db.postgres import AsyncPostgresDb, PostgresDb
+from agno.db.sqlite import AsyncSqliteDb, SqliteDb
 from stocksense.config import get_settings
 
 from ._llm_helper import get_model
@@ -16,4 +18,17 @@ async_postgres_db = AsyncPostgresDb(
     id="traces",
 )
 
-__all__ = ["get_model", "postgres_db", "async_postgres_db"]
+sqlite_db = SqliteDb(
+    db_file=Path(settings.common.sqlite_path).expanduser().as_posix(), id="stocksense"
+)
+async_sqlite_db = AsyncSqliteDb(
+    db_file=Path(settings.common.sqlite_path).expanduser().as_posix(), id="stocksense"
+)
+
+__all__ = [
+    "get_model",
+    "postgres_db",
+    "async_postgres_db",
+    "sqlite_db",
+    "async_sqlite_db",
+]

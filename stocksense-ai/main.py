@@ -18,6 +18,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 agent_os = AgentOS(
     name="StockSense AI API",
+    version="0.1.1",
     agents=[text_to_sql, strategy_selector, company_summary, dataset_description],
     db=async_sqlite_db,
     tracing=True,

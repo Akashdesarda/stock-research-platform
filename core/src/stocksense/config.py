@@ -147,6 +147,7 @@ class Common(BaseModel):
     base_url: str
     postgres_url: str
     postgres_passwd: str
+    sqlite_path: str
 
 
 class AI(BaseModel):

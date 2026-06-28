@@ -1,8 +1,6 @@
 import logging
 
 from agno.agent import Agent
-from stocksense.config import get_settings
-
 from app.prompt import PromptManager
 from app.skills.tools.sql import (
     verify_duckdb_sql_query_syntax,
@@ -18,13 +16,16 @@ from app.skills.tools.strategy import (
     StockDBTools,
     StrategyDiscoveryTools,
 )
-from app.utils import get_model, postgres_db
+from app.utils import async_sqlite_db, get_model
+from stocksense.config import get_settings
 
 from ._helpers import (
+    dataset_description_input_validation,
+    get_dataset_description_instruction,
     get_history_table_columns,
     get_strategy_selection_instruction,
 )
-from ._schema import TextToSQLOutput
+from ._schema import DatasetDescriptionOutput, TextToSQLOutput
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -59,6 +60,7 @@ strategy_selector = Agent(
     name="Stock strategy selector agent",
     id="strategy-selector",
     description=pm.get_prompt("strategy_selector", "description"),
+    db=async_sqlite_db,
     model=get_model(
         settings.ai.strategy_selector_model,
         settings.get_model_api_keys(settings.ai.strategy_selector_model),
@@ -77,25 +79,27 @@ strategy_selector = Agent(
     tools=[StrategyDiscoveryTools()],
     markdown=True,
     stream=True,
+    debug_mode=True,
 )
 
 company_summary = Agent(
     id="company-summary",
     name="Company summary agent",
     description=pm.get_prompt("company_summary", "description"),
-    db=postgres_db,
+    db=async_sqlite_db,
     model=get_model(
         model_name=settings.ai.company_summary_model,
         api_key=settings.get_model_api_keys(settings.ai.company_summary_model),
         base_url=settings.get_model_base_url(settings.ai.company_summary_model),
     ),
-    followups=True,
-    num_followups=4,
-    followup_model=get_model(
-        model_name="ica:ibm/granite-4-h-small",
-        api_key=settings.ai.ICA_API_KEY,
-        base_url=settings.get_model_base_url("ica:ibm/granite-4-h-small"),
-    ),
+    # REVIEW - Do I really need to enable followups for this agent?
+    # followups=True,
+    # num_followups=4,
+    # followup_model=get_model(
+    #     model_name="ica:ibm/granite-4-h-small",
+    #     api_key=settings.ai.ICA_API_KEY,
+    #     base_url=settings.get_model_base_url("ica:ibm/granite-4-h-small"),
+    # ),
     instructions=pm.get_prompt("company_summary", "instructions"),
     expected_output=pm.get_prompt("company_summary", "expected_output"),
     stream=True,
@@ -111,5 +115,23 @@ company_summary = Agent(
     cache_session=True,
     add_history_to_context=True,
     read_chat_history=True,
+    debug_mode=True,
+)
+
+dataset_description = Agent(
+    id="dataset-description",
+    name="Dataset description generator",
+    description=pm.get_prompt("dataset_description", "description"),
+    model=get_model(
+        settings.ai.text_to_sql_model,  # Reuse text_to_sql model for now
+        settings.get_model_api_keys(settings.ai.text_to_sql_model),
+        settings.get_model_base_url(settings.ai.text_to_sql_model),
+    ),
+    instructions=get_dataset_description_instruction,
+    use_instruction_tags=True,
+    output_schema=DatasetDescriptionOutput,
+    use_json_mode=True,
+    pre_hooks=[dataset_description_input_validation],
+    stream=False,
     debug_mode=True,
 )

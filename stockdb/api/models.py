@@ -1,12 +1,20 @@
+import logging
 from datetime import date, datetime
 from enum import Enum
 from typing import Any, Literal
 from uuid import uuid4
 
+import polars as pl
+from agno.client import AgentOSClient
+from agno.run import RunStatus
 from pydantic import BaseModel, Field, model_validator
+from stocksense.config import get_settings
 from stocksense.types import DataInterval, DataPeriod
 
 from api.dependency import stable_hash
+
+logger = logging.getLogger("stocksense")
+settings = get_settings()
 
 
 class APITags(Enum):
@@ -178,11 +186,7 @@ class TickerHistoryQuery(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if (
-            self.start_date
-            and self.end_date
-            and self.start_date > self.end_date
-        ):
+        if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -218,9 +222,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
         StockExchange.nse,
         description="Stock Exchange to download ticker history for",
     )
-    task_mode: TaskMode = Field(
-        TaskMode.auto, description="Mode of task execution"
-    )
+    task_mode: TaskMode = Field(TaskMode.auto, description="Mode of task execution")
     download_mode: TickerHistoryDownloadMode = Field(
         TickerHistoryDownloadMode.incremental,
         description="Download mode. `full` mode downloads complete history. `incremental` mode downloads only latest/missing data.",
@@ -255,9 +257,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             )
         if self.task_mode == TaskMode.manual:
             if self.start_date is None or self.end_date is None:
-                raise ValueError(
-                    "start_date and end_date are required in manual mode"
-                )
+                raise ValueError("start_date and end_date are required in manual mode")
             if self.start_date > self.end_date:
                 raise ValueError("start_date must be less than end_date")
         return self
@@ -286,9 +286,7 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t,
                 exchange=self.exchange.name,
-                exch_id=getattr(
-                    StockExchangeYahooIdentifier, self.exchange.name
-                ),
+                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
             )
             for t in self.ticker
         ]
@@ -351,11 +349,7 @@ class BulkTickerHistoryInput(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if (
-            self.start_date
-            and self.end_date
-            and self.start_date > self.end_date
-        ):
+        if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -365,9 +359,7 @@ class BulkTickerHistoryInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t.upper(),  # ticker symbol must be always Upper case
                 exchange=self.exchange.name,
-                exch_id=getattr(
-                    StockExchangeYahooIdentifier, self.exchange.name
-                ),
+                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
             )
             for t in self.ticker
         ]
@@ -470,40 +462,37 @@ class PromptCacheOutput(BaseModel):
 
 class LogicalPlan(BaseModel):
     exchange: StockExchange
-    ticker: list[str] | None = None
-    interval: DataInterval | None = None
-    period: DataPeriod | None = None
-    start_date: date | None = None
-    end_date: date | None = None
-    sql_query: str | None = None
+    ticker: list[str] | None = Field(None, examples=["INFY", "TCS"])
+    interval: DataInterval | None = Field(None, examples=["1d", "1mo"])
+    period: DataPeriod | None = Field(None, examples=["3mo", "1y"])
+    start_date: date | None = Field(None, examples=[date(2023, 1, 1), date(2024, 1, 1)])
+    end_date: date | None = Field(None, examples=[date(2023, 1, 30), date(2024, 1, 30)])
+    sql_query: str | None = Field(
+        None,
+        examples=[
+            "SELECT * FROM stockdb where ticker = 'INFY' AND date BETWEEN '2023-01-01' AND '2023-01-30'"
+        ],
+    )
 
     @model_validator(mode="after")
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if (
-            self.start_date
-            and self.end_date
-            and self.start_date > self.end_date
-        ):
+        if self.start_date and self.end_date and self.start_date > self.end_date:
             raise ValueError("Start date must be less than end date")
         return self
 
     @model_validator(mode="after")
     def check_sql_or_query_params(self):
         # When sql_query is provided, other query parameters should not be provided and vice versa.
-        if self.sql_query is not None and any(
-            [
-                self.ticker,
-                self.interval,
-                self.period,
-                self.start_date,
-                self.end_date,
-            ]
-        ):
-            raise ValueError(
-                "sql_query cannot be provided with other query parameters"
-            )
+        if self.sql_query is not None and any([
+            self.ticker,
+            self.interval,
+            self.period,
+            self.start_date,
+            self.end_date,
+        ]):
+            raise ValueError("sql_query cannot be provided with other query parameters")
 
         # When sql_query is not provided, ticker and interval are required. Also, either period or
         # start_date & end_date should be provided.
@@ -528,9 +517,7 @@ class DataRegistrationInput(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique identifier for the dataset. If not provided, a UUID will be generated.",
     )
-    name: str | None = Field(
-        None, description="Name of the dataset to be registered"
-    )
+    name: str | None = Field(None, description="Name of the dataset to be registered")
     description: str | None = Field(
         None, description="Description of the dataset to be registered"
     )
@@ -542,6 +529,60 @@ class DataRegistrationInput(BaseModel):
         ...,
         description="List of tags associated with the dataset for better discoverability",
     )
+
+    async def _generate_name_description(self):
+        client = AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}", timeout=5)
+        response = await client.run_agent(
+            agent_id="dataset-description",
+            message="generate based on provided context",
+            dependencies={
+                "exchange": self.logical_plan.exchange.value,
+                "ticker_identifier": ", ".join(self.tags),
+                "interval": self.logical_plan.interval,
+                "period": self.logical_plan.period,
+                "start_date": self.logical_plan.start_date,
+                "end_date": self.logical_plan.end_date,
+                "sql_query": self.logical_plan.sql_query,
+            },
+        )
+        if response.status != RunStatus.completed:
+            raise ValueError(
+                "No dataset name & description provided and AI agent Failed to generate dataset name and description",
+            )
+        self.name = response.content.get("name")
+        self.description = response.content.get("description")
+
+    async def pydantic_to_polars(self) -> pl.DataFrame:
+        if not self.name:
+            logger.debug(
+                f"Generating name for dataset with id {self.dataset_id} using AI"
+            )
+            await self._generate_name_description()
+        return pl.DataFrame(
+            [
+                {
+                    "dataset_id": self.dataset_id,
+                    "name": self.name,
+                    "description": self.description,
+                    "logical_plan": self.logical_plan.model_dump(mode="json"),
+                    "tags": self.tags,
+                    "last_modified": datetime.now(),
+                }
+            ],
+            schema_overrides={"tags": pl.List(pl.String)},
+        ).with_columns(
+            pl.col("logical_plan").cast(
+                pl.Struct({
+                    "exchange": pl.String,
+                    "ticker": pl.List(pl.String),
+                    "interval": pl.String,
+                    "period": pl.String,
+                    "start_date": pl.Date,
+                    "end_date": pl.Date,
+                    "sql_query": pl.String,
+                })
+            )
+        )
 
 
 class RegisteredDataOutput(BaseModel):

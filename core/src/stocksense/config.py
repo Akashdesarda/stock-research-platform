@@ -51,7 +51,7 @@ def _get_local_data_directory() -> Path:
         else:
             base_dir = Path.home() / ".local" / "share"
 
-    return base_dir / "stock-research-platform"
+    return base_dir / "stock-research-platform/assets/stockdb"
 
 
 def _resolve_data_path(config_path: Path) -> Path:

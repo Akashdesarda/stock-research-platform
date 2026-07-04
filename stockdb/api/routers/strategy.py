@@ -22,23 +22,27 @@ async def list_strategies() -> list[catalog.StrategyDescriptor]:
 
 
 @router.get("/catalog")
-async def list_strategies_as_catalog_grouped() -> tuple[catalog.StrategyCatalog, ...]:
+async def list_strategies_as_catalog_grouped() -> tuple[
+    catalog.StrategyCatalogIndex, ...
+]:
     """List all strategies available grouped by catalog"""
-    return catalog.list_catalog()
+    return catalog.list_strategy_catalogs()
 
 
 @router.get("/catalog/{category}")
 async def list_strategies_by_category(
-    category: catalog.CatalogCategory,
+    category: catalog.StrategyCategoryTypes,
 ) -> list[catalog.StrategyDescriptor]:
     """List all strategies in the catalog that belong to a specific category"""
     return catalog.list_strategies_by_category(category)
 
 
 @router.get("/id")
-async def get_catalog_strategy_id_map() -> dict[catalog.CatalogCategory, list[str]]:
+async def get_catalog_strategy_id_map() -> dict[
+    catalog.StrategyCategoryTypes, list[str]
+]:
     """Get a mapping of catalog categories to the IDs of strategies that belong to each category"""
-    return catalog.get_catalog_strategy_id_map()
+    return catalog.get_strategy_catalog_id_map()
 
 
 @router.get("/id/{strategy_id}")

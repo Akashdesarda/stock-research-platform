@@ -1,13 +1,11 @@
 import http
 import logging
-import os
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import polars as pl
 from about_time import about_time
-from api import setup
 from api.models import APITags, StockExchange
 from api.routers import bulk, ops, per_security, strategy
 from fastapi import FastAPI, Request, status
@@ -130,11 +128,9 @@ async def _internal_scalar_html():
 
 if __name__ == "__main__":
     import uvicorn
+    from api import setup
 
-    # FIXME - remove below prints after testing
-    print("initial", os.getenv("CONFIG_FILE"))
     setup()
-    print("after setup", os.getenv("CONFIG_FILE"))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

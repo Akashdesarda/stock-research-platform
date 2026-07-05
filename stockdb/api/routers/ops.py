@@ -243,7 +243,7 @@ async def register_data(register: DataRegistrationInput):
             detail=str(e),
         ) from e
     # performing data validation.
-    if df.limit(1).collect().is_empty():
+    if (await df.limit(1).collect_async()).is_empty():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid logical plan provided. Please ensure the logical plan is correctly "

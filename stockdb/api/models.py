@@ -531,26 +531,44 @@ class DataRegistrationInput(BaseModel):
     )
 
     async def _generate_name_description(self):
-        client = AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}", timeout=5)
-        response = await client.run_agent(
-            agent_id="dataset-description",
-            message="generate based on provided context",
-            dependencies={
-                "exchange": self.logical_plan.exchange.value,
-                "ticker_identifier": ", ".join(self.tags),
-                "interval": self.logical_plan.interval,
-                "period": self.logical_plan.period,
-                "start_date": self.logical_plan.start_date,
-                "end_date": self.logical_plan.end_date,
-                "sql_query": self.logical_plan.sql_query,
-            },
-        )
+        client = AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
+        try:
+            response = await client.run_agent(
+                agent_id="dataset-description",
+                message="generate based on provided context",
+                dependencies={
+                    "exchange": self.logical_plan.exchange.value,
+                    "ticker_identifier": ", ".join(self.tags),
+                    "interval": self.logical_plan.interval.value
+                    if self.logical_plan.interval
+                    else None,
+                    "period": self.logical_plan.period.value
+                    if self.logical_plan.period
+                    else None,
+                    "start_date": self.logical_plan.start_date.isoformat()
+                    if self.logical_plan.start_date
+                    else None,
+                    "end_date": self.logical_plan.end_date.isoformat()
+                    if self.logical_plan.end_date
+                    else None,
+                    "sql_query": self.logical_plan.sql_query,
+                },
+            )
+        except Exception as e:
+            raise ValueError(
+                f"AI agent request failed while generating dataset name and description: {e}"
+            ) from e
         if response.status != RunStatus.completed:
             raise ValueError(
                 "No dataset name & description provided and AI agent Failed to generate dataset name and description",
             )
-        self.name = response.content.get("name")
-        self.description = response.content.get("description")
+        content = response.content or {}
+        name = content.get("name")
+        description = content.get("description")
+        if not name or not description:
+            raise ValueError("AI agent response missing name or description")
+        self.name = name
+        self.description = description
 
     async def pydantic_to_polars(self) -> pl.DataFrame:
         if not self.name:

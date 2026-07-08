@@ -1,6 +1,4 @@
 import logging
-from functools import lru_cache
-from pathlib import Path
 
 import duckdb
 import polars as pl
@@ -15,37 +13,113 @@ from stocksense.data import StockDataDB
 logger = logging.getLogger("stocksense")
 settings = get_settings()
 
-# Configuration for sample-based validation
-SAMPLE_SIZE = 10000  # Number of rows to use for validation
-METADATA_CACHE_SIZE = 10  # Number of table metadata entries to cache
 
-
-@lru_cache(maxsize=METADATA_CACHE_SIZE)
-def _get_table_metadata(exchange: str, table_path: Path) -> dict:
-    """Cache table metadata for faster validation.
+def verify_duckdb_sql_query_syntax(query: str) -> str:
+    """You must use this tool to verify the syntax of the DuckDB SQL query.
 
     Args:
-        exchange: Exchange identifier (e.g., 'nse')
-        table_path: Path to the table data
+        query (str): The DuckDB SQL query to validate.
 
     Returns:
-        dict: Metadata including row count, date range, sample tickers, and columns
+        str: A message confirming the query syntax is valid.
     """
-    logger.debug(f"Loading metadata for {exchange} from {table_path}")
-    history_table_data = StockDataDB(table_path).table_data
+    try:
+        logger.debug(f"Validating SQL query: {query}")
+        parse_one(query, dialect=Dialects.DUCKDB)
+        return "Valid SQL query syntax"
+
+    except ParseError as e:
+        logger.error(f"Invalid SQL syntax: {e}")
+        raise RetryAgentRun(f"Invalid SQL query: {e}") from e
+
+
+def verify_table_name(query: str, table_name: str = "stockdb") -> str:
+    """Use this tool to verify if the given SQL query contains the specified table name.
+
+    Args:
+        query (str): The SQL query to be verified.
+        table_name (str, optional): The table name that must be present in the query, by default "stockdb".
+
+    Returns:
+        str: A message confirming the given table name is used in the query.
+    """
+    logger.debug(f"Checking if table name '{table_name}' is used in query: {query}")
+    try:
+        # Parse the SQL query
+        expression = parse_one(query, dialect=Dialects.DUCKDB)
+
+        # Find all 'exp.Table' nodes in the AST
+        table_expressions = expression.find_all(exp.Table)
+
+        # Extract the table name
+        table_names = {table.this.name for table in table_expressions}
+
+        if table_name in table_names:
+            return "Correct table name is used in the query."
+        logger.error(f"Table name '{table_name}' not found in query.")
+        raise RetryAgentRun(
+            f"Table name '{table_name}' not found in query. Instead found: {table_names}"
+        )
+
+    except ParseError as e:
+        logger.error(f"Invalid SQL syntax: {e}")
+        raise RetryAgentRun(f"Invalid SQL query: {e}") from e
+
+
+def verify_sql_query_returns_data(query: str, run_context: RunContext) -> str:
+    """Verify if the SQL query returns data by executing it against a sample dataset.
+
+    Note: Use this tool AFTER verifying syntax and table names. If this tool fails, read the error
+    message carefully - it can contain useful guidance on what to fix.
+
+    Args:
+        query (str): The SQL query string to be executed against the registered table.
+        run_context: The run context containing dependencies (automatically provided)
+
+    Returns:
+        str: A message confirming the query result is not empty or indicating no data.
+    """
+    logger.debug(f"Checking if SQL query returns data: {query}")
+    try:
+        dependencies = run_context.dependencies or {}
+        # REVIEW - using NSE as default exchange for now
+        exchange = dependencies.get("exchange", "nse")
+        table_path = settings.stockdb.data_base_path / f"{exchange}/ticker_history"
+        history_table = StockDataDB(table_path)
+
+        # Use duckdb for sql query validation
+        logger.debug("Validating sql query if it returns any data using duckdb")
+        if history_table.sql_filter(query).limit(1).collect().is_empty():
+            # get metadata for detailed error messages
+            metadata = _get_table_metadata(history_table.table_data)
+            # Analyze why the query returned no data
+            error_context = _analyze_empty_result(query, metadata)
+            raise RetryAgentRun(
+                f"The SQL query is syntactically correct but returns no data. Modify it.\n\n{error_context}"
+            )
+
+        return "The SQL query returns data successfully"
+
+    except (duckdb.Error, ParseError) as e:
+        logger.warning(f"Error executing SQL query: {e}", exc_info=True)
+        raise RetryAgentRun(f"Error executing SQL query: {e}") from e
+
+
+def _get_table_metadata(history_data: pl.LazyFrame) -> dict:
+    logger.debug("Loading metadata for ticker history data")
 
     # Get metadata without loading full dataset
     metadata = {
-        "row_count": history_table_data.select(pl.len()).collect()[0, 0],
-        "date_range": history_table_data
+        "row_count": history_data.select(pl.len()).collect()[0, 0],
+        "date_range": history_data
         .select(
             pl.col("date").min().cast(pl.Date).alias("min_date"),
             pl.col("date").max().cast(pl.Date).alias("max_date"),
         )
         .collect()
         .to_dicts()[0],
-        "columns": history_table_data.collect_schema().names(),
-        "tickers": history_table_data
+        "columns": history_data.collect_schema().names(),
+        "tickers": history_data
         .select(pl.col("ticker"))
         .unique()
         .collect()
@@ -59,21 +133,6 @@ def _get_table_metadata(exchange: str, table_path: Path) -> dict:
     )
 
     return metadata
-
-
-def _get_sample_data(exchange: str, limit: int = SAMPLE_SIZE) -> pl.DataFrame:
-    """Get a sample of data for validation.
-
-    Args:
-        exchange: Exchange identifier (e.g., 'nse')
-        limit: Number of rows to sample
-
-    Returns:
-        pl.DataFrame: Sample data
-    """
-    table_path = settings.stockdb.data_base_path / f"{exchange}/ticker_history"
-    history_data = StockDataDB(table_path)
-    return history_data.table_data.limit(limit).collect()
 
 
 def _extract_ticker_filters(parsed_query: exp.Expr) -> list[str]:
@@ -115,14 +174,6 @@ def _extract_ticker_filters(parsed_query: exp.Expr) -> list[str]:
 
 
 def _extract_date_filters(parsed_query: exp.Expr) -> dict:
-    """Extract date range from WHERE clause filters.
-
-    Args:
-        parsed_query: Parsed SQL expression
-
-    Returns:
-        dict: Dictionary with 'min_date' and 'max_date' if found
-    """
     date_info = {}
 
     # Find date comparisons
@@ -130,7 +181,6 @@ def _extract_date_filters(parsed_query: exp.Expr) -> dict:
         left = comparison.left
         right = comparison.right
 
-        # Check if comparing date column
         if isinstance(left, exp.Column) and left.name.lower() == "date":
             if isinstance(right, exp.Literal):
                 date_value = right.this
@@ -147,15 +197,24 @@ def _extract_date_filters(parsed_query: exp.Expr) -> dict:
                 elif isinstance(comparison, (exp.GTE, exp.GT)):
                     date_info["max_date"] = date_value
 
+    # Find date BETWEEN ranges
+    for between in parsed_query.find_all(exp.Between):
+        if isinstance(between.this, exp.Column) and between.this.name.lower() == "date":
+            low = between.args.get("low")
+            high = between.args.get("high")
+            if isinstance(low, exp.Literal):
+                date_info["min_date"] = low.this
+            if isinstance(high, exp.Literal):
+                date_info["max_date"] = high.this
+
     return date_info
 
 
-def _analyze_empty_result(query: str, data: pl.DataFrame, metadata: dict) -> str:
+def _analyze_empty_result(query: str, metadata: dict) -> str:
     """Analyze why a query returned no data and provide actionable feedback.
 
     Args:
         query: The SQL query that returned no data
-        data: Sample data used for validation
         metadata: Table metadata including available tickers and date range
 
     Returns:
@@ -222,115 +281,3 @@ def _analyze_empty_result(query: str, data: pl.DataFrame, metadata: dict) -> str
     except Exception as e:
         logger.warning(f"Error analyzing empty result: {e}", exc_info=True)
         return "Query returned no data. Please check your filters and try again."
-
-
-def verify_duckdb_sql_query_syntax(query: str) -> str:
-    """You must use this tool to verify the syntax of the DuckDB SQL query.
-
-    Args:
-        query (str): The DuckDB SQL query to validate.
-
-    Returns:
-        str: A message confirming the query syntax is valid.
-    """
-    try:
-        logger.debug(f"Validating SQL query: {query}")
-        parse_one(query, dialect=Dialects.DUCKDB)
-        return "Valid SQL query syntax"
-
-    except ParseError as e:
-        logger.error(f"Invalid SQL syntax: {e}")
-        raise RetryAgentRun(f"Invalid SQL query: {e}") from e
-
-
-def verify_table_name(query: str, table_name: str = "stockdb") -> str:
-    """Use this tool to verify if the given SQL query contains the specified table name.
-
-    Args:
-        query (str): The SQL query to be verified.
-        table_name (str, optional): The table name that must be present in the query, by default "stockdb".
-
-    Returns:
-        str: A message confirming the given table name is used in the query.
-    """
-    logger.debug(f"Checking if table name '{table_name}' is used in query: {query}")
-    try:
-        # Parse the SQL query
-        expression = parse_one(query, dialect=Dialects.DUCKDB)
-
-        # Find all 'exp.Table' nodes in the AST
-        table_expressions = expression.find_all(exp.Table)
-
-        # Extract the table name
-        table_names = {table.this.name for table in table_expressions}
-
-        if table_name in table_names:
-            return "Table name is used in the query."
-        logger.error(f"Table name '{table_name}' not found in query.")
-        raise RetryAgentRun(
-            f"Table name '{table_name}' not found in query. Found tables: {table_names}"
-        )
-
-    except ParseError as e:
-        logger.error(f"Invalid SQL syntax: {e}")
-        raise RetryAgentRun(f"Invalid SQL query: {e}") from e
-
-
-def verify_sql_query_returns_data(query: str, run_context: RunContext) -> str:
-    """Verify if the SQL query returns data by executing it against a sample dataset.
-
-    Note: Use this tool AFTER verifying syntax and table names. If this tool fails, read the error
-    message carefully - it can contain useful guidance on what to fix.
-
-    Args:
-        query (str): The SQL query string to be executed against the registered table.
-        run_context: The run context containing dependencies (automatically provided)
-
-    Returns:
-        str: A message confirming the query result is not empty or indicating no data.
-    """
-    logger.debug(f"Checking if SQL query returns data: {query}")
-    try:
-        dependencies = run_context.dependencies or {}
-        # NOTE - using NSE as default exchange for now
-        exchange = dependencies.get("exchange", "nse")
-
-        # Get cached metadata for detailed error messages
-        table_path = settings.stockdb.data_base_path / f"{exchange}/ticker_history"
-        metadata = _get_table_metadata(exchange, table_path)
-
-        # Use sample data for validation (much faster than full dataset)
-        sample_data = _get_sample_data(exchange, limit=SAMPLE_SIZE)
-
-        logger.debug(f"Validating query against {len(sample_data)} sample rows")
-
-        if not _check_sql_query_returns_data(sample_data, query):
-            # Analyze why the query returned no data
-            error_context = _analyze_empty_result(query, sample_data, metadata)
-            raise RetryAgentRun(
-                f"The SQL query is valid but returns no data.\n\n{error_context}"
-            )
-
-        return "The SQL query returns data successfully"
-
-    except (duckdb.Error, ParseError) as e:
-        logger.warning(f"Error executing SQL query: {e}", exc_info=True)
-        raise RetryAgentRun(f"Error executing SQL query: {e}") from e
-
-
-def _check_sql_query_returns_data(data: pl.DataFrame, query: str) -> bool:
-    # Parse the query and find all table names
-    expression = parse_one(query, dialect=Dialects.DUCKDB)
-    table_names = {table.this.name for table in expression.find_all(exp.Table)}
-
-    with duckdb.connect() as con:
-        # Register the same dataframe for every table name found in the query
-        for table_name in table_names:
-            con.register(table_name, data)
-
-        # Also register the default just in case
-        con.register("stockdb", data)
-
-        result = con.sql(query).pl(lazy=True)
-        # inverting the logic because we want to return True if the query returns data
-        return not result.limit(1).collect().is_empty()

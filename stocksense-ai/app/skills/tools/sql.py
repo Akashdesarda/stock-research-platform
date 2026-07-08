@@ -108,31 +108,22 @@ def verify_sql_query_returns_data(query: str, run_context: RunContext) -> str:
 def _get_table_metadata(history_data: pl.LazyFrame) -> dict:
     logger.debug("Loading metadata for ticker history data")
 
-    # Get metadata without loading full dataset
-    metadata = {
-        "row_count": history_data.select(pl.len()).collect()[0, 0],
-        "date_range": history_data
-        .select(
-            pl.col("date").min().cast(pl.Date).alias("min_date"),
-            pl.col("date").max().cast(pl.Date).alias("max_date"),
-        )
-        .collect()
-        .to_dicts()[0],
+    summary = history_data.select(
+        pl.len().alias("row_count"),
+        pl.col("date").min().cast(pl.Date).alias("min_date"),
+        pl.col("date").max().cast(pl.Date).alias("max_date"),
+        pl.col("ticker").unique().implode().alias("tickers"),
+    ).collect().to_dicts()[0]
+
+    return {
+        "row_count": summary["row_count"],
+        "date_range": {
+            "min_date": summary["min_date"],
+            "max_date": summary["max_date"],
+        },
         "columns": history_data.collect_schema().names(),
-        "tickers": history_data
-        .select(pl.col("ticker"))
-        .unique()
-        .collect()
-        .to_series()
-        .to_list(),
+        "tickers": summary["tickers"],
     }
-
-    logger.debug(
-        f"Metadata loaded: {metadata['row_count']:,} rows, "
-        f"date range: {metadata['date_range']['min_date']} to {metadata['date_range']['max_date']}"
-    )
-
-    return metadata
 
 
 def _extract_ticker_filters(parsed_query: exp.Expr) -> list[str]:
@@ -188,6 +179,9 @@ def _extract_date_filters(parsed_query: exp.Expr) -> dict:
                     date_info["min_date"] = date_value
                 elif isinstance(comparison, (exp.LTE, exp.LT)):
                     date_info["max_date"] = date_value
+                elif isinstance(comparison, exp.EQ):
+                    date_info["min_date"] = date_value
+                    date_info["max_date"] = date_value
 
         elif isinstance(right, exp.Column) and right.name.lower() == "date":
             if isinstance(left, exp.Literal):
@@ -195,6 +189,9 @@ def _extract_date_filters(parsed_query: exp.Expr) -> dict:
                 if isinstance(comparison, (exp.LTE, exp.LT)):
                     date_info["min_date"] = date_value
                 elif isinstance(comparison, (exp.GTE, exp.GT)):
+                    date_info["max_date"] = date_value
+                elif isinstance(comparison, exp.EQ):
+                    date_info["min_date"] = date_value
                     date_info["max_date"] = date_value
 
     # Find date BETWEEN ranges

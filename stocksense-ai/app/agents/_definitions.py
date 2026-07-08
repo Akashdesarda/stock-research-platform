@@ -47,12 +47,12 @@ text_to_sql = Agent(
     use_instruction_tags=True,
     dependencies={"exchange": "nse"},  # default dependency
     output_schema=TextToSQLOutput,
-    use_json_mode=True,
     tools=[
         verify_duckdb_sql_query_syntax,
         verify_table_name,
         verify_sql_query_returns_data,
     ],
+    tool_call_limit=9,
     debug_mode=True,
 )
 
@@ -92,14 +92,6 @@ company_summary = Agent(
         api_key=settings.get_model_api_keys(settings.ai.company_summary_model),
         base_url=settings.get_model_base_url(settings.ai.company_summary_model),
     ),
-    # REVIEW - Do I really need to enable followups for this agent?
-    # followups=True,
-    # num_followups=4,
-    # followup_model=get_model(
-    #     model_name="ica:ibm/granite-4-h-small",
-    #     api_key=settings.ai.ICA_API_KEY,
-    #     base_url=settings.get_model_base_url("ica:ibm/granite-4-h-small"),
-    # ),
     instructions=pm.get_prompt("company_summary", "instructions"),
     expected_output=pm.get_prompt("company_summary", "expected_output"),
     stream=True,

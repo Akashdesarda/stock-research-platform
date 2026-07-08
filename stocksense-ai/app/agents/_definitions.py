@@ -47,13 +47,12 @@ text_to_sql = Agent(
     use_instruction_tags=True,
     dependencies={"exchange": "nse"},  # default dependency
     output_schema=TextToSQLOutput,
-    # use_json_mode=True,
     tools=[
         verify_duckdb_sql_query_syntax,
         verify_table_name,
         verify_sql_query_returns_data,
     ],
-    tool_call_limit=4,
+    tool_call_limit=9,
     debug_mode=True,
 )
 

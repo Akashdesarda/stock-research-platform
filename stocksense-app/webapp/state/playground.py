@@ -6,10 +6,11 @@ from typing import Any
 import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
+from agno.client import AgentOSClient
+from agno.run import agent
 from httpx import AsyncClient
 from stocksense.config import get_settings
 from stocksense.types import (
-    AgentStructuredResponse,
     DataInterval,
     DataPeriod,
 )
@@ -43,6 +44,7 @@ class DataState(TickerSelectionMixin, rx.State):
     # AI workflow fields
     ai_use_cache: bool = True
     ai_prompt: str = ""
+    ai_run_id: str = ""
     ai_generated_sql: str = ""
     ai_sql_query: str = ""
     ai_thinking_part: str = ""
@@ -66,13 +68,17 @@ class DataState(TickerSelectionMixin, rx.State):
     dataset_tags: list[str] = []
     register_dialog_open: bool = False
 
-    def _client(self) -> AsyncClient:
+    def _stockdb_client(self) -> AsyncClient:
         """Return a configured httpx AsyncClient."""
         return AsyncClient(
             timeout=None,
             follow_redirects=True,
             base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
         )
+
+    def _ai_client(self) -> AgentOSClient:
+        """Return a configured AgentOSClient."""
+        return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
 
     @rx.event
     def set_interval(self, value: str):
@@ -175,10 +181,7 @@ class DataState(TickerSelectionMixin, rx.State):
             self.fetch_data_ready = False
             self.ai_error = ""
             self.data = []
-            if self.index_choice:
-                self.dataset_tags = [self.index_choice]
-            else:
-                self.dataset_tags = []
+            self.dataset_tags = [self.index_choice] if self.index_choice else []
             self._cancel_event.clear()
             tickers = self.selected_ticker
             use_sql = bool(self.sql_query.strip())
@@ -213,16 +216,14 @@ class DataState(TickerSelectionMixin, rx.State):
             self.ai_status_message = "Generating SQL query"
             self.ai_status_steps = ["Initializing text-to-SQL agent..."]
 
-            use_cache = bool(self.ai_use_cache)
+            use_cache = self.ai_use_cache
 
         try:
             # Cache lookup (best-effort). Do not mutate the user's cache preference.
             if use_cache:
                 async with self:
                     self.ai_status_steps.append("Checking prompt cache...")
-                retrieved_cache = await self._try_fetch_cached_sql(
-                    self.ai_prompt
-                )
+                retrieved_cache = await self._fetch_cached_sql(self.ai_prompt)
                 if retrieved_cache is not None:
                     cached_sql, cached_thinking = retrieved_cache
                     async with self:
@@ -246,13 +247,10 @@ class DataState(TickerSelectionMixin, rx.State):
             logger.exception("Error generating SQL", exc_info=e)
             async with self:
                 self.ai_error = (
-                    f"Failed to generate SQL query due to error: {e}. "
-                    "Please try again."
+                    f"Failed to generate SQL query due to error: {e}. Please try again."
                 )
                 self.ai_status_message = ""
-                self.ai_status_steps.append(
-                    f"Generation failed: {type(e).__name__}"
-                )
+                self.ai_status_steps.append(f"Generation failed: {type(e).__name__}")
 
         finally:
             async with self:
@@ -287,7 +285,7 @@ class DataState(TickerSelectionMixin, rx.State):
             "tags": self.dataset_tags,
         }
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.put(
                     url="/operation/data/register", json=payload
                 )
@@ -304,12 +302,10 @@ class DataState(TickerSelectionMixin, rx.State):
                 position="bottom-right",
             )
 
-    async def _try_fetch_cached_sql(
-        self, prompt: str
-    ) -> tuple[str, str] | None:
+    async def _fetch_cached_sql(self, prompt: str) -> tuple[str, str] | None:
         """Try to fetch cached SQL for a prompt"""
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.post(
                     url="/operation/prompt/search",
                     json={
@@ -324,46 +320,80 @@ class DataState(TickerSelectionMixin, rx.State):
             return payload.get("response", ""), payload.get("thinking", "")
 
         except Exception as e:
-            logger.error(
-                f"Cache lookup returned non-JSON due to {e}; treating as miss"
-            )
+            logger.error(f"Cache lookup returned non-JSON due to {e}; treating as miss")
 
-    async def _generate_sql_via_llm(self, prompt: str):
-        """Generate SQL using the LLM agent"""
-        async with self:
-            self.ai_status_steps.append(
-                f"Running model: {settings.ai.text_to_sql_model}."
-            )
-
-        # send the request
+    async def _put_cache_generated_sql(self, prompt):
+        """Put the generated SQL into the cache"""
         try:
-            async with self._client() as client:
-                response = await client.post(
-                    "/agent/text-to-sql",
+            async with self._stockdb_client() as client:
+                response = await client.put(
+                    url="/operation/prompt/cache",
                     json={
+                        "agent": "text-to-sql",
                         "prompt": prompt,
                         "model": settings.ai.text_to_sql_model,
-                        "exchange": self.selected_exchange,
-                        "session_id": str(uuid.uuid4()),
+                        "response": self.ai_generated_sql,
+                        "thinking": self.ai_thinking_part,
                     },
                 )
                 # Ensure non-2xx responses surface as HTTPStatusError
                 response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Cache update failed: {e}")
 
-                result = AgentStructuredResponse.model_validate(response.json())
+    async def _generate_sql_via_llm(self, prompt: str):
+        """Generate SQL using the LLM agent"""
+        # send the request
+        try:
+            client = self._ai_client()
+            # Agent stream event
+            async for event in client.run_agent_stream(
+                agent_id="text-to-sql",
+                message=prompt,
+                dependencies={"exchange": self.selected_exchange},
+            ):
+                if isinstance(event, agent.RunStartedEvent):
+                    logger.debug(
+                        f"{event.agent_id} agent run started with run id: {event.run_id}"
+                    )
+                    async with self:
+                        self.ai_run_id = event.run_id or "unknown"
+                        self.ai_status_steps.append(f"Running model: {event.model}")
+                elif isinstance(event, agent.ToolCallStartedEvent):
+                    async with self:
+                        self.ai_status_steps.append(
+                            f"Using tool {event.tool.tool_name}"
+                        )
+                elif isinstance(event, agent.ToolCallCompletedEvent):
+                    async with self:
+                        self.ai_status_steps.append(
+                            f"Tool {event.tool.tool_name} completed"
+                        )
+                elif isinstance(event, agent.ToolCallErrorEvent):
+                    async with self:
+                        self.ai_status_steps.append(
+                            f"Tool {event.tool.tool_name} failed"
+                        )
+                elif isinstance(event, agent.RunCompletedEvent):
+                    logger.debug(f"{event.agent_id} agent run finished")
+                    result = event
+
+                    # updating UI state with LLM response
+                    async with self:
+                        self.ai_thinking_part = result.reasoning_content or ""
+                        self.ai_generated_sql = result.content.get("sql_query", "")
+                        self.ai_sql_query = result.content.get("sql_query", "")
+                        # TODO - add tool calls to steps
+                        self.ai_status_steps.append("SQL query generated successfully.")
+                        self.ai_status_message = "SQL query generated successfully."
+
+                    # Cache the generated SQL for future requests
+                    await self._put_cache_generated_sql(prompt)
+
         except Exception as e:
             logger.error(f"Error during LLM generation: {e}")
             async with self:
                 return
-
-        # updating UI state with LLM response
-        async with self:
-            self.ai_thinking_part = result.thinking or ""
-            self.ai_generated_sql = result.content.get("sql_query", "")
-            self.ai_sql_query = result.content.get("sql_query", "")
-            # TODO - add tool calls to steps
-            self.ai_status_steps.append("SQL query generated successfully.")
-            self.ai_status_message = "SQL query generated successfully."
 
     async def _process_results(self, data: pl.LazyFrame):
         """Process and set results from a Polars DataFrame."""
@@ -387,7 +417,7 @@ class DataState(TickerSelectionMixin, rx.State):
 
     async def _fetch_via_sql_api(self):
         """Fetch data using the SQL API"""
-        async with self._client() as client:
+        async with self._stockdb_client() as client:
             response = await client.post(
                 url="/bulk/ticker/query",
                 json={
@@ -405,12 +435,10 @@ class DataState(TickerSelectionMixin, rx.State):
             data = pl.LazyFrame(result)
         await self._process_results(data)
 
-    async def _fetch_via_ticker_api(
-        self, tickers: list[str], history_params: dict
-    ):
+    async def _fetch_via_ticker_api(self, tickers: list[str], history_params: dict):
         """Fetch data by using Bulk history API"""
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 resp = await client.post(
                     url="/bulk/ticker/history",
                     json={
@@ -527,9 +555,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
     def set_selected_dataset_ids(self, value: list[dict]):
         """Set selected dataset ids from grid row selection."""
         self.selected_dataset_ids = [
-            str(row.get("dataset_id", ""))
-            for row in value
-            if row.get("dataset_id")
+            str(row.get("dataset_id", "")) for row in value if row.get("dataset_id")
         ]
         self.selected_dataset_id = (
             self.selected_dataset_ids[0] if self.selected_dataset_ids else ""
@@ -616,9 +642,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
             logical_plan = data.get("logical_plan") or {}
             exchange = logical_plan.get("exchange") or ""
             ticker = logical_plan.get("ticker") or []
-            interval = (
-                logical_plan.get("interval") or DataInterval.ONE_DAY.value
-            )
+            interval = logical_plan.get("interval") or DataInterval.ONE_DAY.value
             period = logical_plan.get("period") or DataPeriod.SIX_MONTHS.value
             start_date = logical_plan.get("start_date") or ""
             end_date = logical_plan.get("end_date") or ""
@@ -635,9 +659,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
                 exchanges = await self.available_exchanges
                 matched = exchanges.filter(pl.col("symbol") == exchange)
                 if not matched.is_empty():
-                    self.selected_exchange_dropdown = matched.select(
-                        "dropdown"
-                    ).item()
+                    self.selected_exchange_dropdown = matched.select("dropdown").item()
 
             self.selected_ticker = ticker
             self.selected_ticker_dropdown = ""
@@ -691,9 +713,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
         logical_plan = {
             "exchange": self.selected_exchange,
             "ticker": self.selected_ticker or None,
-            "interval": None
-            if self.sql_query.strip()
-            else (self.interval or None),
+            "interval": None if self.sql_query.strip() else (self.interval or None),
             "period": None
             if self.sql_query.strip() or (self.date_start and self.date_end)
             else (self.period or None),
@@ -704,9 +724,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
 
         payload = {
             "dataset_id": self.selected_dataset_id,
-            "name": self.edit_dataset_name
-            if len(self.edit_dataset_name) > 0
-            else None,
+            "name": self.edit_dataset_name if len(self.edit_dataset_name) > 0 else None,
             "description": self.edit_dataset_description
             if len(self.edit_dataset_description) > 0
             else None,

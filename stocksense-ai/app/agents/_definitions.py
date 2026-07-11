@@ -46,6 +46,7 @@ text_to_sql = Agent(
     ),
     use_instruction_tags=True,
     dependencies={"exchange": "nse"},  # default dependency
+    add_dependencies_to_context=True,
     output_schema=TextToSQLOutput,
     tools=[
         verify_duckdb_sql_query_syntax,

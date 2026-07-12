@@ -269,9 +269,9 @@ def manual_panel() -> rx.Component:
                 on_change=DataState.set_preview_enabled,
             ),
             rx.cond(
-                DataState.ai_error != "",
+                DataState.agent_error != "",
                 rx.callout(
-                    DataState.ai_error,
+                    DataState.agent_error,
                     icon="triangle_alert",
                     color_scheme="red",
                     width="100%",
@@ -312,23 +312,28 @@ def ai_panel() -> rx.Component:
                 ),
                 submit_button(
                     on_click=DataState.generate_text_to_sql,
-                    disabled=DataState.ai_is_generating
+                    disabled=DataState.agent_is_generating
                     | (DataState.ai_prompt == "")
                     | (DataState.selected_exchange == ""),
                 ),
                 rx.cond(
-                    DataState.ai_is_generating
-                    | (DataState.ai_status_message != ""),
+                    DataState.agent_is_generating,
+                    cancel_button(on_click=DataState.cancel_agent_run),
+                    rx.fragment(),
+                ),
+                rx.cond(
+                    DataState.agent_is_generating
+                    | (DataState.agent_status_message != ""),
                     rx.callout(
                         rx.vstack(
                             rx.hstack(
                                 rx.cond(
-                                    DataState.ai_is_generating,
+                                    DataState.agent_is_generating,
                                     rx.spinner(size="2"),
                                     rx.icon("check", size=16),
                                 ),
                                 rx.text(
-                                    DataState.ai_status_message,
+                                    DataState.agent_status_message,
                                     size="2",
                                     weight="medium",
                                 ),
@@ -336,7 +341,7 @@ def ai_panel() -> rx.Component:
                                 align="center",
                             ),
                             rx.foreach(
-                                DataState.ai_status_steps,
+                                DataState.agent_steps,
                                 lambda step: rx.hstack(
                                     rx.icon("check", size=16, color="green"),
                                     rx.text(step, size="2", color="gray"),
@@ -354,9 +359,9 @@ def ai_panel() -> rx.Component:
                     rx.fragment(),
                 ),
                 rx.cond(
-                    DataState.ai_error != "",
+                    DataState.agent_error != "",
                     rx.callout(
-                        DataState.ai_error,
+                        DataState.agent_error,
                         icon="triangle_alert",
                         color_scheme="red",
                         width="100%",

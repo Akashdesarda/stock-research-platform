@@ -1,11 +1,15 @@
-from typing import Literal
+import logging
+from typing import Awaitable, Callable, Literal
 
 import polars as pl
 import reflex as rx
+from agno.client import AgentOSClient
+from agno.run import agent as agent_event
 from httpx import AsyncClient
 from pydantic import BaseModel
 from stocksense.config import get_settings
 
+logger = logging.getLogger("stocksense")
 settings = get_settings()
 
 
@@ -31,10 +35,12 @@ class CommonMixin(rx.State, mixin=True):
             # NOTE - response --> [exchange_symbol: exchange_name]
             exch_response = response.json()
             # NOTE - df --> | exch_symbol | exch_name | exch_name (exch_symbol) |
-            return pl.DataFrame({
-                "symbol": exch_response.keys(),
-                "name": exch_response.values(),
-            }).with_columns(dropdown=pl.col("name") + " (" + pl.col("symbol") + ")")
+            return pl.DataFrame(
+                {
+                    "symbol": exch_response.keys(),
+                    "name": exch_response.values(),
+                }
+            ).with_columns(dropdown=pl.col("name") + " (" + pl.col("symbol") + ")")
 
     @rx.var
     async def exchange_dropdown_list(self) -> list[str]:
@@ -58,10 +64,12 @@ class CommonMixin(rx.State, mixin=True):
 
             for exch in available_tickers:
                 if not tickers_wrt_exchange[exch]:
-                    available_tickers[exch] = pl.DataFrame({
-                        "ticker": [],
-                        "company": [],
-                    }).with_columns(dropdown=pl.lit(""))
+                    available_tickers[exch] = pl.DataFrame(
+                        {
+                            "ticker": [],
+                            "company": [],
+                        }
+                    ).with_columns(dropdown=pl.lit(""))
                 else:
                     available_tickers[exch] = pl.DataFrame(tickers_wrt_exchange[exch])
                     available_tickers[exch] = available_tickers[exch].with_columns(
@@ -105,8 +113,7 @@ class CommonMixin(rx.State, mixin=True):
         _ = await self.available_tickers
         df = _[self.selected_exchange]
         self.selected_ticker = (
-            df
-            .filter(pl.col("dropdown").is_in(dropdown_values))
+            df.filter(pl.col("dropdown").is_in(dropdown_values))
             .select("ticker")
             .to_series()
             .to_list()
@@ -234,3 +241,140 @@ class ChatMixin(rx.State, mixin=True):
         # Reset the prompt only if the message is from the user
         if role == "user":
             yield type(self).reset_prompt
+
+
+class AgentRunMixin(rx.State, mixin=True):
+    """A mixin state for common agent run data."""
+
+    agent_is_generating: bool = False  # Single busy flag: drives the spinner, disables the button, gates cancel, and prevents overlapping runs.
+    agent_run_id: str = ""
+    agent_error: str = ""
+    agent_status_message: str = ""
+    agent_steps: list[str] = []
+
+    _active_agent_id: str = ""
+
+    async def stream_agent_run(
+        self,
+        *,
+        agent_id: str,
+        message: str,
+        dependencies: dict | None = None,
+        on_content: Callable[[agent_event.RunOutputEvent], Awaitable[None]]
+        | None = None,
+        on_complete: Callable[[agent_event.RunOutputEvent], Awaitable[None]]
+        | None = None,
+        manage_lifecycle: bool = True,
+    ):
+        # manage_lifecycle=True: the mixin owns the agent_is_generating window (sets/resets + guards).
+        # manage_lifecycle=False: the caller owns it (e.g. to wrap pre-stream work like cache lookup).
+        # Record the active agent id up front (always, regardless of lifecycle mode) so
+        # cancel_agent_run can target the right run even when manage_lifecycle=False.
+        async with self:
+            self._active_agent_id = agent_id
+
+        if manage_lifecycle:
+            if self.agent_is_generating:
+                # Guard: a run is already in flight, ignore the new request (prevents overlapping runs).
+                return
+
+            # Update UI state before starting the agent run
+            async with self:
+                # Mark busy: flips button to disabled + shows spinner in the UI.
+                self.agent_is_generating = True
+                self.agent_error = ""
+                self.agent_status_message = "Generating…"
+                self.agent_steps = []
+                self.agent_run_id = ""
+
+        try:
+            client = self._ai_client()
+            completed = None
+
+            async for event in client.run_agent_stream(
+                agent_id=agent_id, message=message, dependencies=dependencies
+            ):
+                if isinstance(event, agent_event.RunStartedEvent):
+                    async with self:
+                        self.agent_run_id = event.run_id
+                        self.agent_steps.append(f"Running model: {event.model}")
+                        logger.debug(
+                            f"using model {event.model} for agent: {agent_id} with run_id: {self.agent_run_id}"
+                        )
+                # Tool calling events
+                elif isinstance(event, agent_event.ToolCallStartedEvent):
+                    async with self:
+                        self.agent_steps.append(f"Calling tool {event.tool.tool_name}")
+                elif isinstance(event, agent_event.ToolCallCompletedEvent):
+                    async with self:
+                        self.agent_steps.append(f"Tool {event.tool.tool_name} completed")
+                elif isinstance(event, agent_event.ToolCallErrorEvent):
+                    async with self:
+                        self.agent_steps.append(f"Tool {event.tool.tool_name} failed")
+                # Content delta event
+                elif isinstance(event, agent_event.RunContentEvent):
+                    if on_content:
+                        await on_content(event)
+                # Cancellation event
+                elif isinstance(event, agent_event.RunCancelledEvent):
+                    async with self:
+                        self.agent_status_message = "Request Cancelled"
+                        self.agent_steps.append(f"Run cancelled: {event.reason or ''}")
+                    return
+                # Error event
+                elif isinstance(event, agent_event.RunErrorEvent):
+                    async with self:
+                        self.agent_error = (
+                            f"Agent run failed: {event.content or event.error_type}"
+                        )
+                        self.agent_status_message = (
+                            "Generation failed. Please try again later."
+                        )
+                    return
+                # Completion event
+                elif isinstance(event, agent_event.RunCompletedEvent):
+                    completed = event
+                    logger.debug(f"{completed.run_id} agent run completed successfully")
+
+            # processing the completion event
+            if completed is None:
+                async with self:
+                    self.agent_error = "Generation ended without a completion event."
+                    self.agent_status_message = "Generation failed."
+                return
+            if on_complete:
+                await on_complete(completed)
+
+        except Exception as e:
+            logger.exception("Agent stream failed", exc_info=e)
+            async with self:
+                self.agent_error = f"Failed to generate due to error: {e}."
+                self.agent_status_message = ""
+
+        finally:
+            if manage_lifecycle:
+                async with self:
+                    # Clear busy: re-enables the button and flips the spinner to the check icon.
+                    self.agent_is_generating = False
+
+    @rx.event
+    async def cancel_agent_run(self):
+        """Request server-side cancellation of the active run."""
+        if not self.agent_is_generating or not self.agent_run_id:
+            # No live run (or no run id yet) — nothing to cancel, so this is a no-op.
+            return
+        try:
+            client = self._ai_client()
+            await client.cancel_agent_run(
+                agent_id=self._active_agent_id,
+                run_id=self.agent_run_id,
+            )
+            async with self:
+                self.agent_steps.append("Cancellation requested")
+        except Exception as e:
+            logger.error("Cancel request failed", exc_info=e)
+            async with self:
+                self.agent_error = f"Failed to cancel run: {e}"
+
+    def _ai_client(self) -> AgentOSClient:
+        return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")

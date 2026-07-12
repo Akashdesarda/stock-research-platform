@@ -6,7 +6,6 @@ from typing import Any
 import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
-from agno.client import AgentOSClient
 from agno.run import agent
 from httpx import AsyncClient
 from stocksense.config import get_settings
@@ -15,7 +14,7 @@ from stocksense.types import (
     DataPeriod,
 )
 
-from webapp.state.shared import TickerSelectionMixin
+from webapp.state.shared import AgentRunMixin, TickerSelectionMixin
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -30,7 +29,7 @@ POLARS_AG_GRID_FILTER_MAP = {
 }
 
 
-class DataState(TickerSelectionMixin, rx.State):
+class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     """State for the Playground → Data page (manual + AI workflows)."""
 
     # Manual form fields
@@ -44,14 +43,9 @@ class DataState(TickerSelectionMixin, rx.State):
     # AI workflow fields
     ai_use_cache: bool = True
     ai_prompt: str = ""
-    ai_run_id: str = ""
     ai_generated_sql: str = ""
     ai_sql_query: str = ""
     ai_thinking_part: str = ""
-    ai_status_message: str = ""
-    ai_status_steps: list[str] = []
-    ai_is_generating: bool = False
-    ai_error: str = ""
     # TODO - add prompt cache/history
 
     # Submit state
@@ -75,10 +69,6 @@ class DataState(TickerSelectionMixin, rx.State):
             follow_redirects=True,
             base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
         )
-
-    def _ai_client(self) -> AgentOSClient:
-        """Return a configured AgentOSClient."""
-        return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
 
     @rx.event
     def set_interval(self, value: str):
@@ -105,19 +95,19 @@ class DataState(TickerSelectionMixin, rx.State):
         self.ai_prompt = value
         self.ai_generated_sql = ""
         self.ai_sql_query = ""
-        self.ai_status_message = ""
-        self.ai_status_steps = []
-        self.ai_error = ""
+        self.agent_status_message = ""
+        self.agent_steps = []
+        self.agent_error = ""
 
     @rx.event
     def set_ai_use_cache(self, value: bool):
         self.ai_use_cache = value
         if not value:
-            self.ai_status_steps.append(
+            self.agent_steps.append(
                 "Cache disabled, will generate new SQL on next generation."
             )
         else:
-            self.ai_status_steps.append(
+            self.agent_steps.append(
                 "Cache enabled, will attempt to fetch from cache on next generation."
             )
 
@@ -179,7 +169,7 @@ class DataState(TickerSelectionMixin, rx.State):
                 return
             self.is_loading = True
             self.fetch_data_ready = False
-            self.ai_error = ""
+            self.agent_error = ""
             self.data = []
             self.dataset_tags = [self.index_choice] if self.index_choice else []
             self._cancel_event.clear()
@@ -205,24 +195,25 @@ class DataState(TickerSelectionMixin, rx.State):
     @rx.event(background=True)
     async def generate_text_to_sql(self):
         """Generate SQL query from the AI prompt."""
+        if self.agent_is_generating:
+            # Guard: text-to-sql owns the busy window (manage_lifecycle=False), so this is the active re-entrancy check.
+            return
         async with self:
-            if self.ai_is_generating:
-                return
-            self.ai_is_generating = True
+            # Mark busy up front so the cache lookup below is also guarded against double-clicks.
+            self.agent_is_generating = True
+            self.agent_error = ""
+            self.agent_status_message = "Generating SQL query"
+            self.agent_steps = ["Initializing text-to-SQL agent..."]
             self.ai_generated_sql = ""
             self.ai_sql_query = ""
             self.ai_thinking_part = ""
-            self.ai_error = ""
-            self.ai_status_message = "Generating SQL query"
-            self.ai_status_steps = ["Initializing text-to-SQL agent..."]
-
             use_cache = self.ai_use_cache
 
         try:
             # Cache lookup (best-effort). Do not mutate the user's cache preference.
             if use_cache:
                 async with self:
-                    self.ai_status_steps.append("Checking prompt cache...")
+                    self.agent_steps.append("Checking prompt cache...")
                 retrieved_cache = await self._fetch_cached_sql(self.ai_prompt)
                 if retrieved_cache is not None:
                     cached_sql, cached_thinking = retrieved_cache
@@ -230,31 +221,44 @@ class DataState(TickerSelectionMixin, rx.State):
                         self.ai_generated_sql = cached_sql
                         self.ai_sql_query = cached_sql
                         self.ai_thinking_part = cached_thinking
-                        self.ai_status_steps.append("Fetched SQL from cache.")
-                        self.ai_status_message = (
+                        self.agent_steps.append("Fetched SQL from cache.")
+                        self.agent_status_message = (
                             "SQL query generated successfully (from cache)."
                         )
                     return
 
                 async with self:
-                    self.ai_status_steps.append(
+                    self.agent_steps.append(
                         "No cache entry found; generating via model."
                     )
 
-            await self._generate_sql_via_llm(self.ai_prompt)
+            await self.stream_agent_run(
+                agent_id="text-to-sql",
+                message=self.ai_prompt,
+                dependencies={
+                    "exchange": self.selected_exchange,
+                    "ticker": self.selected_ticker,
+                },
+                on_content=None,
+                on_complete=self._t2sql_on_completed,
+                # manage_lifecycle=False: we already own the busy window (set at top, reset in finally) so the
+                # mixin won't re-guard or re-reset and skip this stream.
+                manage_lifecycle=False,
+            )
 
         except Exception as e:
             logger.exception("Error generating SQL", exc_info=e)
             async with self:
-                self.ai_error = (
+                self.agent_error = (
                     f"Failed to generate SQL query due to error: {e}. Please try again."
                 )
-                self.ai_status_message = ""
-                self.ai_status_steps.append(f"Generation failed: {type(e).__name__}")
+                self.agent_status_message = ""
+                self.agent_steps.append(f"Generation failed: {type(e).__name__}")
 
         finally:
             async with self:
-                self.ai_is_generating = False
+                # We own lifecycle (manage_lifecycle=False), so clear busy ourselves once cache+stream are done.
+                self.agent_is_generating = False
 
     @rx.event
     async def register_dataset(self):
@@ -341,59 +345,26 @@ class DataState(TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.error(f"Cache update failed: {e}")
 
-    async def _generate_sql_via_llm(self, prompt: str):
-        """Generate SQL using the LLM agent"""
-        # send the request
-        try:
-            client = self._ai_client()
-            # Agent stream event
-            async for event in client.run_agent_stream(
-                agent_id="text-to-sql",
-                message=prompt,
-                dependencies={"exchange": self.selected_exchange},
-            ):
-                if isinstance(event, agent.RunStartedEvent):
-                    logger.debug(
-                        f"{event.agent_id} agent run started with run id: {event.run_id}"
-                    )
-                    async with self:
-                        self.ai_run_id = event.run_id or "unknown"
-                        self.ai_status_steps.append(f"Running model: {event.model}")
-                elif isinstance(event, agent.ToolCallStartedEvent):
-                    async with self:
-                        self.ai_status_steps.append(
-                            f"Using tool {event.tool.tool_name}"
-                        )
-                elif isinstance(event, agent.ToolCallCompletedEvent):
-                    async with self:
-                        self.ai_status_steps.append(
-                            f"Tool {event.tool.tool_name} completed"
-                        )
-                elif isinstance(event, agent.ToolCallErrorEvent):
-                    async with self:
-                        self.ai_status_steps.append(
-                            f"Tool {event.tool.tool_name} failed"
-                        )
-                elif isinstance(event, agent.RunCompletedEvent):
-                    logger.debug(f"{event.agent_id} agent run finished")
-                    result = event
+    async def _t2sql_on_completed(self, completed: agent.RunOutputEvent):
+        """Handle the final text-to-SQL result from the shared agent run.
 
-                    # updating UI state with LLM response
-                    async with self:
-                        self.ai_thinking_part = result.reasoning_content or ""
-                        self.ai_generated_sql = result.content.get("sql_query", "")
-                        self.ai_sql_query = result.content.get("sql_query", "")
-                        # TODO - add tool calls to steps
-                        self.ai_status_steps.append("SQL query generated successfully.")
-                        self.ai_status_message = "SQL query generated successfully."
+        ``ai_generated_sql`` is the canonical LLM output; ``ai_sql_query`` is the
+        editable copy the user can tweak before running the query.
+        """
+        content = completed.content or {}
+        if hasattr(content, "model_dump"):
+            content = content.model_dump()
+        sql = content.get("sql_query", "") if isinstance(content, dict) else ""
 
-                    # Cache the generated SQL for future requests
-                    await self._put_cache_generated_sql(prompt)
+        async with self:
+            self.ai_thinking_part = completed.reasoning_content or self.ai_thinking_part
+            self.ai_generated_sql = sql
+            self.ai_sql_query = sql
+            self.agent_steps.append("SQL query generated successfully.")
+            self.agent_status_message = "SQL query generated successfully."
 
-        except Exception as e:
-            logger.error(f"Error during LLM generation: {e}")
-            async with self:
-                return
+        if sql:
+            await self._put_cache_generated_sql(self.ai_prompt)
 
     async def _process_results(self, data: pl.LazyFrame):
         """Process and set results from a Polars DataFrame."""
@@ -427,7 +398,7 @@ class DataState(TickerSelectionMixin, rx.State):
             )
             if response.is_error:
                 async with self:
-                    self.ai_error = f"Error fetching data: {response.text}"
+                    self.agent_error = f"Error fetching data: {response.text}"
                     self.is_loading = False
                 return
 

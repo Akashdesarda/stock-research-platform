@@ -26,12 +26,6 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
     last_summary_exchange: str = ""
     last_summary_ticker: str = ""
 
-    # Index of the assistant message currently being streamed into (UI display).
-    _stream_message_index: int = -1
-    # Agno emits *delta* chunks via RunContentEvent.content so we accumulate deltas here and mirror
-    # them onto the placeholder message.
-    _stream_content: str = ""
-
     @rx.event(background=True)
     async def generate_summary(self):
         if self.agent_is_generating or not self.selected_ticker:
@@ -54,10 +48,8 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
                 self.summary_result = ""
 
             # else: same company -> reuse current_session_id and keep messages.
-            self._stream_content = ""
             self.messages.append(Message(role="user", content=prompt))
             self.messages.append(Message(role="assistant", content=""))
-            self._stream_message_index = len(self.messages) - 1
 
         # manage_lifecycle=True: AgentRunMixin owns busy flag, status, steps, error handling, UI reset
         await self.stream_agent_run(
@@ -83,11 +75,9 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
 
         async with self:
             self.is_loading = True
-            self._stream_content = ""
             self.messages.append(Message(role="user", content=prompt))
-            self.prompt = ""
+            self.prompt = ""  # rest the user prompt input field.
             self.messages.append(Message(role="assistant", content=""))
-            self._stream_message_index = len(self.messages) - 1
 
         # Reuse the exact session generate_summary created earlier (no dependencies:
         # exchange/ticker already live in the agent's session_state).
@@ -105,40 +95,32 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
             self.is_loading = False
 
     async def _on_content(self, event: RunContentEvent):
-        """Append each text delta to the accumulator"""
+        """Append each text delta to the streaming assistant message."""
         async with self:
-            self._stream_content += event.content or ""
-            if 0 <= self._stream_message_index < len(self.messages):
-                self.messages[self._stream_message_index] = Message(
-                    role="assistant", content=self._stream_content
+            if self.messages and self.messages[-1].role == "assistant":
+                # adding next delta text to previous text content
+                last = self.messages[-1]
+                self.messages[-1] = Message(
+                    role="assistant", content=last.content + (event.content or "")
                 )
 
     async def _on_summary_completed(self, completed: RunCompletedEvent):
         async with self:
-            # RunCompletedEvent.content is the full accumulated text. using it as authoritative final value
-            self._stream_content = (
-                completed.content
-                if isinstance(completed.content, str)
-                else str(completed.content or "")
-            )
-            self.summary_result = self._stream_content
-            if 0 <= self._stream_message_index < len(self.messages):
-                self.messages[self._stream_message_index] = Message(
-                    role="assistant", content=self._stream_content
-                )
+            # RunCompletedEvent.content is the full accumulated text; use it as the
+            # authoritative final value for the streaming assistant message.
+            final_content = completed.content or ""
+
+            if self.messages and self.messages[-1].role == "assistant":
+                self.messages[-1] = Message(role="assistant", content=final_content)
+            self.summary_result = final_content
             self.agent_steps.append("Summary generated successfully")
             self.agent_status_message = "Company summary generated"
 
     async def _on_qa_completed(self, completed):
         async with self:
-            # Full accumulated text from the completed event.
-            self._stream_content = (
-                completed.content
-                if isinstance(completed.content, str)
-                else str(completed.content or "")
-            )
-            if 0 <= self._stream_message_index < len(self.messages):
-                self.messages[self._stream_message_index] = Message(
-                    role="assistant", content=self._stream_content
+            if self.messages and self.messages[-1].role == "assistant":
+                # latest message is the streaming assistant message, update it with Full accumulated text.
+                self.messages[-1] = Message(
+                    role="assistant", content=completed.content or ""
                 )
             self.agent_status_message = ""

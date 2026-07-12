@@ -254,26 +254,40 @@ class AgentRunMixin(rx.State, mixin=True):
 
     _active_agent_id: str = ""
 
+    async def agent_run(self, **kwargs) -> agent_event.RunOutput:
+        async with self:
+            self._active_agent_id = kwargs["agent_id"]
+        try:
+            client = self._ai_client()
+            run_output = await client.run_agent(**kwargs)
+            async with self:
+                self.agent_run_id = run_output.run_id
+            return run_output
+
+        except Exception as e:
+            logger.exception("Agent stream failed", exc_info=e)
+            async with self:
+                self.agent_error = f"Failed to generate due to error: {e}."
+            # Re-raise to preserve return type contract
+            raise
+
     async def stream_agent_run(
         self,
-        *,
-        agent_id: str,
-        message: str,
-        dependencies: dict | None = None,
-        on_content: Callable[[agent_event.RunOutputEvent], Awaitable[None]]
+        on_content: Callable[[agent_event.RunContentEvent], Awaitable[None]]
         | None = None,
-        on_complete: Callable[[agent_event.RunOutputEvent], Awaitable[None]]
+        on_complete: Callable[[agent_event.RunCompletedEvent], Awaitable[None]]
         | None = None,
         manage_lifecycle: bool = True,
+        **kwargs,
     ):
-        # manage_lifecycle=True: the mixin owns the agent_is_generating window (sets/resets + guards).
-        # manage_lifecycle=False: the caller owns it (e.g. to wrap pre-stream work like cache lookup).
-        # Record the active agent id up front (always, regardless of lifecycle mode) so
-        # cancel_agent_run can target the right run even when manage_lifecycle=False.
         async with self:
-            self._active_agent_id = agent_id
+            # Record the active agent id up front (always, regardless of lifecycle mode) so
+            # cancel_agent_run can target the right run even when manage_lifecycle=False.
+            self._active_agent_id = kwargs["agent_id"]
 
         if manage_lifecycle:
+            # manage_lifecycle=True: the mixin owns the agent_is_generating window (sets/resets + guards).
+            # manage_lifecycle=False: the caller owns it (e.g. to wrap pre-stream work like cache lookup).
             if self.agent_is_generating:
                 # Guard: a run is already in flight, ignore the new request (prevents overlapping runs).
                 return
@@ -291,26 +305,33 @@ class AgentRunMixin(rx.State, mixin=True):
             client = self._ai_client()
             completed = None
 
-            async for event in client.run_agent_stream(
-                agent_id=agent_id, message=message, dependencies=dependencies
-            ):
+            async for event in client.run_agent_stream(**kwargs):
                 if isinstance(event, agent_event.RunStartedEvent):
                     async with self:
                         self.agent_run_id = event.run_id
                         self.agent_steps.append(f"Running model: {event.model}")
                         logger.debug(
-                            f"using model {event.model} for agent: {agent_id} with run_id: {self.agent_run_id}"
+                            f"using model {event.model} for agent: {event.agent_id} with run_id: {self.agent_run_id}"
                         )
-                # Tool calling events
+                # Tool calling events - guard against None tool
                 elif isinstance(event, agent_event.ToolCallStartedEvent):
-                    async with self:
-                        self.agent_steps.append(f"Calling tool {event.tool.tool_name}")
+                    if event.tool and event.tool.tool_name:
+                        async with self:
+                            self.agent_steps.append(
+                                f"Calling tool {event.tool.tool_name}"
+                            )
                 elif isinstance(event, agent_event.ToolCallCompletedEvent):
-                    async with self:
-                        self.agent_steps.append(f"Tool {event.tool.tool_name} completed")
+                    if event.tool and event.tool.tool_name:
+                        async with self:
+                            self.agent_steps.append(
+                                f"Tool {event.tool.tool_name} completed"
+                            )
                 elif isinstance(event, agent_event.ToolCallErrorEvent):
-                    async with self:
-                        self.agent_steps.append(f"Tool {event.tool.tool_name} failed")
+                    if event.tool and event.tool.tool_name:
+                        async with self:
+                            self.agent_steps.append(
+                                f"Tool {event.tool.tool_name} failed"
+                            )
                 # Content delta event
                 elif isinstance(event, agent_event.RunContentEvent):
                     if on_content:

@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "agno>=2.6.22",
+    "fastapi>=0.139.0",
     "httpx>=0.28.1",
     "reflex>=0.8.23",
     "reflex-enterprise>=0.4.2",
@@ -15,12 +17,12 @@ dependencies = [
 stocksense-core = { git = "https://github.com/Akashdesarda/stock-research-platform.git", subdirectory = "core" }
 
 [tool.pyrefly]
-project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
-]
+project-includes = ["**/*.py*", "**/*.ipynb"]
+
+[tool.pyrefly.errors]
+bad-assignment = false
+invalid-argument = false
+bad-class-definition = false
 
 [dependency-groups]
-dev = [
-    "ipykernel>=7.1.0",
-]
+dev = ["ipykernel>=7.1.0"]

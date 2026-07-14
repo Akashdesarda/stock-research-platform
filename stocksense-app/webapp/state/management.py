@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import reflex as rx
-from httpx import AsyncClient
 from stocksense.config import get_settings
 
 from webapp.state.shared import CommonMixin
@@ -14,7 +13,7 @@ class ConfigurationState(rx.State):
 
     # Common settings
     common_base_url: str = settings.common.base_url
-    common_phoenix_port: int = settings.common.phoenix_port
+    common_sqlite_path: str = settings.common.sqlite_path
 
     # AI settings
     # api keys
@@ -23,18 +22,18 @@ class ConfigurationState(rx.State):
     ai_ANTHROPIC_API_KEY: str = settings.ai.ANTHROPIC_API_KEY
     ai_OLLAMA_API_KEY: str = settings.ai.OLLAMA_API_KEY
     ai_GOOGLE_API_KEY: str = settings.ai.GOOGLE_API_KEY
-    # Aagent
+    ai_OPENROUTER_API_KEY: str = settings.ai.OPENROUTER_API_KEY
+    ai_INCEPTION_API_KEY: str = settings.ai.INCEPTION_API_KEY
+    ai_SARVAM_API_KEY: str = settings.ai.SARVAM_API_KEY
+    ai_ICA_API_KEY: str = settings.ai.ICA_API_KEY
+    # Agent
     ai_text_to_sql_model: str = settings.ai.text_to_sql_model
     ai_company_summary_model: str = settings.ai.company_summary_model
-    ai_company_summary_qa_model: str = settings.ai.company_summary_qa_model
+    ai_dataset_description_model: str = settings.ai.dataset_description_model
+    ai_strategy_selector_model: str = settings.ai.strategy_selector_model
 
     # StockDB settings
-    stockdb_port: int = settings.stockdb.port
-    # stockdb_data_base_path: str = settings.stockdb.data_base_path.as_posix()
     stockdb_download_batch_size: int = settings.stockdb.download_batch_size
-
-    # App settings
-    app_port: int = settings.app.port
 
     # UI helpers
     last_saved: str = ""
@@ -43,6 +42,10 @@ class ConfigurationState(rx.State):
     @rx.event
     def update_base_url(self, value: str):
         self.common_base_url = value
+
+    @rx.event
+    def update_sqlite_path(self, value: str):
+        self.common_sqlite_path = value
 
     @rx.event
     def update_groq_api_key(self, value: str):
@@ -65,20 +68,20 @@ class ConfigurationState(rx.State):
         self.ai_GOOGLE_API_KEY = value
 
     @rx.event
-    def update_mlflow_port(self, value: int | str):
-        self.common_phoenix_port = int(value)
+    def update_openrouter_api_key(self, value: str):
+        self.ai_OPENROUTER_API_KEY = value
 
     @rx.event
-    def update_stockdb_port(self, value: int | str):
-        self.stockdb_port = int(value)
+    def update_inception_api_key(self, value: str):
+        self.ai_INCEPTION_API_KEY = value
 
     @rx.event
-    def update_stockdb_download_batch_size(self, value: int | str):
-        self.stockdb_download_batch_size = int(value)
+    def update_sarvam_api_key(self, value: str):
+        self.ai_SARVAM_API_KEY = value
 
     @rx.event
-    def update_app_port(self, value: int | str):
-        self.app_port = int(value)
+    def update_ica_api_key(self, value: str):
+        self.ai_ICA_API_KEY = value
 
     @rx.event
     def update_text_to_sql_model(self, value: str):
@@ -89,8 +92,16 @@ class ConfigurationState(rx.State):
         self.ai_company_summary_model = value
 
     @rx.event
-    def update_company_summary_qa_model(self, value: str):
-        self.ai_company_summary_qa_model = value
+    def update_dataset_description_model(self, value: str):
+        self.ai_dataset_description_model = value
+
+    @rx.event
+    def update_strategy_selector_model(self, value: str):
+        self.ai_strategy_selector_model = value
+
+    @rx.event
+    def update_stockdb_download_batch_size(self, value: int | str):
+        self.stockdb_download_batch_size = int(value)
 
     @rx.event
     def apply_to_current_session(self) -> None:
@@ -99,27 +110,29 @@ class ConfigurationState(rx.State):
         settings = get_settings()
 
         settings.common.base_url = self.common_base_url
-        settings.common.phoenix_port = self.common_phoenix_port
+        settings.common.sqlite_path = self.common_sqlite_path
 
         settings.ai.GROQ_API_KEY = self.ai_GROQ_API_KEY
         settings.ai.OPENAI_API_KEY = self.ai_OPENAI_API_KEY
         settings.ai.ANTHROPIC_API_KEY = self.ai_ANTHROPIC_API_KEY
         settings.ai.OLLAMA_API_KEY = self.ai_OLLAMA_API_KEY
         settings.ai.GOOGLE_API_KEY = self.ai_GOOGLE_API_KEY
+        settings.ai.OPENROUTER_API_KEY = self.ai_OPENROUTER_API_KEY
+        settings.ai.INCEPTION_API_KEY = self.ai_INCEPTION_API_KEY
+        settings.ai.SARVAM_API_KEY = self.ai_SARVAM_API_KEY
+        settings.ai.ICA_API_KEY = self.ai_ICA_API_KEY
 
         settings.ai.text_to_sql_model = self.ai_text_to_sql_model
         settings.ai.company_summary_model = self.ai_company_summary_model
-        settings.ai.company_summary_qa_model = self.ai_company_summary_qa_model
+        settings.ai.dataset_description_model = self.ai_dataset_description_model
+        settings.ai.strategy_selector_model = self.ai_strategy_selector_model
 
-        settings.stockdb.port = self.stockdb_port
         settings.stockdb.download_batch_size = self.stockdb_download_batch_size
-
-        settings.app.port = self.app_port
 
         self.save_error = ""
 
     @rx.event
-    def update_config(self) -> None:
+    def update_config_toml(self) -> None:
         """Update the current configuration to the settings"""
         try:
             # Update settings for runtime usage
@@ -129,21 +142,14 @@ class ConfigurationState(rx.State):
             settings.ai.ANTHROPIC_API_KEY = self.ai_ANTHROPIC_API_KEY
             settings.ai.OLLAMA_API_KEY = self.ai_OLLAMA_API_KEY
             settings.ai.GOOGLE_API_KEY = self.ai_GOOGLE_API_KEY
-            settings.common.phoenix_port = self.common_phoenix_port
-
-            settings.stockdb.port = self.stockdb_port
-            # settings.stockdb.data_base_path = self.stockdb_data_base_path
-            settings.stockdb.download_batch_size = (
-                self.stockdb_download_batch_size
-            )
-
-            settings.app.port = self.app_port
+            settings.ai.OPENROUTER_API_KEY = self.ai_OPENROUTER_API_KEY
+            settings.ai.INCEPTION_API_KEY = self.ai_INCEPTION_API_KEY
+            settings.ai.SARVAM_API_KEY = self.ai_SARVAM_API_KEY
             settings.ai.text_to_sql_model = self.ai_text_to_sql_model
             settings.ai.company_summary_model = self.ai_company_summary_model
-            settings.ai.company_summary_qa_model = (
-                self.ai_company_summary_qa_model
-            )
-
+            settings.ai.dataset_description_model = self.ai_dataset_description_model
+            settings.ai.strategy_selector_model = self.ai_strategy_selector_model
+            settings.stockdb.download_batch_size = self.stockdb_download_batch_size
             # update the config file
             settings.save_as_toml()
 
@@ -235,24 +241,15 @@ class TaskState(CommonMixin, rx.State):
                 "task_mode": self.task_mode,
                 "download_mode": self.download_mode,
                 "exchange": self.selected_exchange,
-                "ticker": self.selected_ticker
-                if self.task_mode == "manual"
-                else None,
-                "start_date": self.start_date
-                if self.task_mode == "manual"
-                else None,
-                "end_date": self.end_date
-                if self.task_mode == "manual"
-                else None,
+                "ticker": self.selected_ticker if self.task_mode == "manual" else None,
+                "start_date": self.start_date if self.task_mode == "manual" else None,
+                "end_date": self.end_date if self.task_mode == "manual" else None,
             }
 
-            url = (
-                f"{settings.common.base_url}:{settings.stockdb.port}"
-                "/api/operation/download/ticker/history"
-            )
-
-            async with AsyncClient(follow_redirects=True) as client:
-                response = await client.post(url, json=payload)
+            async with self._stockdb_client() as client:
+                response = await client.post(
+                    "/operation/download/ticker/history", json=payload
+                )
 
             async with self:
                 if response.status_code == 200:
@@ -264,10 +261,10 @@ class TaskState(CommonMixin, rx.State):
                     try:
                         payload = response.json()
                         detail = str(payload.get("detail", detail))
-                    except Exception:  # pragma: no cover
+                    except Exception:
                         detail = response.text or detail
                     self.update_submit_error = detail
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             async with self:
                 self.update_submit_error = str(exc)
         finally:
@@ -291,20 +288,13 @@ class TaskState(CommonMixin, rx.State):
             self.optimize_submit_success = ""
 
         try:
-            payload = {
-                "compact": self.compact,
-                "vacuum": self.vacuum,
-            }
-
-            url = (
-                f"{settings.common.base_url}:{settings.stockdb.port}"
-                f"/api/operation/optimize/{self.selected_exchange}/ticker/history"
-            )
-
-            async with AsyncClient(follow_redirects=True) as client:
+            async with self._stockdb_client() as client:
                 response = await client.put(
-                    url,
-                    params=payload,
+                    f"/operation/optimize/{self.selected_exchange}/ticker/history",
+                    params={
+                        "compact": self.compact,
+                        "vacuum": self.vacuum,
+                    },
                 )
 
             async with self:
@@ -317,7 +307,7 @@ class TaskState(CommonMixin, rx.State):
                     detail = "Request failed."
                     try:
                         payload = response.json()
-                        detail = response.text
+                        detail = str(payload.get("detail", detail))
                     except Exception:
                         detail = response.text or detail
                     self.optimize_submit_error = detail
@@ -350,15 +340,14 @@ class TaskState(CommonMixin, rx.State):
             self.prompt_search_error = ""
 
         try:
-            async with AsyncClient() as client:
+            async with self._stockdb_client() as client:
                 response = await client.post(
-                    url=f"{settings.common.base_url}:{settings.stockdb.port}/api/operation/prompt/search",
+                    url="/operation/prompt/search",
                     json={
                         "agent": self.agent,
                         "prompt": self.prompt,
                         "cache_tier": self.cache_tier,
                     },
-                    timeout=60.0,
                 )
 
             async with self:

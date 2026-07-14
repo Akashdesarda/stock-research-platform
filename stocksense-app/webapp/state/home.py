@@ -16,6 +16,7 @@ class HomeState(CommonMixin, rx.State):
     # Status State (populated by event)
     stockdb_api: bool = False
     stockdb_data_status: dict[str, str] = {}
+    stocksense_ai_api: bool = False
 
     @rx.event
     def set_selected_status_exchange(self, value: str):
@@ -27,28 +28,37 @@ class HomeState(CommonMixin, rx.State):
         try:
             async with AsyncClient() as client:
                 # 1. Check API Health
-                api_resp = await client.get(
-                    f"{settings.common.base_url}:{settings.stockdb.port}/health/api",
+                stockdb_api_response = await client.get(
+                    f"{settings.stockdb.stockdb_url}:{settings.stockdb.port}/health/api",
                     timeout=5,
                     follow_redirects=True,
                 )
-                self.stockdb_api = api_resp.status_code == 200
+                self.stockdb_api = stockdb_api_response.status_code == 200
 
                 # 2. Check Data Health
-                data_resp = await client.get(
-                    f"{settings.common.base_url}:{settings.stockdb.port}/health/data/",
+                stockdb_data_response = await client.get(
+                    f"{settings.stockdb.stockdb_url}:{settings.stockdb.port}/health/data/",
                     timeout=20,  # Increased timeout for data scan
                     follow_redirects=True,
                 )
 
-                if data_resp.status_code == 200:
-                    self.stockdb_data_status = data_resp.json()
+                if stockdb_data_response.status_code == 200:
+                    self.stockdb_data_status = stockdb_data_response.json()
                 else:
                     self.stockdb_data_status = {}
+
+                # 3. Check Stocksense AI API Health
+                ai_api_response = await client.get(
+                    f"{settings.ai.ai_url}:{settings.ai.port}/health",
+                    timeout=5,
+                    follow_redirects=True,
+                )
+                self.stocksense_ai_api = ai_api_response.status_code == 200
 
         except Exception:
             self.stockdb_api = False
             self.stockdb_data_status = {}
+            self.stocksense_ai_api = False
 
         # 3. Set default selection if needed
         if not self.selected_status_exchange and self.stockdb_data_status:

@@ -80,6 +80,14 @@ def _services_health_card() -> rx.Component:
                         False: ("Unavailable", "red"),
                     },
                 ),
+                status_indicator(
+                    label="Stocksense AI API",
+                    value=HomeState.stocksense_ai_api,
+                    matchers={
+                        True: ("Available", "green"),
+                        False: ("Unavailable", "red"),
+                    },
+                ),
                 # Add more services here as they grow
                 width="100%",
                 spacing="3",

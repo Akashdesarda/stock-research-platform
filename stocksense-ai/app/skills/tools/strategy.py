@@ -285,11 +285,8 @@ class StockDBTools(Toolkit):
     """Tools for interacting with the StockDB API."""
 
     def __init__(self, **kwargs):
-        self.stockdb_api_base_url = (
-            f"{settings.common.base_url}:{settings.stockdb.port}/api"
-        )
         self._aclient = AsyncClient(
-            base_url=self.stockdb_api_base_url,
+            base_url=f"{settings.stockdb.stockdb_url}:{settings.stockdb.port}/api",
             timeout=None,
         )
         async_tools = [

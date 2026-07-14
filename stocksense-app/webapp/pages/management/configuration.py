@@ -22,6 +22,7 @@ def configuration() -> rx.Component:
         rx.tabs.trigger("🛢️ StockDB", value="stockdb"),
         rx.tabs.trigger("💻 App", value="app"),
     )
+
     common_tab = rx.tabs.content(
         rx.vstack(
             rx.spacer(spacing="3"),
@@ -41,7 +42,7 @@ def configuration() -> rx.Component:
                     width="100%",
                     radius="large",
                 ),
-                help_text="API key for GROQ service.",
+                help_text="API key for GROQ service",
             ),
             form_field(
                 label="OPENAI API Key",
@@ -51,7 +52,7 @@ def configuration() -> rx.Component:
                     width="100%",
                     radius="large",
                 ),
-                help_text="API key for OpenAI ChatGPT service.",
+                help_text="API key for OpenAI ChatGPT service",
             ),
             form_field(
                 label="ANTHROPIC API Key",
@@ -61,7 +62,7 @@ def configuration() -> rx.Component:
                     width="100%",
                     radius="large",
                 ),
-                help_text="API key for Anthropic Claude service.",
+                help_text="API key for Anthropic Claude service",
             ),
             form_field(
                 label="GOOGLE API Key",
@@ -71,16 +72,47 @@ def configuration() -> rx.Component:
                     radius="large",
                     on_change=ConfigurationState.update_google_api_key,
                 ),
-                help_text="API key for Google Gemini service.",
+                help_text="API key for Google Gemini service",
             ),
             form_field(
-                label="MLflow Port",
-                control=number_input(
-                    on_change=ConfigurationState.update_mlflow_port,
+                label="OPENROUTER API Key",
+                control=rx.input(
+                    type="password",
                     width="100%",
-                    value=ConfigurationState.common_phoenix_port,
+                    radius="large",
+                    on_change=ConfigurationState.update_openrouter_api_key,
                 ),
-                help_text="Port number for MLflow tracking server.",
+                help_text="API key for OpenRouter service",
+            ),
+            form_field(
+                label="INCEPTION API Key",
+                control=rx.input(
+                    type="password",
+                    width="100%",
+                    radius="large",
+                    on_change=ConfigurationState.update_inception_api_key,
+                ),
+                help_text="API key for Inception service",
+            ),
+            form_field(
+                label="SARVAM API Key",
+                control=rx.input(
+                    type="password",
+                    width="100%",
+                    radius="large",
+                    on_change=ConfigurationState.update_sarvam_api_key,
+                ),
+                help_text="API key for Sarvam service",
+            ),
+            form_field(
+                label="ICA API Key",
+                control=rx.input(
+                    type="password",
+                    width="100%",
+                    radius="large",
+                    on_change=ConfigurationState.update_ica_api_key,
+                ),
+                help_text="API key for IBM ICA service",
             ),
         ),
         value="common",
@@ -90,15 +122,6 @@ def configuration() -> rx.Component:
     stockdb_tab = rx.tabs.content(
         rx.vstack(
             rx.spacer(spacing="3"),
-            form_field(
-                label="StockDB API Port",
-                control=number_input(
-                    value=ConfigurationState.stockdb_port,
-                    on_change=ConfigurationState.update_stockdb_port,
-                    width="100%",
-                ),
-                help_text="Port for StockDB API server. Only change if you know what you are doing.",
-            ),
             form_field(
                 label="Download Batch Size",
                 control=number_input(
@@ -120,15 +143,6 @@ def configuration() -> rx.Component:
         rx.vstack(
             rx.spacer(spacing="3"),
             form_field(
-                label="App Port",
-                control=number_input(
-                    value=ConfigurationState.app_port,
-                    on_change=ConfigurationState.update_app_port,
-                    width="100%",
-                ),
-                help_text="Port for the Stocksense app. Only change if you know what you are doing.",
-            ),
-            form_field(
                 label="Text to SQL Model",
                 control=rx.input(
                     value=ConfigurationState.ai_text_to_sql_model,
@@ -149,14 +163,24 @@ def configuration() -> rx.Component:
                 help_text="LLM Model to use for generating company summaries agent.",
             ),
             form_field(
-                label="Company Summary QA Model",
+                label="Strategy Selector Model",
                 control=rx.input(
-                    value=ConfigurationState.ai_company_summary_qa_model,
-                    on_change=ConfigurationState.update_company_summary_qa_model,
+                    value=ConfigurationState.ai_strategy_selector_model,
+                    on_change=ConfigurationState.update_strategy_selector_model,
                     width="100%",
                     radius="large",
                 ),
-                help_text="LLM Model to use for company summary question answering agent",
+                help_text="LLM Model to use for strategy selection agent",
+            ),
+            form_field(
+                label="Dataset description Model",
+                control=rx.input(
+                    value=ConfigurationState.ai_dataset_description_model,
+                    on_change=ConfigurationState.update_dataset_description_model,
+                    width="100%",
+                    radius="large",
+                ),
+                help_text="LLM Model to use for dataset description agent",
             ),
         ),
         value="app",
@@ -182,7 +206,7 @@ def configuration() -> rx.Component:
             bordered_container(
                 config_tabs,
                 rx.hstack(
-                    save_button(on_click=ConfigurationState.update_config),
+                    save_button(on_click=ConfigurationState.update_config_toml),
                     action_button(
                         "Apply to current session",
                         kind="secondary",

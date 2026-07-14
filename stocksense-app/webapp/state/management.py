@@ -1,7 +1,6 @@
 from datetime import datetime
 
 import reflex as rx
-from httpx import AsyncClient
 from stocksense.config import get_settings
 
 from webapp.state.shared import CommonMixin
@@ -247,8 +246,10 @@ class TaskState(CommonMixin, rx.State):
                 "end_date": self.end_date if self.task_mode == "manual" else None,
             }
 
-            async with self._client() as client:
-                response = await client.post("/download/ticker/history", json=payload)
+            async with self._stockdb_client() as client:
+                response = await client.post(
+                    "/operation/download/ticker/history", json=payload
+                )
 
             async with self:
                 if response.status_code == 200:
@@ -287,9 +288,9 @@ class TaskState(CommonMixin, rx.State):
             self.optimize_submit_success = ""
 
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.put(
-                    f"/optimize/{self.selected_exchange}/ticker/history",
+                    f"/operation/optimize/{self.selected_exchange}/ticker/history",
                     params={
                         "compact": self.compact,
                         "vacuum": self.vacuum,
@@ -339,9 +340,9 @@ class TaskState(CommonMixin, rx.State):
             self.prompt_search_error = ""
 
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.post(
-                    url="/prompt/search",
+                    url="/operation/prompt/search",
                     json={
                         "agent": self.agent,
                         "prompt": self.prompt,
@@ -362,10 +363,3 @@ class TaskState(CommonMixin, rx.State):
         finally:
             async with self:
                 self.prompt_search_is_submitting = False
-
-    def _client(self) -> AsyncClient:
-        return AsyncClient(
-            base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api/operation",
-            timeout=60.0,
-            follow_redirects=True,
-        )

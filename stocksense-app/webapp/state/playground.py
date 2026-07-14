@@ -7,7 +7,6 @@ import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
 from agno.run import agent
-from httpx import AsyncClient
 from stocksense.config import get_settings
 from stocksense.types import (
     DataInterval,
@@ -44,7 +43,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     ai_use_cache: bool = True
     ai_prompt: str = ""
     ai_generated_sql: str = ""
-    ai_sql_query: str = ""
+    ai_sql_query: str = ""  # use for editing AI generated SQL
     ai_thinking_part: str = ""
     # TODO - add prompt cache/history
 
@@ -61,14 +60,6 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     dataset_description: str = ""
     dataset_tags: list[str] = []
     register_dialog_open: bool = False
-
-    def _stockdb_client(self) -> AsyncClient:
-        """Return a configured httpx AsyncClient."""
-        return AsyncClient(
-            timeout=None,
-            follow_redirects=True,
-            base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
-        )
 
     @rx.event
     def set_interval(self, value: str):
@@ -345,16 +336,10 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.error(f"Cache update failed: {e}")
 
-    async def _t2sql_on_completed(self, completed: agent.RunOutputEvent):
-        """Handle the final text-to-SQL result from the shared agent run.
-
-        ``ai_generated_sql`` is the canonical LLM output; ``ai_sql_query`` is the
-        editable copy the user can tweak before running the query.
-        """
+    async def _t2sql_on_completed(self, completed: agent.RunCompletedEvent):
+        """Handle the final text-to-SQL result from the shared agent run"""
         content = completed.content or {}
-        if hasattr(content, "model_dump"):
-            content = content.model_dump()
-        sql = content.get("sql_query", "") if isinstance(content, dict) else ""
+        sql = content.get("sql_query", "")
 
         async with self:
             self.ai_thinking_part = completed.reasoning_content or self.ai_thinking_part
@@ -603,7 +588,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
 
         self.edit_is_loading = True
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.get(
                     f"/operation/data/{self.selected_dataset_id}"
                 )
@@ -704,7 +689,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
         }
 
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.put(
                     url="/operation/data/register",
                     json=payload,
@@ -730,7 +715,7 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
         """Fetch registered datasets"""
         _ = self._refresh_tick
         try:
-            async with self._client() as client:
+            async with self._stockdb_client() as client:
                 response = await client.get("/operation/data")
                 response.raise_for_status()
                 data = response.json()
@@ -761,11 +746,3 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.error(f"Error fetching registered datasets: {e}")
             return []
-
-    def _client(self) -> AsyncClient:
-        """Return a configured httpx AsyncClient."""
-        return AsyncClient(
-            timeout=None,
-            follow_redirects=True,
-            base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
-        )

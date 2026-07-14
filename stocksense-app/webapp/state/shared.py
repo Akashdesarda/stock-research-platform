@@ -5,7 +5,7 @@ import polars as pl
 import reflex as rx
 from agno.client import AgentOSClient
 from agno.run import agent as agent_event
-from httpx import AsyncClient
+from httpx2 import AsyncClient, Timeout
 from pydantic import BaseModel
 from stocksense.config import get_settings
 
@@ -26,11 +26,8 @@ class CommonMixin(rx.State, mixin=True):
         Returns:
             A DataFrame of available stock exchanges.
         """
-        async with AsyncClient() as client:
-            response = await client.get(
-                f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/",
-                follow_redirects=True,
-            )
+        async with self._stockdb_client() as client:
+            response = await client.get("/per-security")
             response.raise_for_status()
             # NOTE - response --> [exchange_symbol: exchange_name]
             exch_response = response.json()
@@ -51,11 +48,8 @@ class CommonMixin(rx.State, mixin=True):
     @rx.var
     async def available_tickers(self) -> dict[str, pl.DataFrame]:
         """Get the available tickers for each exchange"""
-        async with AsyncClient() as client:
-            response = await client.get(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/list-tickers",
-                follow_redirects=True,
-            )
+        async with self._stockdb_client() as client:
+            response = await client.get("/bulk/list-tickers")
             # NOTE - response --> {exchange_symbol: [{ticker, company},...]}
             tickers_wrt_exchange = response.json()
             available_tickers = dict.fromkeys(
@@ -121,16 +115,23 @@ class CommonMixin(rx.State, mixin=True):
 
     async def get_ticker_history_columns(self) -> list[str]:
         """Fetch column names for the stock history table."""
-        async with AsyncClient(timeout=None, follow_redirects=True) as client:
+        async with self._stockdb_client() as client:
             response = await client.get(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}"
-                f"/api/per-security/nse/tcs/history",
+                url="/per-security/nse/tcs/history",
                 params={"interval": "1d", "period": "1d"},
             )
             if response.status_code != 200:
                 return []
             payload = response.json()
             return list(payload[0].keys()) if payload else []
+
+    def _stockdb_client(self) -> AsyncClient:
+        """Return a configured httpx AsyncClient."""
+        return AsyncClient(
+            timeout=Timeout(connect=5, read=120, write=120),
+            follow_redirects=True,
+            base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
+        )
 
 
 class TickerSelectionMixin(CommonMixin, mixin=True):
@@ -147,10 +148,8 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
 
     @rx.var
     async def exchange_wise_index(self) -> dict:
-        async with AsyncClient() as client:
-            response = await client.get(
-                f"{settings.common.base_url}:{settings.stockdb.port}/api/bulk/list-indexes"
-            )
+        async with self._stockdb_client() as client:
+            response = await client.get("/bulk/list-indexes")
             return response.json()
 
     @rx.var
@@ -189,10 +188,10 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
 
     @rx.event
     async def get_tickers_for_index(self):
-        async with AsyncClient() as client:
+        async with self._stockdb_client() as client:
             # NOTE - response --> [{ticker, company},...]
             response = await client.get(
-                url=f"{settings.common.base_url}:{settings.stockdb.port}/api/per-security/{self.selected_exchange}/{self.index_choice}"
+                f"/per-security/{self.selected_exchange}/{self.index_choice}"
             )
         self.selected_ticker = [i["ticker"] for i in response.json()]
 

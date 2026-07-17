@@ -1,9 +1,10 @@
 import reflex as rx
+import reflex_enterprise as rxe
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
 from webapp.components.layout import form_field
-from webapp.state.shared import ChatMixin, TickerSelectionMixin
-from webapp.types import TickerChoice
+from webapp.state.shared import ChatMixin, CommonMixin, TickerSelectionMixin
+from webapp.types import TickerChoice, TraceStep
 
 
 def _index_based_ticker_selection(
@@ -115,9 +116,7 @@ def chat_bubble(role: str, content: str) -> rx.Component:
     return rx.hstack(
         rx.box(
             rx.markdown(content),
-            background_color=rx.cond(
-                is_user, rx.color("accent"), "transparent"
-            ),
+            background_color=rx.cond(is_user, rx.color("accent"), "transparent"),
             border_radius="10px",
             max_width="80%",
             margin="16px",
@@ -204,4 +203,27 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
         z_index="10",
         display="flex",
         justify_content="center",
+    )
+
+
+def execution_step(state: type[CommonMixin]) -> rx.Component:
+    def _add_step(step: TraceStep) -> rx.Component:
+        color = rx.cond(step.passed, "green", "red")
+        return rxe.mantine.timeline.item(
+            rx.text(step.detail, size="2", color="gray.6"),
+            title=rx.text(step.name, weight="bold", color=color),
+            bullet=rx.icon(step.icon),
+            color=color,
+        )
+
+    return rx.vstack(
+        rxe.mantine.collapse(
+            rxe.mantine.timeline(
+                rx.foreach(state.trace_steps, _add_step),
+                bullet_size=24,
+                line_width=2,
+            ),
+            in_=state.collapse_toggle,
+        ),
+        rx.button("See steps", on_click=state.set_collapse_toggle),
     )

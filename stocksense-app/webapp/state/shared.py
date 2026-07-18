@@ -6,8 +6,9 @@ import reflex as rx
 from agno.client import AgentOSClient
 from agno.run import agent as agent_event
 from httpx2 import AsyncClient, Timeout
-from pydantic import BaseModel
 from stocksense.config import get_settings
+
+from webapp.types import Message, TraceStep
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -18,6 +19,8 @@ class CommonMixin(rx.State, mixin=True):
 
     selected_exchange: str = ""
     selected_ticker: list[str] = []
+    trace_steps: list[TraceStep] = []
+    collapse_toggle: bool = False
 
     @rx.var
     async def available_exchanges(self) -> pl.DataFrame:
@@ -81,6 +84,19 @@ class CommonMixin(rx.State, mixin=True):
         df = _[self.selected_exchange]
         return df.select("dropdown").to_series().to_list()
 
+    @rx.var
+    async def ticker_history_columns(self) -> list[str]:
+        """Fetch column names for the stock history table."""
+        async with self._stockdb_client() as client:
+            response = await client.get(
+                url="/per-security/nse/tcs/history",
+                params={"interval": "1d", "period": "1d"},
+            )
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            return list(payload[0].keys()) if payload else []
+
     @rx.event
     async def get_exchange_symbol(self, dropdown_value: str):
         """Extract the exchange symbol from the dropdown value.
@@ -113,22 +129,15 @@ class CommonMixin(rx.State, mixin=True):
             .to_list()
         )
 
-    async def get_ticker_history_columns(self) -> list[str]:
-        """Fetch column names for the stock history table."""
-        async with self._stockdb_client() as client:
-            response = await client.get(
-                url="/per-security/nse/tcs/history",
-                params={"interval": "1d", "period": "1d"},
-            )
-            if response.status_code != 200:
-                return []
-            payload = response.json()
-            return list(payload[0].keys()) if payload else []
+    @rx.event
+    async def set_collapse_toggle(self):
+        """Toggle the collapse state of the ticker selection form."""
+        self.collapse_toggle = not self.collapse_toggle
 
     def _stockdb_client(self) -> AsyncClient:
         """Return a configured httpx AsyncClient."""
         return AsyncClient(
-            timeout=Timeout(connect=5, read=120, write=120),
+            timeout=Timeout(connect=5, read=120, write=120, pool=10),
             follow_redirects=True,
             base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
         )
@@ -209,11 +218,6 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
         await self.get_ticker_symbols(normalized_values)
 
 
-class Message(BaseModel):
-    role: str
-    content: str
-
-
 class ChatMixin(rx.State, mixin=True):
     """A mixin state for common chat data."""
 
@@ -241,6 +245,40 @@ class ChatMixin(rx.State, mixin=True):
         if role == "user":
             yield type(self).reset_prompt
 
+    @rx.event
+    def toggle_message_steps(self, index: int):
+        msg = self.messages[index]
+        self.messages[index] = Message(
+            role=msg.role,
+            content=msg.content,
+            steps=msg.steps,
+            steps_open=not msg.steps_open,
+        )
+
+    def _update_last_assistant(
+        self,
+        *,
+        content: str | None = None,
+        append_content: str | None = None,
+    ):
+        """Update the streaming assistant message while preserving steps."""
+        if not (self.messages and self.messages[-1].role == "assistant"):
+            return
+        last = self.messages[-1]
+        new_content = last.content
+        # appending text delta for streaming assistant
+        if append_content is not None:
+            new_content = last.content + append_content
+        # replacing the entire message content for non-streaming assistant
+        if content is not None:
+            new_content = content
+        self.messages[-1] = Message(
+            role="assistant",
+            content=new_content,
+            steps=last.steps,
+            steps_open=last.steps_open,
+        )
+
 
 class AgentRunMixin(rx.State, mixin=True):
     """A mixin state for common agent run data."""
@@ -250,6 +288,7 @@ class AgentRunMixin(rx.State, mixin=True):
     agent_error: str = ""
     agent_status_message: str = ""
     agent_steps: list[str] = []
+    messages: list[Message] = []
 
     _active_agent_id: str = ""
 
@@ -297,7 +336,6 @@ class AgentRunMixin(rx.State, mixin=True):
                 self.agent_is_generating = True
                 self.agent_error = ""
                 self.agent_status_message = "Generating…"
-                self.agent_steps = []
                 self.agent_run_id = ""
 
         try:
@@ -308,7 +346,13 @@ class AgentRunMixin(rx.State, mixin=True):
                 if isinstance(event, agent_event.RunStartedEvent):
                     async with self:
                         self.agent_run_id = event.run_id
-                        self.agent_steps.append(f"Running model: {event.model}")
+                        self._push_step(
+                            TraceStep(
+                                name="Running model",
+                                icon="brain",
+                                detail=f"Model: {event.model}",
+                            )
+                        )
                         logger.debug(
                             f"using model {event.model} for agent: {event.agent_id} with run_id: {self.agent_run_id}"
                         )
@@ -316,20 +360,33 @@ class AgentRunMixin(rx.State, mixin=True):
                 elif isinstance(event, agent_event.ToolCallStartedEvent):
                     if event.tool and event.tool.tool_name:
                         async with self:
-                            self.agent_steps.append(
-                                f"Calling tool {event.tool.tool_name}"
+                            self._push_step(
+                                TraceStep(
+                                    name="Tool calling",
+                                    icon="hammer",
+                                    detail=f"Tool: {event.tool.tool_name}",
+                                )
                             )
                 elif isinstance(event, agent_event.ToolCallCompletedEvent):
                     if event.tool and event.tool.tool_name:
                         async with self:
-                            self.agent_steps.append(
-                                f"Tool {event.tool.tool_name} completed"
+                            self._push_step(
+                                TraceStep(
+                                    name="Tool completed",
+                                    icon="circle_check_big",
+                                    detail=f"Tool: {event.tool.tool_name}",
+                                )
                             )
                 elif isinstance(event, agent_event.ToolCallErrorEvent):
                     if event.tool and event.tool.tool_name:
                         async with self:
-                            self.agent_steps.append(
-                                f"Tool {event.tool.tool_name} failed"
+                            self._push_step(
+                                TraceStep(
+                                    name="Tool error",
+                                    icon="circle_x",
+                                    detail=f"Tool: {event.tool.tool_name}",
+                                    passed=False,
+                                )
                             )
                 # Content delta event
                 elif isinstance(event, agent_event.RunContentEvent):
@@ -338,18 +395,30 @@ class AgentRunMixin(rx.State, mixin=True):
                 # Cancellation event
                 elif isinstance(event, agent_event.RunCancelledEvent):
                     async with self:
-                        self.agent_status_message = "Request Cancelled"
-                        self.agent_steps.append(f"Run cancelled: {event.reason or ''}")
+                        self._push_step(
+                            TraceStep(
+                                name="Request cancelled",
+                                icon="circle_minus",
+                                passed=False,
+                            )
+                        )
                     return
                 # Error event
                 elif isinstance(event, agent_event.RunErrorEvent):
                     async with self:
-                        self.agent_error = (
-                            f"Agent run failed: {event.content or event.error_type}"
+                        self._push_step(
+                            TraceStep(
+                                name="Run error",
+                                icon="circle_x",
+                                detail=f"Error: {event.content}",
+                                passed=False,
+                            )
                         )
                         self.agent_status_message = (
                             "Generation failed. Please try again later."
                         )
+                        self.agent_error = event.content
+                        logger.error(f"Run error: {event.content}")
                     return
                 # Completion event
                 elif isinstance(event, agent_event.RunCompletedEvent):
@@ -398,3 +467,15 @@ class AgentRunMixin(rx.State, mixin=True):
 
     def _ai_client(self) -> AgentOSClient:
         return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
+
+    def _push_step(self, step: TraceStep):
+        """Attach a trace step to the streaming assistant message"""
+        if self.messages and self.messages[-1].role == "assistant":
+            last = self.messages[-1]
+            # reassign to trigger Reflex reactivity
+            self.messages[-1] = Message(
+                role="assistant",
+                content=last.content,
+                steps=[*last.steps, step],
+                steps_open=last.steps_open,
+            )

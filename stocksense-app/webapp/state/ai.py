@@ -97,30 +97,22 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""
         async with self:
-            if self.messages and self.messages[-1].role == "assistant":
-                # adding next delta text to previous text content
-                last = self.messages[-1]
-                self.messages[-1] = Message(
-                    role="assistant", content=last.content + (event.content or "")
-                )
+            # assigning inline steps to last assistant message
+            self._update_last_assistant(append_content=event.content or "")
 
     async def _on_summary_completed(self, completed: RunCompletedEvent):
         async with self:
             # RunCompletedEvent.content is the full accumulated text; use it as the
             # authoritative final value for the streaming assistant message.
-            final_content = completed.content or ""
-
-            if self.messages and self.messages[-1].role == "assistant":
-                self.messages[-1] = Message(role="assistant", content=final_content)
-            self.summary_result = final_content
-            self.agent_steps.append("Summary generated successfully")
+            final = completed.content or ""
+            # assigning inline steps to last assistant message
+            self._update_last_assistant(content=final)
+            self.summary_result = final
             self.agent_status_message = "Company summary generated"
 
-    async def _on_qa_completed(self, completed):
+    async def _on_qa_completed(self, completed: RunCompletedEvent):
         async with self:
-            if self.messages and self.messages[-1].role == "assistant":
-                # latest message is the streaming assistant message, update it with Full accumulated text.
-                self.messages[-1] = Message(
-                    role="assistant", content=completed.content or ""
-                )
+            # RunCompletedEvent.content is the full accumulated text; use it as the
+            # authoritative final value for the streaming assistant message.
+            self._update_last_assistant(content=completed.content or "")
             self.agent_status_message = ""

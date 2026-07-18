@@ -1,9 +1,12 @@
+from typing import Any
+
 import reflex as rx
 import reflex_enterprise as rxe
+from reflex.event import EventType
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
-from webapp.components.layout import form_field
-from webapp.state.shared import ChatMixin, CommonMixin, TickerSelectionMixin
+from webapp.components.layout import form_field, refined_markdown
+from webapp.state.shared import ChatMixin, TickerSelectionMixin
 from webapp.types import TickerChoice, TraceStep
 
 
@@ -47,7 +50,6 @@ def _desired_ticker_selection(
 
 
 def _all_ticker_selection() -> rx.Component:
-    # NOTE - # No selection needed for "All" option
     return rx.callout(
         "All tickers from the selected exchange will be included.",
         color_scheme="blue",
@@ -110,21 +112,113 @@ def ticker_selector(state: type[TickerSelectionMixin]) -> rx.Component:
     )
 
 
-def chat_bubble(role: str, content: str) -> rx.Component:
-    is_user = role == "user"
+def inline_steps(state: type[ChatMixin], msg, index) -> rx.Component:
+    def _step_item(step: TraceStep) -> rx.Component:
+        color = rx.cond(step.passed, "green", "red")
+        return rxe.mantine.timeline.item(
+            rx.text(step.detail, size="1", color=rx.color("gray", 10)),
+            title=rx.text(step.name, size="1", weight="bold", color=color),
+            bullet=rx.icon(step.icon, size=12),
+            color=color,
+        )
 
+    return rx.cond(
+        msg.steps.length() > 0,
+        rx.vstack(
+            # Compact toggle chip that sits right above the answer text
+            rx.hstack(
+                rx.icon(
+                    rx.cond(msg.steps_open, "chevron_down", "chevron_right"),
+                    size=14,
+                    color=rx.color("gray", 10),
+                ),
+                rx.icon("sparkles", size=13, color=rx.color("gray", 10)),
+                rx.text(
+                    rx.cond(msg.steps_open, "Hide steps", "Show steps"),
+                    size="1",
+                    weight="medium",
+                    color=rx.color("gray", 11),
+                ),
+                spacing="1",
+                align="center",
+                cursor="pointer",
+                on_click=lambda: state.toggle_message_steps(index),
+                padding="4px 8px",
+                border_radius="8px",
+                _hover={"background": rx.color("gray", 3)},
+            ),
+            rxe.mantine.collapse(
+                rx.box(
+                    rxe.mantine.timeline(
+                        rx.foreach(msg.steps, _step_item),
+                        bullet_size=20,
+                        line_width=2,
+                    ),
+                    padding="8px 4px 4px 8px",
+                    border_left=f"2px solid {rx.color('gray', 5)}",
+                    margin_left="6px",
+                ),
+                in_=msg.steps_open,
+            ),
+            spacing="1",
+            width="100%",
+            align="start",
+        ),
+        rx.fragment(),
+    )
+
+
+def _user_bubble(content: str) -> rx.Component:
+    return rx.flex(
+        rx.box(
+            refined_markdown(
+                content,
+            ),
+            background_color=rx.color("accent", 9),
+            color="white",
+            border_radius="18px 18px 4px 18px",
+            padding="8px 14px",  # tighter than before
+            max_width="min(75%, 520px)",  # bubble hugs content, capped
+            width="fit-content",
+            box_shadow="0 1px 2px rgb(0 0 0 / 0.15)",
+            style={"word_wrap": "break-word", "white_space": "pre-wrap"},
+        ),
+        justify="end",
+        width="100%",
+    )
+
+
+def _assistant_bubble(state: type[ChatMixin], msg, index) -> rx.Component:
     return rx.hstack(
         rx.box(
-            rx.markdown(content),
-            background_color=rx.cond(is_user, rx.color("accent"), "transparent"),
-            border_radius="10px",
-            max_width="80%",
-            margin="16px",
-            padding="10px",
+            rx.icon("bot", size=16, color=rx.color("accent", 11)),
+            background=rx.color("accent", 3),
+            border_radius="50%",
+            padding="6px",
+            margin_top="2px",
+            flex_shrink="0",
         ),
-        justify=rx.cond(is_user, "end", "start"),
+        rx.vstack(
+            inline_steps(state, msg, index),
+            rx.box(
+                refined_markdown(msg.content),
+                width="100%",
+            ),
+            spacing="2",
+            align="start",
+            width="100%",
+        ),
+        align="start",
         width="100%",
-        # padding_y="0.25em",
+        spacing="3",
+    )
+
+
+def _chat_bubble(state: type[ChatMixin], msg, index) -> rx.Component:
+    return rx.cond(
+        msg.role == "user",
+        _user_bubble(msg.content),
+        _assistant_bubble(state, msg, index),
     )
 
 
@@ -133,12 +227,14 @@ def chat_window(state: type[ChatMixin]) -> rx.Component:
         rx.vstack(
             rx.foreach(
                 state.messages,
-                lambda msg: chat_bubble(msg.role, msg.content),
+                lambda msg, i: _chat_bubble(state, msg, i),
             ),
             width="100%",
-            padding_x="24px",
-            padding_y="20px",
-            spacing="3",
+            max_width="768px",  # readable column
+            margin="0 auto",
+            padding_x="16px",
+            padding_y="24px",
+            spacing="6",  # gap between turns
         ),
         flex="1",
         overflow_y="auto",
@@ -146,7 +242,10 @@ def chat_window(state: type[ChatMixin]) -> rx.Component:
     )
 
 
-def chat_input(state: type[ChatMixin]) -> rx.Component:
+def chat_input(
+    state: type[ChatMixin],
+    on_submit: EventType[Any],
+) -> rx.Component:
     return rx.box(
         rx.hstack(
             rx.text_area(
@@ -155,7 +254,7 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
                 on_change=state.set_prompt,
                 on_key_down=lambda key, modifiers: rx.cond(
                     (key == "Enter") & ~modifiers["shift_key"],
-                    state.generate_answer.prevent_default,
+                    on_submit.prevent_default,
                     None,
                 ),
                 variant="soft",
@@ -175,7 +274,7 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
             ),
             rx.button(
                 rx.icon("send", size=18),
-                on_click=state.generate_answer,
+                on_click=on_submit,
                 loading=state.is_loading,
                 disabled=state.is_loading | (state.prompt == ""),
                 size="2",
@@ -203,27 +302,4 @@ def chat_input(state: type[ChatMixin]) -> rx.Component:
         z_index="10",
         display="flex",
         justify_content="center",
-    )
-
-
-def execution_step(state: type[CommonMixin]) -> rx.Component:
-    def _add_step(step: TraceStep) -> rx.Component:
-        color = rx.cond(step.passed, "green", "red")
-        return rxe.mantine.timeline.item(
-            rx.text(step.detail, size="2", color="gray.6"),
-            title=rx.text(step.name, weight="bold", color=color),
-            bullet=rx.icon(step.icon),
-            color=color,
-        )
-
-    return rx.vstack(
-        rxe.mantine.collapse(
-            rxe.mantine.timeline(
-                rx.foreach(state.trace_steps, _add_step),
-                bullet_size=24,
-                line_width=2,
-            ),
-            in_=state.collapse_toggle,
-        ),
-        rx.button("See steps", on_click=state.set_collapse_toggle),
     )

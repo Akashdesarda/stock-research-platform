@@ -6,8 +6,8 @@ from reflex.event import EventType
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
 from webapp.components.layout import form_field, refined_markdown
-from webapp.state.shared import ChatMixin, TickerSelectionMixin
-from webapp.types import TickerChoice, TraceStep
+from webapp.state.shared import ChatMixin, CommonMixin, TickerSelectionMixin
+from webapp.types import RunState, TickerChoice, TraceStep
 
 
 def _index_based_ticker_selection(
@@ -112,13 +112,67 @@ def ticker_selector(state: type[TickerSelectionMixin]) -> rx.Component:
     )
 
 
+def workflow_steps(state: type[CommonMixin]) -> rx.Component:
+    """Render all trace steps for a non-chat workflow (start -> steps -> finish)."""
+
+    def _step_item(step: TraceStep) -> rx.Component:
+        color = rx.cond(step.passed, "green", "red")
+        return rxe.mantine.timeline.item(
+            rx.text(step.detail, size="1", color=rx.color("gray", 10)),
+            title=rx.text(step.name, size="1", weight="bold", color=color),
+            bullet=rx.icon(step.icon, size=15),
+            color=color,
+        )
+
+    return rx.cond(
+        state.trace_steps.length() > 0,
+        rx.vstack(
+            rx.hstack(
+                rx.icon(
+                    rx.cond(state.steps_open, "chevron_down", "chevron_right"),
+                    size=14,
+                    color=rx.color("gray", 10),
+                ),
+                rx.icon("sparkles", size=13, color=rx.color("gray", 10)),
+                rx.text(
+                    rx.cond(state.steps_open, "Hide steps", "Show steps"),
+                    size="1",
+                    weight="medium",
+                    color=rx.color("gray", 11),
+                ),
+                spacing="1",
+                align="center",
+                cursor="pointer",
+                on_click=state.toggle_steps,
+                padding="4px 8px",
+                border_radius="8px",
+                _hover={"background": rx.color("gray", 3)},
+            ),
+            rxe.mantine.collapse(
+                rx.box(
+                    rxe.mantine.timeline(
+                        rx.foreach(state.trace_steps, _step_item),
+                        bullet_size=20,
+                        line_width=2,
+                    ),
+                    padding="8px",
+                    border_left=f"2px solid {rx.color('gray', 5)}",
+                    margin_left="6px",
+                ),
+                in_=state.steps_open,
+            ),
+        ),
+        rx.fragment(),
+    )
+
+
 def inline_steps(state: type[ChatMixin], msg, index) -> rx.Component:
     def _step_item(step: TraceStep) -> rx.Component:
         color = rx.cond(step.passed, "green", "red")
         return rxe.mantine.timeline.item(
             rx.text(step.detail, size="1", color=rx.color("gray", 10)),
             title=rx.text(step.name, size="1", weight="bold", color=color),
-            bullet=rx.icon(step.icon, size=12),
+            bullet=rx.icon(step.icon, size=15),
             color=color,
         )
 
@@ -245,7 +299,10 @@ def chat_window(state: type[ChatMixin]) -> rx.Component:
 def chat_input(
     state: type[ChatMixin],
     on_submit: EventType[Any],
+    on_cancel: EventType[Any],
 ) -> rx.Component:
+    is_generating = state.run_state == RunState.generating.value
+
     return rx.box(
         rx.hstack(
             rx.text_area(
@@ -253,8 +310,8 @@ def chat_input(
                 placeholder="Ask StockSense...",
                 on_change=state.set_prompt,
                 on_key_down=lambda key, modifiers: rx.cond(
-                    (key == "Enter") & ~modifiers["shift_key"],
-                    on_submit.prevent_default,
+                    (key == "Enter") & ~modifiers["shift_key"] & ~is_generating,
+                    on_submit.prevent_default,  # block Enter-to-send while generating
                     None,
                 ),
                 variant="soft",
@@ -272,19 +329,36 @@ def chat_input(
                     "box_shadow": "none",
                 },
             ),
-            rx.button(
-                rx.icon("send", size=18),
-                on_click=on_submit,
-                loading=state.is_loading,
-                disabled=state.is_loading | (state.prompt == ""),
-                size="2",
-                radius="full",
-                variant="solid",
-                cursor="pointer",
-                margin_right="0.5em",
+            # ---- SEND / STOP button swap (enum-driven, resume-ready) ----
+            rx.cond(
+                is_generating,
+                # STOP button — cancels the active run
+                rx.button(
+                    rx.icon("square", size=16),
+                    on_click=on_cancel,
+                    size="2",
+                    radius="full",
+                    variant="solid",
+                    color_scheme="red",
+                    cursor="pointer",
+                    margin_right="0.5em",
+                    title="Stop generating",
+                ),
+                # SEND button — submits the prompt
+                rx.button(
+                    rx.icon("send", size=18),
+                    on_click=on_submit,
+                    disabled=state.prompt == "",
+                    size="2",
+                    radius="full",
+                    variant="solid",
+                    cursor="pointer",
+                    margin_right="0.5em",
+                    title="Send",
+                ),
             ),
             width="100%",
-            max_width="900px",
+            max_width="768px",
             align_items="center",
             bg=rx.color("gray", 2),
             border=f"1px solid {rx.color('gray', 5)}",

@@ -10,10 +10,18 @@ class TickerChoice(Enum):
     all = "All"
 
 
+class RunState(str, Enum):
+    idle = "idle"  # no run in flight; ready to send
+    generating = "generating"  # streaming in progress -> show STOP
+    cancelled = "cancelled"  # user cancelled -> resumable (future)
+    error = "error"  # run failed -> retry/resume candidate (future)
+    completed = "completed"  # finished cleanly (treated like idle for input)
+
+
 class TraceStep(BaseModel):
     name: str
     detail: str = ""
-    icon: str
+    icon: str = "info"
     passed: bool = True
 
 
@@ -22,3 +30,4 @@ class Message(BaseModel):
     content: str
     steps: list[TraceStep] = []
     steps_open: bool = False
+    run_state: str = RunState.idle.value

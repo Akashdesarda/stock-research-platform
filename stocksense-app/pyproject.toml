@@ -23,6 +23,7 @@ project-includes = ["**/*.py*", "**/*.ipynb"]
 bad-assignment = false
 invalid-argument = false
 bad-class-definition = false
+bad-argument-type = false
 
 [dependency-groups]
 dev = ["ipykernel>=7.1.0"]

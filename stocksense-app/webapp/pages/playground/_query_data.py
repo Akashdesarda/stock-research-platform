@@ -16,10 +16,12 @@ from webapp.components.layout import (
     dialog_actions,
     dialog_form,
     form_field,
+    refined_markdown,
     section_header,
 )
-from webapp.pages.shared_components import ticker_selector
+from webapp.pages.shared_components import ticker_selector, workflow_steps
 from webapp.state.playground import DataState
+from webapp.types import RunState
 
 
 def _register_dataset_dialog() -> rx.Component:
@@ -119,7 +121,7 @@ def _submit_workflow(on_click=None, disabled=None) -> rx.Component:
     if on_click is None:
         on_click = DataState.fetch_data
     if disabled is None:
-        disabled = DataState.is_loading
+        disabled = DataState.fetch_state == RunState.generating.value
 
     return rx.hstack(
         submit_button(
@@ -127,7 +129,7 @@ def _submit_workflow(on_click=None, disabled=None) -> rx.Component:
             disabled=disabled,
         ),
         rx.cond(
-            DataState.is_loading,
+            DataState.fetch_state == RunState.generating.value,
             rx.hstack(
                 rx.spinner(size="3"),
                 rx.text(
@@ -193,9 +195,7 @@ def manual_panel() -> rx.Component:
                     ),
                     rx.center(  # OR separator
                         rx.vstack(
-                            rx.text(
-                                "OR", size="1", weight="bold", color="gray"
-                            ),
+                            rx.text("OR", size="1", weight="bold", color="gray"),
                             rx.separator(
                                 orientation="vertical",
                                 size="4",
@@ -280,7 +280,7 @@ def manual_panel() -> rx.Component:
             ),
             _submit_workflow(
                 disabled=(DataState.selected_exchange == "")
-                | DataState.is_loading
+                | (DataState.fetch_state == RunState.generating.value)
             ),
             width="100%",
             spacing="4",
@@ -310,52 +310,26 @@ def ai_panel() -> rx.Component:
                     value=DataState.ai_use_cache,
                     on_change=DataState.set_ai_use_cache,
                 ),
-                submit_button(
-                    on_click=DataState.generate_text_to_sql,
-                    disabled=DataState.agent_is_generating
-                    | (DataState.ai_prompt == "")
-                    | (DataState.selected_exchange == ""),
-                ),
-                rx.cond(
-                    DataState.agent_is_generating,
-                    cancel_button(on_click=DataState.cancel_agent_run),
-                    rx.fragment(),
-                ),
-                rx.cond(
-                    DataState.agent_is_generating
-                    | (DataState.agent_status_message != ""),
-                    rx.callout(
-                        rx.vstack(
-                            rx.hstack(
-                                rx.cond(
-                                    DataState.agent_is_generating,
-                                    rx.spinner(size="2"),
-                                    rx.icon("check", size=16),
-                                ),
-                                rx.text(
-                                    DataState.agent_status_message,
-                                    size="2",
-                                    weight="medium",
-                                ),
-                                spacing="2",
-                                align="center",
-                            ),
-                            rx.foreach(
-                                DataState.agent_steps,
-                                lambda step: rx.hstack(
-                                    rx.icon("check", size=16, color="green"),
-                                    rx.text(step, size="2", color="gray"),
-                                    spacing="2",
-                                    align="center",
-                                ),
-                            ),
-                            spacing="2",
-                            width="100%",
-                        ),
-                        icon="sparkles",
-                        color_scheme="blue",
-                        width="100%",
+                rx.hstack(
+                    submit_button(
+                        on_click=DataState.generate_text_to_sql,
+                        disabled=(DataState.run_state == RunState.generating.value)
+                        | (DataState.ai_prompt == "")
+                        | (DataState.selected_exchange == ""),
                     ),
+                    rx.cond(
+                        DataState.run_state == RunState.generating.value,
+                        cancel_button(on_click=DataState.cancel_agent_run),
+                        rx.fragment(),
+                    ),
+                    spacing="4",
+                    align="center",
+                    width="100%",
+                ),
+                rx.cond(
+                    (DataState.run_state == RunState.generating.value)
+                    | (DataState.agent_status_message != ""),
+                    workflow_steps(DataState),
                     rx.fragment(),
                 ),
                 rx.cond(
@@ -372,16 +346,14 @@ def ai_panel() -> rx.Component:
                     DataState.ai_generated_sql != "",
                     rx.vstack(
                         rx.text("Generated SQL", size="2", weight="medium"),
-                        rx.markdown(
-                            "```sql\n" + DataState.ai_generated_sql + "\n```"
-                        ),
+                        refined_markdown("```sql\n" + DataState.ai_generated_sql + "\n```"),
                         form_field(
                             label="Edit SQL before running",
                             control=text_area(
                                 value=DataState.ai_sql_query,
                                 on_change=DataState.set_ai_sql_query,
                                 placeholder="Edit the SQL query...",
-                                rows=6,
+                                rows=15,
                             ),
                         ),
                         checkbox_input(
@@ -395,7 +367,7 @@ def ai_panel() -> rx.Component:
                                 DataState.fetch_data,
                             ],
                             disabled=(DataState.selected_exchange == "")
-                            | DataState.is_loading
+                            | (DataState.fetch_state == RunState.generating.value)
                             | (DataState.ai_sql_query == ""),
                         ),
                         spacing="3",

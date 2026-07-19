@@ -7,6 +7,7 @@ import polars as pl
 import reflex as rx
 import reflex_enterprise as rxe
 from agno.run import agent
+from sqlglot import parse_one
 from stocksense.config import get_settings
 from stocksense.types import (
     DataInterval,
@@ -14,6 +15,7 @@ from stocksense.types import (
 )
 
 from webapp.state.shared import AgentRunMixin, TickerSelectionMixin
+from webapp.types import RunState, TraceStep
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -52,7 +54,8 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     columns_def: list[dict] = []
     manual_submitted: bool = False
     fetch_data_ready: bool = False
-    is_loading: bool = False
+    run_state: str = RunState.idle.value  # for agent (text-to-SQL)
+    fetch_state: str = RunState.idle.value  # for manual/SQL fetch flow
     _cancel_event: asyncio.Event = asyncio.Event()
 
     # Registered dataset state
@@ -87,19 +90,26 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
         self.ai_generated_sql = ""
         self.ai_sql_query = ""
         self.agent_status_message = ""
-        self.agent_steps = []
         self.agent_error = ""
 
     @rx.event
     def set_ai_use_cache(self, value: bool):
         self.ai_use_cache = value
         if not value:
-            self.agent_steps.append(
-                "Cache disabled, will generate new SQL on next generation."
+            self._record_step(
+                TraceStep(
+                    name="Cache disabled",
+                    detail="Will generate new SQL on next generation",
+                    icon="info",
+                )
             )
         else:
-            self.agent_steps.append(
-                "Cache enabled, will attempt to fetch from cache on next generation."
+            self._record_step(
+                TraceStep(
+                    name="Cache enabled",
+                    detail="Will attempt to fetch from cache on next generation.",
+                    icon="info",
+                )
             )
 
     @rx.event
@@ -124,7 +134,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     def cancel_fetching(self):
         """Cancel the ongoing fetch operation."""
         self._cancel_event.set()
-        self.is_loading = False
+        self.fetch_state = RunState.cancelled.value
         self.data = []
         self.columns_def = []
         self.fetch_data_ready = False
@@ -156,9 +166,9 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     async def fetch_data(self):
         """Fetch data based on the current state settings."""
         async with self:
-            if self.is_loading:
+            if self.fetch_state == RunState.generating.value:
                 return
-            self.is_loading = True
+            self.fetch_state = RunState.generating.value
             self.fetch_data_ready = False
             self.agent_error = ""
             self.data = []
@@ -186,15 +196,21 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     @rx.event(background=True)
     async def generate_text_to_sql(self):
         """Generate SQL query from the AI prompt."""
-        if self.agent_is_generating:
+        if self.run_state == RunState.generating.value:
             # Guard: text-to-sql owns the busy window (manage_lifecycle=False), so this is the active re-entrancy check.
             return
         async with self:
             # Mark busy up front so the cache lookup below is also guarded against double-clicks.
-            self.agent_is_generating = True
+            self.run_state = RunState.generating.value
             self.agent_error = ""
             self.agent_status_message = "Generating SQL query"
-            self.agent_steps = ["Initializing text-to-SQL agent..."]
+            self._reset_steps()
+            self._record_step(
+                TraceStep(
+                    name="Initializing",
+                    detail="Starting text-to-SQL agent",
+                )
+            )
             self.ai_generated_sql = ""
             self.ai_sql_query = ""
             self.ai_thinking_part = ""
@@ -204,7 +220,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
             # Cache lookup (best-effort). Do not mutate the user's cache preference.
             if use_cache:
                 async with self:
-                    self.agent_steps.append("Checking prompt cache...")
+                    self._record_step(TraceStep(name="Checking prompt cache"))
                 retrieved_cache = await self._fetch_cached_sql(self.ai_prompt)
                 if retrieved_cache is not None:
                     cached_sql, cached_thinking = retrieved_cache
@@ -212,15 +228,21 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
                         self.ai_generated_sql = cached_sql
                         self.ai_sql_query = cached_sql
                         self.ai_thinking_part = cached_thinking
-                        self.agent_steps.append("Fetched SQL from cache.")
+                        self._record_step(
+                            TraceStep(
+                                name="Fetched SQL from cache", icon="circle_check_big"
+                            )
+                        )
                         self.agent_status_message = (
                             "SQL query generated successfully (from cache)."
                         )
                     return
 
                 async with self:
-                    self.agent_steps.append(
-                        "No cache entry found; generating via model."
+                    self._record_step(
+                        TraceStep(
+                            name="No cache entry found", detail="generating via model"
+                        )
                     )
 
             await self.stream_agent_run(
@@ -244,12 +266,19 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
                     f"Failed to generate SQL query due to error: {e}. Please try again."
                 )
                 self.agent_status_message = ""
-                self.agent_steps.append(f"Generation failed: {type(e).__name__}")
+                self._record_step(
+                    TraceStep(
+                        name="Generation failed",
+                        detail=f"Error: {type(e).__name__}",
+                        icon="circle_x",
+                        passed=False,
+                    )
+                )
 
         finally:
             async with self:
                 # We own lifecycle (manage_lifecycle=False), so clear busy ourselves once cache+stream are done.
-                self.agent_is_generating = False
+                self.run_state = RunState.idle.value
 
     @rx.event
     async def register_dataset(self):
@@ -339,13 +368,17 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     async def _t2sql_on_completed(self, completed: agent.RunCompletedEvent):
         """Handle the final text-to-SQL result from the shared agent run"""
         content = completed.content or {}
-        sql = content.get("sql_query", "")
+        sql = parse_one(content.get("sql_query", "")).sql(dialect="duckdb", pretty=True)
 
         async with self:
             self.ai_thinking_part = completed.reasoning_content or self.ai_thinking_part
             self.ai_generated_sql = sql
             self.ai_sql_query = sql
-            self.agent_steps.append("SQL query generated successfully.")
+            self._record_step(
+                TraceStep(
+                    name="SQL query generated successfully", icon="circle_check_big"
+                )
+            )
             self.agent_status_message = "SQL query generated successfully."
 
         if sql:
@@ -369,7 +402,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
                 self.data = _.to_dicts()
                 self.columns_def = column_def
                 self.fetch_data_ready = True
-                self.is_loading = False
+                self.fetch_state = RunState.idle.value
 
     async def _fetch_via_sql_api(self):
         """Fetch data using the SQL API"""
@@ -384,7 +417,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
             if response.is_error:
                 async with self:
                     self.agent_error = f"Error fetching data: {response.text}"
-                    self.is_loading = False
+                    self.fetch_state = RunState.error.value
                 return
 
             result = response.json()
@@ -409,7 +442,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.error(f"Error fetching data: {e}")
             async with self:
-                self.is_loading = False
+                self.fetch_state = RunState.error.value
 
 
 DATASET_COLUMN_DEFS = [
@@ -634,7 +667,8 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
                 exchange_df = available_tickers.get(exchange)
                 if exchange_df is not None and not exchange_df.is_empty():
                     matched_tickers = (
-                        exchange_df.filter(pl.col("ticker").is_in(ticker))
+                        exchange_df
+                        .filter(pl.col("ticker").is_in(ticker))
                         .select("dropdown")
                         .to_series()
                         .to_list()
@@ -732,16 +766,14 @@ class RegisteredDatasetState(TickerSelectionMixin, rx.State):
                                 val_str = str(v)
                             plan_items.append({"key": k, "value": val_str})
 
-                    formatted_data.append(
-                        {
-                            "dataset_id": i.get("dataset_id", ""),
-                            "name": i.get("name", ""),
-                            "description": i.get("description") or "",
-                            "logical_plan": plan_items,
-                            "tags": ", ".join(i.get("tags") or []),
-                            "last_modified": i.get("last_modified", ""),
-                        }
-                    )
+                    formatted_data.append({
+                        "dataset_id": i.get("dataset_id", ""),
+                        "name": i.get("name", ""),
+                        "description": i.get("description") or "",
+                        "logical_plan": plan_items,
+                        "tags": ", ".join(i.get("tags") or []),
+                        "last_modified": i.get("last_modified", ""),
+                    })
                 return formatted_data
         except Exception as e:
             logger.error(f"Error fetching registered datasets: {e}")

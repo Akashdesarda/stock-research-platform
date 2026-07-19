@@ -99,9 +99,7 @@ def bordered_container(
     )
 
 
-def stat_card(
-    label: str, value: str, trend: str | None = None, icon: str = "activity"
-):
+def stat_card(label: str, value: str, trend: str | None = None, icon: str = "activity"):
     """Displays a key metric with an optional trend indicator."""
     return rx.card(
         rx.vstack(
@@ -113,9 +111,7 @@ def stat_card(
             ),
             rx.hstack(
                 rx.heading(value, size="6"),
-                rx.badge(trend, color_scheme="green")
-                if trend
-                else rx.fragment(),
+                rx.badge(trend, color_scheme="green") if trend else rx.fragment(),
                 justify="between",
                 width="100%",
                 align="end",
@@ -141,9 +137,7 @@ def status_indicator(
         matchers: Dict mapping value to (badge_text, badge_color).
         default: Fallback (badge_text, badge_color) if no match.
     """
-    badge_component = rx.badge(
-        default[0], color_scheme=default[1], variant="surface"
-    )
+    badge_component = rx.badge(default[0], color_scheme=default[1], variant="surface")
 
     # Build the nested rx.cond structure
     for match_value, (badge_text, badge_color) in matchers.items():
@@ -321,3 +315,92 @@ def data_preview(data: pl.DataFrame, **props) -> rx.Component:
         height=height,
         **props,
     )
+
+
+def _h(size, mt, mb):
+    return lambda text: rx.heading(
+        text,
+        size=size,
+        margin_top=mt,
+        margin_bottom=mb,
+        line_height="1.3",
+    )
+
+
+def refined_markdown(content, **props) -> rx.Component:
+    _cell_border = f"1px solid {rx.color('gray', 5)}"
+    markdown_component_map = {
+        # markdown header support
+        "h1": _h("6", "1em", "0.5em"),
+        "h2": _h("5", "0.9em", "0.4em"),
+        "h3": _h("4", "0.8em", "0.35em"),
+        "h4": _h("3", "0.7em", "0.3em"),
+        # markdown paragraph and list support
+        "p": lambda text: rx.text(
+            text,
+            margin_bottom="0.75em",
+            line_height="1.7",
+            size="3",
+        ),
+        "li": lambda text: rx.list_item(
+            text,
+            margin_bottom="0.35em",
+            line_height="1.6",
+        ),
+        "ul": lambda items: rx.list.unordered(
+            items,
+            margin_bottom="0.75em",
+            padding_left="1.25em",
+            spacing="1",
+        ),
+        "ol": lambda items: rx.list.ordered(
+            items,
+            margin_bottom="0.75em",
+            padding_left="1.25em",
+            spacing="1",
+        ),
+        # markdown code support
+        "code": lambda text: rx.code(text, color_scheme="gray"),
+        "codeblock": lambda text, **props: rx.code_block(
+            text,
+            **props,
+            margin_y="0.75em",
+            border_radius="8px",
+            wrap_long_lines=True,
+        ),
+        # markdown quote support
+        "a": lambda text, **props: rx.link(text, **props, color_scheme="blue"),
+        "blockquote": lambda text: rx.box(
+            rx.text(text, size="3", color=rx.color("gray", 11)),
+            border_left=f"3px solid {rx.color('accent', 7)}",
+            padding_left="1em",
+            margin_y="0.75em",
+        ),
+        # markdown table support
+        "table": lambda children: rx.box(
+            rx.table.root(children, variant="surface", size="1", width="100%"),
+            overflow_x="auto",
+            margin_y="1em",
+            width="100%",
+            border=f"1px solid {rx.color('gray', 6)}",
+            border_radius="8px",
+        ),
+        "thead": lambda children: rx.table.header(children),
+        "tbody": lambda children: rx.table.body(children),
+        "tr": lambda children: rx.table.row(children),
+        "th": lambda text: rx.table.column_header_cell(
+            text,
+            style={
+                "white_space": "nowrap",
+                "border_right": _cell_border,  # vertical column separator
+            },
+        ),
+        "td": lambda text: rx.table.cell(
+            text,
+            style={
+                "border_right": _cell_border,  # vertical column separator
+            },
+        ),
+    }
+
+    return rx.markdown(content, component_map=markdown_component_map, **props)

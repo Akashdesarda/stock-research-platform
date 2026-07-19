@@ -6,8 +6,9 @@ import reflex as rx
 from agno.client import AgentOSClient
 from agno.run import agent as agent_event
 from httpx2 import AsyncClient, Timeout
-from pydantic import BaseModel
 from stocksense.config import get_settings
+
+from webapp.types import Message, RunState, TraceStep
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -18,6 +19,8 @@ class CommonMixin(rx.State, mixin=True):
 
     selected_exchange: str = ""
     selected_ticker: list[str] = []
+    trace_steps: list[TraceStep] = []
+    steps_open: bool = False
 
     @rx.var
     async def available_exchanges(self) -> pl.DataFrame:
@@ -32,12 +35,10 @@ class CommonMixin(rx.State, mixin=True):
             # NOTE - response --> [exchange_symbol: exchange_name]
             exch_response = response.json()
             # NOTE - df --> | exch_symbol | exch_name | exch_name (exch_symbol) |
-            return pl.DataFrame(
-                {
-                    "symbol": exch_response.keys(),
-                    "name": exch_response.values(),
-                }
-            ).with_columns(dropdown=pl.col("name") + " (" + pl.col("symbol") + ")")
+            return pl.DataFrame({
+                "symbol": exch_response.keys(),
+                "name": exch_response.values(),
+            }).with_columns(dropdown=pl.col("name") + " (" + pl.col("symbol") + ")")
 
     @rx.var
     async def exchange_dropdown_list(self) -> list[str]:
@@ -58,12 +59,10 @@ class CommonMixin(rx.State, mixin=True):
 
             for exch in available_tickers:
                 if not tickers_wrt_exchange[exch]:
-                    available_tickers[exch] = pl.DataFrame(
-                        {
-                            "ticker": [],
-                            "company": [],
-                        }
-                    ).with_columns(dropdown=pl.lit(""))
+                    available_tickers[exch] = pl.DataFrame({
+                        "ticker": [],
+                        "company": [],
+                    }).with_columns(dropdown=pl.lit(""))
                 else:
                     available_tickers[exch] = pl.DataFrame(tickers_wrt_exchange[exch])
                     available_tickers[exch] = available_tickers[exch].with_columns(
@@ -80,6 +79,19 @@ class CommonMixin(rx.State, mixin=True):
             return []
         df = _[self.selected_exchange]
         return df.select("dropdown").to_series().to_list()
+
+    @rx.var
+    async def ticker_history_columns(self) -> list[str]:
+        """Fetch column names for the stock history table."""
+        async with self._stockdb_client() as client:
+            response = await client.get(
+                url="/per-security/nse/tcs/history",
+                params={"interval": "1d", "period": "1d"},
+            )
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            return list(payload[0].keys()) if payload else []
 
     @rx.event
     async def get_exchange_symbol(self, dropdown_value: str):
@@ -107,28 +119,30 @@ class CommonMixin(rx.State, mixin=True):
         _ = await self.available_tickers
         df = _[self.selected_exchange]
         self.selected_ticker = (
-            df.filter(pl.col("dropdown").is_in(dropdown_values))
+            df
+            .filter(pl.col("dropdown").is_in(dropdown_values))
             .select("ticker")
             .to_series()
             .to_list()
         )
 
-    async def get_ticker_history_columns(self) -> list[str]:
-        """Fetch column names for the stock history table."""
-        async with self._stockdb_client() as client:
-            response = await client.get(
-                url="/per-security/nse/tcs/history",
-                params={"interval": "1d", "period": "1d"},
-            )
-            if response.status_code != 200:
-                return []
-            payload = response.json()
-            return list(payload[0].keys()) if payload else []
+    @rx.event
+    async def toggle_steps(self):
+        """Toggle the collapse state of the ticker selection form."""
+        self.steps_open = not self.steps_open
+
+    def _record_step(self, step: TraceStep):
+        """Generic step sink. Chat states override to also attach to a message."""
+        self.trace_steps = [*self.trace_steps, step]
+
+    def _reset_steps(self):
+        self.trace_steps = []
+        self.steps_open = True
 
     def _stockdb_client(self) -> AsyncClient:
         """Return a configured httpx AsyncClient."""
         return AsyncClient(
-            timeout=Timeout(connect=5, read=120, write=120),
+            timeout=Timeout(connect=5, read=120, write=120, pool=10),
             follow_redirects=True,
             base_url=f"{settings.common.base_url}:{settings.stockdb.port}/api",
         )
@@ -209,17 +223,13 @@ class TickerSelectionMixin(CommonMixin, mixin=True):
         await self.get_ticker_symbols(normalized_values)
 
 
-class Message(BaseModel):
-    role: str
-    content: str
-
-
 class ChatMixin(rx.State, mixin=True):
     """A mixin state for common chat data."""
 
     prompt: str = ""
     messages: list[Message] = []
-    is_loading: bool = False
+    run_state: str = RunState.idle.value
+    trace_steps: list[TraceStep] = []
 
     @rx.event
     def set_prompt(self, value: str):
@@ -228,7 +238,7 @@ class ChatMixin(rx.State, mixin=True):
     @rx.event
     def reset_prompt(self):
         self.prompt = ""
-        self.is_loading = True
+        # self.is_loading = True
 
     @rx.event
     async def append_message(self, role: Literal["user", "assistant"], content: str):
@@ -241,31 +251,105 @@ class ChatMixin(rx.State, mixin=True):
         if role == "user":
             yield type(self).reset_prompt
 
+    @rx.event
+    def toggle_message_steps(self, index: int):
+        msg = self.messages[index]
+        self.messages[index] = Message(
+            role=msg.role,
+            content=msg.content,
+            steps=msg.steps,
+            steps_open=not msg.steps_open,
+        )
+
+    def _record_step(self, step: TraceStep):
+        # attach to the active assistant message
+        if self.messages and self.messages[-1].role == "assistant":
+            last = self.messages[-1]
+            self.messages[-1] = Message(
+                role="assistant",
+                content=last.content,
+                steps=[*last.steps, step],
+                steps_open=last.steps_open,
+                run_state=last.run_state,
+            )
+
+    def _reset_steps(self):
+        self.trace_steps = []
+
+    def _update_last_assistant(
+        self,
+        *,
+        content: str | None = None,
+        append_content: str | None = None,
+    ):
+        """Update the streaming assistant message while preserving steps."""
+        if not (self.messages and self.messages[-1].role == "assistant"):
+            return
+        last = self.messages[-1]
+        new_content = last.content
+        # appending text delta for streaming assistant
+        if append_content is not None:
+            new_content = last.content + append_content
+        # replacing the entire message content for non-streaming assistant
+        if content is not None:
+            new_content = content
+        self.messages[-1] = Message(
+            role="assistant",
+            content=new_content,
+            # preserve steps and state
+            steps=last.steps,
+            steps_open=last.steps_open,
+            run_state=last.run_state,
+        )
+
 
 class AgentRunMixin(rx.State, mixin=True):
     """A mixin state for common agent run data."""
 
-    agent_is_generating: bool = False  # Single busy flag: drives the spinner, disables the button, gates cancel, and prevents overlapping runs.
+    run_state: str = RunState.idle.value
+    trace_steps: list[TraceStep] = []
+    messages: list[Message] = []
+
     agent_run_id: str = ""
     agent_error: str = ""
     agent_status_message: str = ""
-    agent_steps: list[str] = []
 
     _active_agent_id: str = ""
+
+    @rx.var
+    def has_resumable_run(self) -> bool:
+        """True when the last run was cancelled/errored and could be resumed (future)."""
+        return self.run_state in (RunState.cancelled.value, RunState.error.value)
 
     async def agent_run(self, **kwargs) -> agent_event.RunOutput:
         async with self:
             self._active_agent_id = kwargs["agent_id"]
+            self._record_step(
+                TraceStep(name=f"Running agent {kwargs['agent_id']}", icon="bot")
+            )
         try:
             client = self._ai_client()
             run_output = await client.run_agent(**kwargs)
             async with self:
                 self.agent_run_id = run_output.run_id
+                self._record_step(
+                    TraceStep(
+                        name=f"Agent {kwargs['agent_id']} completed run", icon="bot"
+                    )
+                )
             return run_output
 
         except Exception as e:
             logger.exception("Agent stream failed", exc_info=e)
             async with self:
+                self._record_step(
+                    TraceStep(
+                        name=f"Agent {kwargs['agent_id']} failed to generate",
+                        icon="bot",
+                        detail=str(e),
+                        passed=False,
+                    )
+                )
                 self.agent_error = f"Failed to generate due to error: {e}."
             # Re-raise to preserve return type contract
             raise
@@ -282,23 +366,27 @@ class AgentRunMixin(rx.State, mixin=True):
         async with self:
             # Record the active agent id up front (always, regardless of lifecycle mode) so
             # cancel_agent_run can target the right run even when manage_lifecycle=False.
+            self._record_step(
+                TraceStep(name=f"Running agent {kwargs['agent_id']}", icon="bot")
+            )
             self._active_agent_id = kwargs["agent_id"]
 
-        if manage_lifecycle:
-            # manage_lifecycle=True: the mixin owns the agent_is_generating window (sets/resets + guards).
+            # manage_lifecycle=True: the mixin owns the generating state window (sets/resets + guards).
             # manage_lifecycle=False: the caller owns it (e.g. to wrap pre-stream work like cache lookup).
-            if self.agent_is_generating:
-                # Guard: a run is already in flight, ignore the new request (prevents overlapping runs).
+        if manage_lifecycle:
+            # Guard: a run is already in flight, ignore the new request (prevents overlapping runs).
+            if self.run_state == RunState.generating.value:
                 return
 
             # Update UI state before starting the agent run
             async with self:
                 # Mark busy: flips button to disabled + shows spinner in the UI.
-                self.agent_is_generating = True
+                self.run_state = RunState.generating.value
                 self.agent_error = ""
                 self.agent_status_message = "Generating…"
-                self.agent_steps = []
                 self.agent_run_id = ""
+                self._reset_steps()
+                self._set_last_assistant_run_state(RunState.generating)
 
         try:
             client = self._ai_client()
@@ -308,7 +396,13 @@ class AgentRunMixin(rx.State, mixin=True):
                 if isinstance(event, agent_event.RunStartedEvent):
                     async with self:
                         self.agent_run_id = event.run_id
-                        self.agent_steps.append(f"Running model: {event.model}")
+                        self._record_step(
+                            TraceStep(
+                                name="Running model",
+                                icon="brain",
+                                detail=f"Model: {event.model}",
+                            )
+                        )
                         logger.debug(
                             f"using model {event.model} for agent: {event.agent_id} with run_id: {self.agent_run_id}"
                         )
@@ -316,20 +410,33 @@ class AgentRunMixin(rx.State, mixin=True):
                 elif isinstance(event, agent_event.ToolCallStartedEvent):
                     if event.tool and event.tool.tool_name:
                         async with self:
-                            self.agent_steps.append(
-                                f"Calling tool {event.tool.tool_name}"
+                            self._record_step(
+                                TraceStep(
+                                    name="Tool calling",
+                                    icon="hammer",
+                                    detail=f"Tool: {event.tool.tool_name}",
+                                )
                             )
                 elif isinstance(event, agent_event.ToolCallCompletedEvent):
                     if event.tool and event.tool.tool_name:
                         async with self:
-                            self.agent_steps.append(
-                                f"Tool {event.tool.tool_name} completed"
+                            self._record_step(
+                                TraceStep(
+                                    name="Tool completed",
+                                    icon="circle_check_big",
+                                    detail=f"Tool: {event.tool.tool_name}",
+                                )
                             )
                 elif isinstance(event, agent_event.ToolCallErrorEvent):
                     if event.tool and event.tool.tool_name:
                         async with self:
-                            self.agent_steps.append(
-                                f"Tool {event.tool.tool_name} failed"
+                            self._record_step(
+                                TraceStep(
+                                    name="Tool error",
+                                    icon="circle_x",
+                                    detail=f"Tool: {event.tool.tool_name}",
+                                    passed=False,
+                                )
                             )
                 # Content delta event
                 elif isinstance(event, agent_event.RunContentEvent):
@@ -338,18 +445,36 @@ class AgentRunMixin(rx.State, mixin=True):
                 # Cancellation event
                 elif isinstance(event, agent_event.RunCancelledEvent):
                     async with self:
-                        self.agent_status_message = "Request Cancelled"
-                        self.agent_steps.append(f"Run cancelled: {event.reason or ''}")
+                        self._record_step(
+                            TraceStep(
+                                name="Request cancelled",
+                                icon="circle_minus",
+                                passed=False,
+                            )
+                        )
+                        self.agent_status_message = "Request cancelled"
+                        # Mark both the global and per-message state as resumable.
+                        self.run_state = RunState.cancelled.value
+                        self._set_last_assistant_run_state(RunState.cancelled)
                     return
                 # Error event
                 elif isinstance(event, agent_event.RunErrorEvent):
                     async with self:
-                        self.agent_error = (
-                            f"Agent run failed: {event.content or event.error_type}"
+                        self._record_step(
+                            TraceStep(
+                                name=f"Agent {kwargs['agent_id']} failed to generate",
+                                icon="bot",
+                                detail=f"Error: {event.content}",
+                                passed=False,
+                            )
                         )
                         self.agent_status_message = (
                             "Generation failed. Please try again later."
                         )
+                        self.agent_error = event.content
+                        self.run_state = RunState.error.value
+                        self._set_last_assistant_run_state(RunState.error)
+                        logger.error(f"Run error: {event.content}")
                     return
                 # Completion event
                 elif isinstance(event, agent_event.RunCompletedEvent):
@@ -359,42 +484,96 @@ class AgentRunMixin(rx.State, mixin=True):
             # processing the completion event
             if completed is None:
                 async with self:
-                    self.agent_error = "Generation ended without a completion event."
-                    self.agent_status_message = "Generation failed."
+                    self.agent_error = "Generation ended without a completion event"
+                    self.agent_status_message = "Generation failed"
+                    self.run_state = RunState.error.value
+                    self._set_last_assistant_run_state(RunState.error)
                 return
             if on_complete:
                 await on_complete(completed)
 
+            # Clean finish with LLM output
+            async with self:
+                self._record_step(
+                    TraceStep(
+                        name=f"Agent {kwargs['agent_id']} completed run", icon="bot"
+                    )
+                )
+                self.run_state = RunState.completed.value
+                self._set_last_assistant_run_state(RunState.completed)
+
         except Exception as e:
             logger.exception("Agent stream failed", exc_info=e)
             async with self:
+                self._record_step(
+                    TraceStep(
+                        name=f"Agent {kwargs['agent_id']} failed to generate",
+                        icon="bot",
+                        detail=f"Error: {e}",
+                        passed=False,
+                    )
+                )
                 self.agent_error = f"Failed to generate due to error: {e}."
                 self.agent_status_message = ""
+                self.run_state = RunState.error.value
+                self._set_last_assistant_run_state(RunState.error)
 
         finally:
             if manage_lifecycle:
                 async with self:
-                    # Clear busy: re-enables the button and flips the spinner to the check icon.
-                    self.agent_is_generating = False
+                    # Only reset to idle if we ended in a terminal *non-resumable*
+                    # state. Preserve cancelled/error so resume UI stays available.
+                    if self.run_state == RunState.generating.value:
+                        # Safety net: stream ended without a terminal event.
+                        self.run_state = RunState.completed.value
+                        self._set_last_assistant_run_state(RunState.completed)
 
     @rx.event
     async def cancel_agent_run(self):
         """Request server-side cancellation of the active run."""
-        if not self.agent_is_generating or not self.agent_run_id:
-            # No live run (or no run id yet) — nothing to cancel, so this is a no-op.
+        if self.run_state != RunState.generating.value or not self.agent_run_id:
             return
         try:
             client = self._ai_client()
+            self._record_step(
+                TraceStep(name="Canceling agent run", icon="circle_minus", passed=False)
+            )
             await client.cancel_agent_run(
                 agent_id=self._active_agent_id,
                 run_id=self.agent_run_id,
             )
-            async with self:
-                self.agent_steps.append("Cancellation requested")
         except Exception as e:
             logger.error("Cancel request failed", exc_info=e)
             async with self:
                 self.agent_error = f"Failed to cancel run: {e}"
 
+    @rx.event(background=True)
+    async def resume_agent_run(self, message_index: int):
+        """Resume a previously cancelled/interrupted run"""
+        if not self.has_resumable_run:
+            return
+        # TODO - Agno's resume api
+        raise NotImplementedError("Resume not yet implemented — pending Agno API.")
+
     def _ai_client(self) -> AgentOSClient:
         return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
+
+    def _set_last_assistant_run_state(self, state: RunState):
+        """Stamp the run_state onto the streaming assistant message."""
+        if self.messages and self.messages[-1].role == "assistant":
+            last = self.messages[-1]
+            self.messages[-1] = Message(
+                role="assistant",
+                content=last.content,
+                steps=last.steps,
+                steps_open=last.steps_open,
+                run_state=state.value,
+            )
+
+    def _record_step(self, step: TraceStep):
+        """Store a trace step in the component's state."""
+        self.trace_steps = [*self.trace_steps, step]
+
+    def _reset_steps(self):
+        """Clear the flat step log."""
+        self.trace_steps = []

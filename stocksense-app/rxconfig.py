@@ -8,6 +8,7 @@ settings = get_settings()
 config = rxe.Config(
     app_name="webapp",
     plugins=[
+        rx.plugins.RadixThemesPlugin(),
         rx.plugins.SitemapPlugin(),
         rx.plugins.TailwindV4Plugin(),
     ],

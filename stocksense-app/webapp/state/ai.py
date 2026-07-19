@@ -5,7 +5,7 @@ import reflex as rx
 from agno.run.agent import RunCompletedEvent, RunContentEvent
 
 from webapp.state.shared import AgentRunMixin, ChatMixin, Message, TickerSelectionMixin
-from webapp.types import TickerChoice
+from webapp.types import RunState, TickerChoice
 
 logger = logging.getLogger("stocksense")
 
@@ -14,11 +14,11 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
     """State for the company summary research tool"""
 
     summary_result: str = ""
-
+    run_state: str = RunState.idle.value
+    # since the research work for single company, allowing only single ticker to be selected.
     allow_ticker_choice: bool = False
     ticker_choice: str = TickerChoice.desired.value
     desired_choice_as_multi_select: bool = False
-
     # Agno session used for the (summary + follow-up QA) conversation.
     current_session_id: str = ""
     # Last (exchange, ticker) the active session was created for — used to
@@ -28,7 +28,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
 
     @rx.event(background=True)
     async def generate_summary(self):
-        if self.agent_is_generating or not self.selected_ticker:
+        if (self.run_state == RunState.generating.value) or not self.selected_ticker:
             return
 
         prompt = f"Generate company summary for {self.selected_ticker[0]} in the {self.selected_exchange} exchange"
@@ -46,6 +46,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
                 self.last_summary_ticker = ticker
                 self.messages = []
                 self.summary_result = ""
+                self.run_state = RunState.idle.value
 
             # else: same company -> reuse current_session_id and keep messages.
             self.messages.append(Message(role="user", content=prompt))
@@ -66,7 +67,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
 
     @rx.event(background=True)
     async def generate_answer(self):
-        if self.agent_is_generating or not self.current_session_id:
+        if (self.run_state == RunState.generating.value) or not self.current_session_id:
             return
 
         prompt = self.prompt.strip()
@@ -74,7 +75,7 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
             return
 
         async with self:
-            self.is_loading = True
+            self.run_state = RunState.generating.value
             self.messages.append(Message(role="user", content=prompt))
             self.prompt = ""  # rest the user prompt input field.
             self.messages.append(Message(role="assistant", content=""))
@@ -92,35 +93,27 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
 
         # Always release the input button, even if the run errored.
         async with self:
-            self.is_loading = False
+            self.run_state = RunState.idle.value
 
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""
         async with self:
-            if self.messages and self.messages[-1].role == "assistant":
-                # adding next delta text to previous text content
-                last = self.messages[-1]
-                self.messages[-1] = Message(
-                    role="assistant", content=last.content + (event.content or "")
-                )
+            # assigning inline steps to last assistant message
+            self._update_last_assistant(append_content=event.content or "")
 
     async def _on_summary_completed(self, completed: RunCompletedEvent):
         async with self:
             # RunCompletedEvent.content is the full accumulated text; use it as the
             # authoritative final value for the streaming assistant message.
-            final_content = completed.content or ""
-
-            if self.messages and self.messages[-1].role == "assistant":
-                self.messages[-1] = Message(role="assistant", content=final_content)
-            self.summary_result = final_content
-            self.agent_steps.append("Summary generated successfully")
+            final = completed.content or ""
+            # assigning inline steps to last assistant message
+            self._update_last_assistant(content=final)
+            self.summary_result = final
             self.agent_status_message = "Company summary generated"
 
-    async def _on_qa_completed(self, completed):
+    async def _on_qa_completed(self, completed: RunCompletedEvent):
         async with self:
-            if self.messages and self.messages[-1].role == "assistant":
-                # latest message is the streaming assistant message, update it with Full accumulated text.
-                self.messages[-1] = Message(
-                    role="assistant", content=completed.content or ""
-                )
+            # RunCompletedEvent.content is the full accumulated text; use it as the
+            # authoritative final value for the streaming assistant message.
+            self._update_last_assistant(content=completed.content or "")
             self.agent_status_message = ""

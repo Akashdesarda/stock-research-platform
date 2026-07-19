@@ -8,59 +8,27 @@ from webapp.pages.shared_components import (
     ticker_selector,
 )
 from webapp.state.ai import CompanySummaryState
+from webapp.types import RunState
 
 
 def company_summary_component() -> rx.Component:
     return rx.vstack(
         bordered_container(
             rx.vstack(
+                #  ticker selection form
                 ticker_selector(CompanySummaryState),
                 rx.separator(size="4", width="100%"),
                 submit_button(
                     on_click=CompanySummaryState.generate_summary,
-                    disabled=CompanySummaryState.agent_is_generating
+                    disabled=(
+                        CompanySummaryState.run_state == RunState.generating.value
+                    )
                     | (CompanySummaryState.selected_ticker == []),
                 ),
-                rx.cond(
-                    CompanySummaryState.agent_is_generating
-                    | (CompanySummaryState.agent_status_message != ""),
-                    rx.callout(
-                        rx.vstack(
-                            rx.hstack(
-                                rx.cond(
-                                    CompanySummaryState.agent_is_generating,
-                                    rx.spinner(size="2"),
-                                    rx.icon("check", size=16),
-                                ),
-                                rx.text(
-                                    CompanySummaryState.agent_status_message,
-                                    size="2",
-                                    weight="medium",
-                                ),
-                                spacing="2",
-                                align="center",
-                            ),
-                            rx.foreach(
-                                CompanySummaryState.agent_steps,
-                                lambda step: rx.hstack(
-                                    rx.icon("check", size=16, color="green"),
-                                    rx.text(step, size="2", color="gray"),
-                                    spacing="2",
-                                    align="center",
-                                ),
-                            ),
-                            spacing="2",
-                            width="100%",
-                        ),
-                        icon="sparkles",
-                        color_scheme="blue",
-                        width="100%",
-                    ),
-                    rx.fragment(),
-                ),
+                # Error callout (only when not actively generating)
                 rx.cond(
                     (CompanySummaryState.agent_error != "")
-                    & (CompanySummaryState.agent_is_generating is False),
+                    & (CompanySummaryState.run_state != RunState.generating.value),
                     rx.callout(
                         CompanySummaryState.agent_error,
                         icon="triangle_alert",
@@ -69,12 +37,23 @@ def company_summary_component() -> rx.Component:
                     ),
                     rx.fragment(),
                 ),
+                spacing="4",
+                width="100%",
             )
         ),
+        # chat area (messages + inline steps)
         chat_window(CompanySummaryState),
+        # chat input (only after first summary exists)
         rx.cond(
             CompanySummaryState.summary_result != "",
-            chat_input(CompanySummaryState),
+            chat_input(
+                CompanySummaryState,
+                on_submit=CompanySummaryState.generate_answer,
+                on_cancel=CompanySummaryState.cancel_agent_run,
+            ),
             rx.fragment(),
         ),
+        width="100%",
+        height="100%",
+        spacing="4",
     )

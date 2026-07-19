@@ -196,7 +196,7 @@ def inline_steps(state: type[ChatMixin], msg, index) -> rx.Component:
                 spacing="1",
                 align="center",
                 cursor="pointer",
-                on_click=lambda: state.toggle_message_steps(index),
+                on_click=state.toggle_message_steps(index),
                 padding="4px 8px",
                 border_radius="8px",
                 _hover={"background": rx.color("gray", 3)},

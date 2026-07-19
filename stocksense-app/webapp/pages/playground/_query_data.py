@@ -346,7 +346,7 @@ def ai_panel() -> rx.Component:
                     DataState.ai_generated_sql != "",
                     rx.vstack(
                         rx.text("Generated SQL", size="2", weight="medium"),
-                        refined_markdown(f"```sql\n{DataState.ai_generated_sql}\n```"),
+                        refined_markdown("```sql\n" + DataState.ai_generated_sql + "\n```"),
                         form_field(
                             label="Edit SQL before running",
                             control=text_area(

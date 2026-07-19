@@ -121,7 +121,7 @@ def _submit_workflow(on_click=None, disabled=None) -> rx.Component:
     if on_click is None:
         on_click = DataState.fetch_data
     if disabled is None:
-        disabled = DataState.run_state == RunState.generating.value
+        disabled = DataState.fetch_state == RunState.generating.value
 
     return rx.hstack(
         submit_button(
@@ -129,7 +129,7 @@ def _submit_workflow(on_click=None, disabled=None) -> rx.Component:
             disabled=disabled,
         ),
         rx.cond(
-            DataState.run_state == RunState.generating.value,
+            DataState.fetch_state == RunState.generating.value,
             rx.hstack(
                 rx.spinner(size="3"),
                 rx.text(
@@ -280,7 +280,7 @@ def manual_panel() -> rx.Component:
             ),
             _submit_workflow(
                 disabled=(DataState.selected_exchange == "")
-                | (DataState.run_state == RunState.generating.value)
+                | (DataState.fetch_state == RunState.generating.value)
             ),
             width="100%",
             spacing="4",
@@ -367,7 +367,7 @@ def ai_panel() -> rx.Component:
                                 DataState.fetch_data,
                             ],
                             disabled=(DataState.selected_exchange == "")
-                            | (DataState.run_state == RunState.generating.value)
+                            | (DataState.fetch_state == RunState.generating.value)
                             | (DataState.ai_sql_query == ""),
                         ),
                         spacing="3",

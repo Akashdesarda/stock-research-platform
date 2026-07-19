@@ -54,7 +54,8 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     columns_def: list[dict] = []
     manual_submitted: bool = False
     fetch_data_ready: bool = False
-    run_state: str = RunState.idle.value
+    run_state: str = RunState.idle.value  # for agent (text-to-SQL)
+    fetch_state: str = RunState.idle.value  # for manual/SQL fetch flow
     _cancel_event: asyncio.Event = asyncio.Event()
 
     # Registered dataset state
@@ -133,7 +134,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     def cancel_fetching(self):
         """Cancel the ongoing fetch operation."""
         self._cancel_event.set()
-        self.run_state = RunState.cancelled.value
+        self.fetch_state = RunState.cancelled.value
         self.data = []
         self.columns_def = []
         self.fetch_data_ready = False
@@ -165,9 +166,9 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
     async def fetch_data(self):
         """Fetch data based on the current state settings."""
         async with self:
-            if self.run_state == RunState.generating.value:
+            if self.fetch_state == RunState.generating.value:
                 return
-            self.run_state = RunState.generating.value
+            self.fetch_state = RunState.generating.value
             self.fetch_data_ready = False
             self.agent_error = ""
             self.data = []
@@ -401,7 +402,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
                 self.data = _.to_dicts()
                 self.columns_def = column_def
                 self.fetch_data_ready = True
-                self.run_state = RunState.idle.value
+                self.fetch_state = RunState.idle.value
 
     async def _fetch_via_sql_api(self):
         """Fetch data using the SQL API"""
@@ -416,7 +417,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
             if response.is_error:
                 async with self:
                     self.agent_error = f"Error fetching data: {response.text}"
-                    self.run_state = RunState.error.value
+                    self.fetch_state = RunState.error.value
                 return
 
             result = response.json()
@@ -441,7 +442,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
         except Exception as e:
             logger.error(f"Error fetching data: {e}")
             async with self:
-                self.run_state = RunState.error.value
+                self.fetch_state = RunState.error.value
 
 
 DATASET_COLUMN_DEFS = [

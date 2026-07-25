@@ -11,5 +11,5 @@ __all__ = [
     "DATASET_DETAIL_PARAMS",
     "DataState",
     "RegisteredDatasetState",
-    "DiscoveryState",
+    "StrategyDiscoveryState",
 ]

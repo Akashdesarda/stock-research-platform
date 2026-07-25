@@ -1,11 +1,10 @@
-from stocksense.strategy.catalog import StrategyDescriptor
-from webapp.components.inputs import dropdown_select
-from webapp.components.layout import form_field
 import reflex as rx
-from stocksense.strategy.catalog import AnalysisDomainIndex
+from stocksense.strategy.catalog import AnalysisDomainIndex, StrategyDescriptor
 
+from webapp.components.inputs import dropdown_select
 from webapp.components.layout import (
     bordered_container,
+    form_field,
     page_layout,
     responsive_grid,
     section_header,

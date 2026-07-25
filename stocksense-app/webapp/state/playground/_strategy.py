@@ -1,19 +1,19 @@
-from stocksense.strategy.catalog import AnalysisDomainIndex
 import logging
 
+import reflex as rx
+from stocksense.config import get_settings
 from stocksense.strategy.catalog import (
+    AnalysisDomainIndex,
     AnalysisDomainTypes,
     StrategyCategoryTypes,
     StrategyDescriptor,
+    get_strategy_by_id,
 )
 from stocksense.strategy.catalog.registry import (
     StrategyRegistry,
-    get_registry,
     filter_strategies,
+    get_registry,
 )
-import reflex as rx
-from stocksense.config import get_settings
-from stocksense.strategy.catalog import get_strategy_by_id
 
 from webapp.state.shared import AgentRunMixin, TickerSelectionMixin
 from webapp.types import RunState, TraceStep

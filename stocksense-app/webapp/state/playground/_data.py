@@ -205,12 +205,7 @@ class DataState(AgentRunMixin, TickerSelectionMixin, rx.State):
             self.agent_error = ""
             self.agent_status_message = "Generating SQL query"
             self._reset_steps()
-            self._record_step(
-                TraceStep(
-                    name="Initializing",
-                    detail="Starting text-to-SQL agent",
-                )
-            )
+            self._record_step(TraceStep(name="Initializing"))
             self.ai_generated_sql = ""
             self.ai_sql_query = ""
             self.ai_thinking_part = ""

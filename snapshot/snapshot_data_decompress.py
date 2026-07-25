@@ -16,6 +16,13 @@ def is_dir_empty(path: Path):
     return not any(path.iterdir()) if path.exists() else True
 
 
+def create_required_folders():
+    # parent dir
+    Path("/shared/assets").mkdir(parents=True, exist_ok=True)
+    # sqlite
+    Path("/shared/sqlite").mkdir(parents=True, exist_ok=True)
+
+
 def decompress_archive(
     archive_path: Path, extract_dir: Path, force_decompression=False
 ):
@@ -49,9 +56,14 @@ if __name__ == "__main__":
     FORCE_DECOMPRESSION = (
         os.environ.get("FORCE_DECOMPRESSION", "false").lower() == "true"
     )
+
+    console.print("[bold green]creating required directory[/bold green]")
+    create_required_folders()
+
     decompress_archive(
         Path("assets.tar.zst"), Path("/shared"), force_decompression=FORCE_DECOMPRESSION
     )
+
     console.print(
         "[bold green]copying config.toml to shared assets directory...[/bold green]"
     )

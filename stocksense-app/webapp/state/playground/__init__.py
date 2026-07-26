@@ -4,7 +4,7 @@ from ._data import (
     DataState,
     RegisteredDatasetState,
 )
-from ._strategy import DiscoveryState
+from ._strategy import StrategyDiscoveryState
 
 __all__ = [
     "DATASET_COLUMN_DEFS",

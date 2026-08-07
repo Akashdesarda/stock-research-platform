@@ -263,6 +263,7 @@ def responsive_grid(
     *children,
     columns=None,
     spacing: Literal["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] = "4",
+    **props,
 ):
     """A layout wrapper that adjusts columns based on screen size."""
     if columns is None:
@@ -276,6 +277,7 @@ def responsive_grid(
         ),
         spacing=spacing,
         width="100%",
+        **props,
     )
 
 

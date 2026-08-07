@@ -17,10 +17,13 @@
 			"agno",
 			"groq",
 			"mantine",
+			"OPENROUTER",
+			"SARVAM",
 			"stockdb",
 			"stocksense",
 			"talib",
-			"timeperiod"
+			"timeperiod",
+			"venv"
 		],
 		"editor.fontFamily": "'Monaspace Argon NF', monospace",
 		"ruff.format.preview": true,

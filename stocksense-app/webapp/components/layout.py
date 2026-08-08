@@ -179,6 +179,64 @@ def section_header(
     )
 
 
+def subsection_header(title: str | rx.Var) -> rx.Component:
+    """A compact in-card section label, smaller than section_header."""
+    return rx.text(title, size="2", weight="bold", color_scheme="gray")
+
+
+def bullet_list(items) -> rx.Component:
+    """Unordered list rendered from a list of strings / state vars."""
+    return rx.list.unordered(
+        rx.foreach(
+            items,
+            lambda item: rx.list.item(item),
+        )
+    )
+
+
+def optional_bullet_list(items, empty: str = "—") -> rx.Component:
+    """Bullet list with a muted placeholder when items is empty/None."""
+    return rx.cond(
+        items,
+        bullet_list(items),
+        rx.text(empty, color_scheme="gray"),
+    )
+
+
+def badge_row(items, color_scheme: str = "gray") -> rx.Component:
+    """Wrapping row of soft badges for tags, enums, column names, etc."""
+    return rx.hstack(
+        rx.foreach(
+            items,
+            lambda item: rx.badge(item, variant="soft", color_scheme=color_scheme),
+        ),
+        wrap="wrap",
+        spacing="2",
+    )
+
+
+def data_list_item(label: str | rx.Var, value: rx.Component | str | rx.Var) -> rx.Component:
+    """Single horizontal data-list row (label + value)."""
+    return rx.data_list.item(
+        rx.data_list.label(label),
+        rx.data_list.value(value),
+    )
+
+
+def data_list(
+    *items: rx.Component,
+    orientation: Literal["horizontal", "vertical"] = "horizontal",
+    size: Literal["1", "2", "3"] = "2",
+) -> rx.Component:
+    """Standardized data list used for key/value detail panels."""
+    return rx.data_list.root(
+        *items,
+        orientation=orientation,
+        size=size,
+        width="100%",
+    )
+
+
 def dialog_actions(
     *,
     on_submit=None,

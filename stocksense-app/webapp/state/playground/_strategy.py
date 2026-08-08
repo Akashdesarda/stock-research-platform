@@ -84,6 +84,73 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
     def strategy_json(self) -> str:
         return "" if self.strategy is None else self.strategy.model_dump_json(indent=2)
 
+    @rx.var(cache=True)
+    def strategy_category_label(self) -> str:
+        if self.strategy is None:
+            return ""
+        category = self.strategy.category
+        return category.value if hasattr(category, "value") else str(category)
+
+    @rx.var(cache=True)
+    def domain_id_labels(self) -> dict[str, str]:
+        labels: dict[str, str] = {}
+        for key, domain in self._registry.domains.domains.items():
+            domain_id = domain.id
+            labels[key] = (
+                domain_id.value.title()
+                if hasattr(domain_id, "value")
+                else str(domain_id)
+            )
+        return labels
+
+    @rx.var(cache=True)
+    def strategy_market_regimes(self) -> list[str]:
+        if self.strategy is None:
+            return []
+        return [
+            r.value if hasattr(r, "value") else str(r)
+            for r in self.strategy.market_regimes
+        ]
+
+    @rx.var(cache=True)
+    def strategy_time_horizons(self) -> list[str]:
+        if self.strategy is None:
+            return []
+        return [
+            h.value if hasattr(h, "value") else str(h)
+            for h in self.strategy.time_horizons
+        ]
+
+    @rx.var(cache=True)
+    def strategy_parameter_rows(self) -> list[dict[str, str]]:
+        if self.strategy is None:
+            return []
+        rows: list[dict[str, str]] = []
+        for name, meta in self.strategy.parameters.items():
+            if not isinstance(meta, dict):
+                rows.append({
+                    "name": name,
+                    "type": "",
+                    "default": str(meta),
+                    "range": "",
+                    "description": "",
+                })
+                continue
+            min_v, max_v = meta.get("min"), meta.get("max")
+            range_str = (
+                f"{min_v}–{max_v}" if min_v is not None and max_v is not None else ""
+            )
+            rows.append({
+                "name": name,
+                "type": str(meta.get("type", "")),
+                "default": (
+                    "" if meta.get("default") is None else str(meta["default"])
+                ),
+                "range": range_str,
+                "description": str(meta.get("description", "")),
+            })
+        return rows
+
     @rx.event
     def set_domain(self, value: str) -> None:
         self.selected_domain = value

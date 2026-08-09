@@ -183,6 +183,14 @@ class StrategyAIState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.State):
     # (Also declared on ChatMixin — kept here for clarity of this page's contract.)
     current_session_id: str = ""
 
+    @rx.event
+    def submit_example(self, text: str):
+        """Fill the prompt from an empty-state chip and submit (click = send)."""
+        if self.run_state == RunState.generating.value:
+            return
+        self.prompt = text
+        yield StrategyAIState.generate_answer
+
     @rx.event(background=True)
     async def generate_answer(self):
         if self.run_state == RunState.generating.value:

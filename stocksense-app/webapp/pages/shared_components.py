@@ -276,20 +276,114 @@ def _chat_bubble(state: type[ChatMixin], msg, index) -> rx.Component:
     )
 
 
-def chat_window(state: type[ChatMixin]) -> rx.Component:
-    return rx.box(
+def _chat_empty_state(
+    state: type[ChatMixin],
+    *,
+    empty_title: str | None,
+    empty_description: str | None,
+    example_prompts: list[str] | None,
+    on_example: EventType[str] | None,
+) -> rx.Component:
+    """Centered purpose + clickable example prompts when the conversation is empty."""
+    prompts = example_prompts or []
+
+    def _example_button(text: str) -> rx.Component:
+        if on_example is not None:
+            click_handler = on_example(text)
+        else:
+            click_handler = state.set_prompt(text)
+        return rx.button(
+            text,
+            on_click=click_handler,
+            size="2",
+            variant="soft",
+            radius="large",
+            cursor="pointer",
+            white_space="normal",
+            height="auto",
+            padding_y="0.6em",
+            text_align="left",
+        )
+
+    children: list[rx.Component] = []
+    if empty_title:
+        children.append(
+            rx.heading(empty_title, size="5", weight="medium", text_align="center")
+        )
+    if empty_description:
+        children.append(
+            rx.text(
+                empty_description,
+                size="3",
+                color_scheme="gray",
+                text_align="center",
+                max_width="32rem",
+            )
+        )
+    if prompts:
+        children.append(
+            rx.vstack(
+                *[_example_button(p) for p in prompts],
+                spacing="2",
+                width="100%",
+                max_width="28rem",
+                align="stretch",
+            )
+        )
+
+    return rx.center(
         rx.vstack(
-            rx.foreach(
-                state.messages,
-                lambda msg, i: _chat_bubble(state, msg, i),
-            ),
+            *children,
+            spacing="4",
+            align="center",
             width="100%",
-            max_width="768px",  # readable column
-            margin="0 auto",
-            padding_x="16px",
-            padding_y="24px",
-            spacing="6",  # gap between turns
         ),
+        width="100%",
+        min_height="16rem",
+        padding="2rem",
+    )
+
+
+def chat_window(
+    state: type[ChatMixin],
+    *,
+    empty_title: str | None = None,
+    empty_description: str | None = None,
+    example_prompts: list[str] | None = None,
+    on_example: EventType[str] | None = None,
+) -> rx.Component:
+    has_empty_state = bool(empty_title or empty_description or example_prompts)
+    message_list = rx.vstack(
+        rx.foreach(
+            state.messages,
+            lambda msg, i: _chat_bubble(state, msg, i),
+        ),
+        width="100%",
+        max_width="768px",  # readable column
+        margin="0 auto",
+        padding_x="16px",
+        padding_y="24px",
+        spacing="6",  # gap between turns
+    )
+
+    content = (
+        rx.cond(
+            state.messages.length() == 0,
+            _chat_empty_state(
+                state,
+                empty_title=empty_title,
+                empty_description=empty_description,
+                example_prompts=example_prompts,
+                on_example=on_example,
+            ),
+            message_list,
+        )
+        if has_empty_state
+        else message_list
+    )
+
+    return rx.box(
+        content,
         flex="1",
         overflow_y="auto",
         width="100%",
@@ -387,8 +481,6 @@ def chat_input(
         width="100%",
         padding="1em",
         backdrop_filter="blur(10px)",
-        border_top="1px solid",
-        border_color=rx.color("gray", 4),
         z_index="10",
         display="flex",
         justify_content="center",

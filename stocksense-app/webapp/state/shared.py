@@ -230,6 +230,8 @@ class ChatMixin(rx.State, mixin=True):
     messages: list[Message] = []
     run_state: str = RunState.idle.value
     trace_steps: list[TraceStep] = []
+    # Optional Agno session id used by multi-turn chat pages.
+    current_session_id: str = ""
 
     @rx.event
     def set_prompt(self, value: str):
@@ -239,6 +241,22 @@ class ChatMixin(rx.State, mixin=True):
     def reset_prompt(self):
         self.prompt = ""
         # self.is_loading = True
+
+    @rx.event
+    def reset_chat(self):
+        """Clear the conversation so the next message starts a fresh session."""
+        if self.run_state == RunState.generating.value:
+            return
+        self.current_session_id = ""
+        self.messages = []
+        self.prompt = ""
+        self.run_state = RunState.idle.value
+        self._reset_steps()
+        # AgentRunMixin fields (present when this mixin is composed with it).
+        self.agent_error = ""
+        self.agent_status_message = ""
+        self.agent_run_id = ""
+        self._active_agent_id = ""
 
     @rx.event
     async def append_message(self, role: Literal["user", "assistant"], content: str):

@@ -305,6 +305,22 @@ def chat_input(
 
     return rx.box(
         rx.hstack(
+            # New chat — native to all chat_input consumers via ChatMixin.reset_chat
+            rx.cond(
+                state.messages.length() > 0,
+                rx.button(
+                    rx.icon("message-square-plus", size=16),
+                    on_click=state.reset_chat,
+                    disabled=is_generating,
+                    size="2",
+                    radius="full",
+                    variant="soft",
+                    cursor=rx.cond(is_generating, "not-allowed", "pointer"),
+                    margin_left="0.5em",
+                    title="New chat",
+                ),
+                rx.fragment(),
+            ),
             rx.text_area(
                 value=state.prompt,
                 placeholder="Ask StockSense...",

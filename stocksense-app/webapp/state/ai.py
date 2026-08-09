@@ -26,6 +26,18 @@ class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.Sta
     last_summary_exchange: str = ""
     last_summary_ticker: str = ""
 
+    @rx.event
+    def reset_chat(self):
+        """Clear the summary conversation and allow a fresh Generate Summary run."""
+        if self.run_state == RunState.generating.value:
+            return
+        # ChatMixin.reset_chat clears messages, session, prompt, and agent-run fields.
+        super().reset_chat()
+        # Page-specific bootstrap state so "New chat" unlocks Generate Summary again.
+        self.summary_result = ""
+        self.last_summary_exchange = ""
+        self.last_summary_ticker = ""
+
     @rx.event(background=True)
     async def generate_summary(self):
         if (self.run_state == RunState.generating.value) or not self.selected_ticker:

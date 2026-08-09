@@ -1,6 +1,8 @@
 import logging
+import uuid
 
 import reflex as rx
+from agno.run.agent import RunCompletedEvent, RunContentEvent
 from stocksense.config import get_settings
 from stocksense.strategy.catalog import (
     AnalysisDomainIndex,
@@ -15,8 +17,8 @@ from stocksense.strategy.catalog.registry import (
     get_registry,
 )
 
-from webapp.state.shared import AgentRunMixin, TickerSelectionMixin
-from webapp.types import RunState, TraceStep
+from webapp.state.shared import AgentRunMixin, ChatMixin, TickerSelectionMixin
+from webapp.types import Message, RunState, TraceStep
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -171,3 +173,51 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
         self.strategy = (
             get_strategy_by_id(strategy_id) if strategy_id is not None else None
         )
+
+
+class StrategyAIState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.State):
+    """State for multi-turn strategy-selector chat (no pre-chat bootstrap step)."""
+
+    run_state: str = RunState.idle.value
+    # Agno session for the conversation; minted on the first user message.
+    # (Also declared on ChatMixin — kept here for clarity of this page's contract.)
+    current_session_id: str = ""
+
+    @rx.event(background=True)
+    async def generate_answer(self):
+        if self.run_state == RunState.generating.value:
+            return
+
+        prompt = self.prompt.strip()
+        if not prompt:
+            return
+
+        async with self:
+            # First turn: create a session. Later turns reuse it for multi-turn QA.
+            if not self.current_session_id:
+                self.current_session_id = str(uuid.uuid4())
+            # Do not set run_state=generating here — stream_agent_run(manage_lifecycle=True)
+            # owns the busy window and will no-op if we mark generating first.
+            self.messages.append(Message(role="user", content=prompt))
+            self.prompt = ""  # rest the user prompt input field.
+            self.messages.append(Message(role="assistant", content=""))
+            session_id = self.current_session_id
+
+        await self.stream_agent_run(
+            agent_id="strategy-selector",
+            message=prompt,
+            session_id=session_id,
+            on_content=self._on_content,
+            on_complete=self._on_answer_completed,
+            manage_lifecycle=True,
+        )
+
+    async def _on_content(self, event: RunContentEvent):
+        """Append each text delta to the streaming assistant message."""
+        async with self:
+            self._update_last_assistant(append_content=event.content or "")
+
+    async def _on_answer_completed(self, completed: RunCompletedEvent):
+        async with self:
+            self._update_last_assistant(content=completed.content or "")
+            self.agent_status_message = ""

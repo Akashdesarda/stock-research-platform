@@ -1,6 +1,7 @@
 import reflex as rx
 
 from webapp.components.layout import page_layout
+from webapp.pages.playground._ai_discovery_strategy import ai_discovery_panel
 from webapp.pages.playground._discovery_strategy import discovery_panel
 
 
@@ -35,15 +36,11 @@ def strategy() -> rx.Component:
                 padding_top="1.5rem",
             ),
             rx.tabs.content(
-                rx.callout(
-                    rx.text("Coming soon"),
-                    color_scheme="amber",
-                ),
+                ai_discovery_panel(),
                 value="ai-discovery",
                 width="100%",
                 padding_top="1.5rem",
             ),
             default_value="discovery",
-            width="100%",
-        ),
+        )
     )

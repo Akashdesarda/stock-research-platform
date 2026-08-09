@@ -90,25 +90,23 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
             return
 
         async with self:
-            self.run_state = RunState.generating.value
+            # Do not set run_state=generating here — stream_agent_run(manage_lifecycle=True)
+            # owns the busy window and will no-op if we mark generating first.
             self.messages.append(Message(role="user", content=prompt))
             self.prompt = ""  # rest the user prompt input field.
             self.messages.append(Message(role="assistant", content=""))
+            session_id = self.current_session_id
 
         # Reuse the exact session generate_summary created earlier (no dependencies:
         # exchange/ticker already live in the agent's session_state).
         await self.stream_agent_run(
             agent_id="company-summary",
             message=prompt,
-            session_id=self.current_session_id,
+            session_id=session_id,
             on_content=self._on_content,
             on_complete=self._on_qa_completed,
             manage_lifecycle=True,
         )
-
-        # Always release the input button, even if the run errored.
-        async with self:
-            self.run_state = RunState.idle.value
 
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""

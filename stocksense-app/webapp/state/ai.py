@@ -10,7 +10,10 @@ from webapp.types import RunState, TickerChoice
 logger = logging.getLogger("stocksense")
 
 
-class CompanySummaryState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.State):
+# NOTE - ChatMixin must be first so _record_step attaches agent trace steps to the assistant message
+# (inline_steps). TickerSelectionMixin brings in CommonMixin._record_step via inheritance; listing
+# it before ChatMixin would shadow ChatMixin and break the per-message timeline
+class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
     """State for the company summary research tool"""
 
     summary_result: str = ""

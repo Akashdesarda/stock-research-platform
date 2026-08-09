@@ -13,7 +13,6 @@ from webapp.types import Message, RunState, TraceStep
 logger = logging.getLogger("stocksense")
 settings = get_settings()
 
-
 class CommonMixin(rx.State, mixin=True):
     """A mixin state for common StockDB data."""
 
@@ -132,7 +131,15 @@ class CommonMixin(rx.State, mixin=True):
         self.steps_open = not self.steps_open
 
     def _record_step(self, step: TraceStep):
-        """Generic step sink. Chat states override to also attach to a message."""
+        """Append to the flat trace log used by workflow_steps.
+
+        CommonMixin, ChatMixin, and AgentRunMixin each define _record_step.
+        Python MRO picks the first matching implementation in the state class
+        bases. Chat states must list ChatMixin before TickerSelectionMixin
+        (which inherits CommonMixin) so steps also attach to msg.steps for
+        inline_steps — otherwise only trace_steps is updated and the chat
+        timeline stays empty.
+        """
         self.trace_steps = [*self.trace_steps, step]
 
     def _reset_steps(self):
@@ -280,14 +287,21 @@ class ChatMixin(rx.State, mixin=True):
         )
 
     def _record_step(self, step: TraceStep):
-        # attach to the active assistant message
+        """Record a trace step for chat UIs (inline_steps + workflow_steps).
+
+        Writes to trace_steps and, when the last message is an assistant
+        bubble, appends the same step to msg.steps. This method must win MRO
+        over CommonMixin (via TickerSelectionMixin) and AgentRunMixin on chat
+        state classes — put ChatMixin first in their base list.
+        """
+        self.trace_steps = [*self.trace_steps, step]
         if self.messages and self.messages[-1].role == "assistant":
             last = self.messages[-1]
             self.messages[-1] = Message(
                 role="assistant",
                 content=last.content,
                 steps=[*last.steps, step],
-                steps_open=last.steps_open,
+                steps_open=True if not last.steps else last.steps_open,
                 run_state=last.run_state,
             )
 
@@ -589,7 +603,13 @@ class AgentRunMixin(rx.State, mixin=True):
             )
 
     def _record_step(self, step: TraceStep):
-        """Store a trace step in the component's state."""
+        """Append to trace_steps only (workflow_steps on non-chat pages).
+
+        On states that also use ChatMixin, this implementation is shadowed
+        unless ChatMixin is listed earlier in the class bases. Non-chat states
+        (e.g. DataState) should not include ChatMixin; AgentRunMixin order
+        relative to TickerSelectionMixin only affects which flat-log variant runs.
+        """
         self.trace_steps = [*self.trace_steps, step]
 
     def _reset_steps(self):

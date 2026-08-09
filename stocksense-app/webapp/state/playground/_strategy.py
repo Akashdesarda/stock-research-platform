@@ -175,8 +175,9 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
         )
 
 
-class StrategyAIState(TickerSelectionMixin, ChatMixin, AgentRunMixin, rx.State):
-    """State for multi-turn strategy-selector chat (no pre-chat bootstrap step)."""
+# NOTE - ChatMixin must be first so _record_step attaches agent trace steps to the assistant message (inline_steps)
+class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
+    """State for multi-turn strategy-selector chat (no pre-chat bootstrap step)"""
 
     run_state: str = RunState.idle.value
     # Agno session for the conversation; minted on the first user message.

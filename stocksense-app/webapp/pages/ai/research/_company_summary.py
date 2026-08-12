@@ -41,8 +41,15 @@ def company_summary_component() -> rx.Component:
                 width="100%",
             )
         ),
-        # chat area (messages + inline steps)
-        chat_window(CompanySummaryState),
+        # chat area (messages + inline steps, or empty-state purpose)
+        chat_window(
+            CompanySummaryState,
+            empty_title="Company Summary",
+            empty_description=(
+                "Select a ticker and generate a summary, then ask follow-up "
+                "questions here."
+            ),
+        ),
         # chat input (only after first summary exists)
         rx.cond(
             CompanySummaryState.summary_result != "",

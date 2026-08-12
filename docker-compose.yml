@@ -3,6 +3,7 @@ services:
     # 1. Snapshot Data Initialization Service
     init_snapshot:
         image: ghcr.io/akashdesarda/stock-research-platform/snapshot-data:latest
+        pull_policy: always
         volumes:
             - ./config.toml:/tmp/config.toml
             - shared-data:/shared

@@ -17,12 +17,15 @@
 			"agno",
 			"groq",
 			"mantine",
+			"OPENROUTER",
+			"SARVAM",
 			"stockdb",
 			"stocksense",
 			"talib",
-			"timeperiod"
+			"timeperiod",
+			"venv"
 		],
-		"editor.fontFamily": "'Monaspace Argon NF', monospace",
+		"editor.fontFamily": "'Monaspace Krypton NF', monospace",
 		"ruff.format.preview": true,
 		"ruff.organizeImports": true,
 		"mcp": {
@@ -37,7 +40,9 @@
 				}
 			},
 			"inputs": []
-		}
+		},
+		"terminal.integrated.fontFamily": "'Monaspace Krypton NF', monospace",
+		"terminal.integrated.fontLigatures.enabled": true
 	},
 	"tasks": {
 		"version": "2.0.0",

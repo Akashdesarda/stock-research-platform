@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Literal
 
 import polars as pl
@@ -179,6 +180,200 @@ def section_header(
     )
 
 
+def subsection_header(
+    title: str | rx.Var, *, size: Literal["1", "2", "3"] = "2"
+) -> rx.Component:
+    """A compact in-card section label, smaller than section_header."""
+    return rx.text(title, size=size, weight="bold", color_scheme="gray")
+
+
+def bullet_list(items) -> rx.Component:
+    """Unordered list rendered from a list of strings / state vars."""
+    return rx.list.unordered(
+        rx.foreach(
+            items,
+            lambda item: rx.list.item(item),
+        )
+    )
+
+
+def optional_bullet_list(items, empty: str = "—") -> rx.Component:
+    """Bullet list with a muted placeholder when items is empty/None."""
+    return rx.cond(
+        items,
+        bullet_list(items),
+        rx.text(empty, color_scheme="gray"),
+    )
+
+
+def badge_row(items, color_scheme: str = "gray") -> rx.Component:
+    """Wrapping row of soft badges for tags, enums, column names, etc."""
+    return rx.hstack(
+        rx.foreach(
+            items,
+            lambda item: rx.badge(item, variant="soft", color_scheme=color_scheme),
+        ),
+        wrap="wrap",
+        spacing="2",
+    )
+
+
+def data_list_item(
+    label: str | rx.Var, value: rx.Component | str | rx.Var
+) -> rx.Component:
+    """Single horizontal data-list row (label + value)."""
+    return rx.data_list.item(
+        rx.data_list.label(label),
+        rx.data_list.value(value),
+    )
+
+
+def data_list(
+    *items: rx.Component,
+    orientation: Literal["horizontal", "vertical"] = "horizontal",
+    size: Literal["1", "2", "3"] = "2",
+) -> rx.Component:
+    """Standardized data list used for key/value detail panels."""
+    return rx.data_list.root(
+        *items,
+        orientation=orientation,
+        size=size,
+        width="100%",
+    )
+
+
+def scrollable_card(
+    *children: rx.Component,
+    height: int | str = 500,
+    **props,
+) -> rx.Component:
+    """Card inside a vertical scroll area with a fixed viewport height."""
+    style = props.pop("style", {}) or {}
+    height_value = f"{height}px" if isinstance(height, int) else height
+    return rx.scroll_area(
+        rx.card(*children, width="100%", padding="4"),
+        type=props.pop("type", "auto"),
+        scrollbars=props.pop("scrollbars", "vertical"),
+        style={"height": height_value, **style},
+        **props,
+    )
+
+
+def accordion_item(
+    title: str | rx.Var,
+    *content: rx.Component,
+    value: str | rx.Var | None = None,
+) -> rx.Component:
+    """Named accordion item with a standard trigger + content shell."""
+    return rx.accordion.item(
+        rx.accordion.header(
+            rx.accordion.trigger(
+                rx.hstack(
+                    rx.text(title, weight="medium"),
+                    rx.accordion.icon(),
+                    width="100%",
+                    justify="between",
+                    align="center",
+                ),
+            ),
+        ),
+        rx.accordion.content(*content),
+        value=value if value is not None else title,
+    )
+
+
+def dict_table(
+    columns: Sequence[tuple[str, str]],
+    rows,
+    *,
+    empty: str = "No data",
+    code_keys: Sequence[str] = (),
+    variant: str = "surface",
+    size: Literal["1", "2", "3"] = "1",
+) -> rx.Component:
+    """Simple table from dict rows with optional code-styled columns."""
+    code_key_set = set(code_keys)
+
+    def _cell(row, key: str) -> rx.Component:
+        value = row[key]
+        return rx.code(value) if key in code_key_set else value
+
+    def _row(row) -> rx.Component:
+        cells = []
+        for i, (key, _) in enumerate(columns):
+            content = _cell(row, key)
+            if i == 0:
+                cells.append(rx.table.row_header_cell(content))
+            else:
+                cells.append(rx.table.cell(content))
+        return rx.table.row(*cells)
+
+    return rx.cond(
+        rows.length() > 0,
+        rx.table.root(
+            rx.table.header(
+                rx.table.row(*[
+                    rx.table.column_header_cell(header) for _, header in columns
+                ])
+            ),
+            rx.table.body(rx.foreach(rows, _row)),
+            variant=variant,
+            size=size,
+            width="100%",
+        ),
+        rx.text(empty, color_scheme="gray"),
+    )
+
+
+def empty_state_card(
+    message: str | rx.Var,
+    *,
+    size: Literal["1", "2", "3", "4"] = "2",
+) -> rx.Component:
+    """Muted placeholder card for empty selection / no-data states."""
+    return rx.card(
+        rx.text(message, color_scheme="gray", size=size),
+        width="100%",
+    )
+
+
+def labeled_bullet_columns(
+    *columns: tuple[str | rx.Var, Any, str],
+) -> rx.Component:
+    """Side-by-side labeled bullet lists (e.g. Use If / Avoid When)."""
+    return rx.hstack(
+        *[
+            rx.vstack(
+                rx.text(label, font_weight="bold", color_scheme=color_scheme),
+                bullet_list(items),
+                align_items="start",
+                width="100%",
+            )
+            for label, items, color_scheme in columns
+        ],
+        width="100%",
+        spacing="6",
+        align_items="start",
+    )
+
+
+def detail_section(
+    title: str | rx.Var,
+    *children: rx.Component,
+    separator: bool = False,
+) -> rx.Component:
+    """Subsection header + body, with an optional trailing separator."""
+    body = (
+        rx.vstack(*children, spacing="3", width="100%", align_items="stretch")
+        if children
+        else rx.fragment()
+    )
+    parts: list[rx.Component] = [subsection_header(title), body]
+    if separator:
+        parts.append(rx.separator())
+    return rx.vstack(*parts, spacing="3", width="100%", align_items="stretch")
+
+
 def dialog_actions(
     *,
     on_submit=None,
@@ -263,6 +458,7 @@ def responsive_grid(
     *children,
     columns=None,
     spacing: Literal["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] = "4",
+    **props,
 ):
     """A layout wrapper that adjusts columns based on screen size."""
     if columns is None:
@@ -276,6 +472,7 @@ def responsive_grid(
         ),
         spacing=spacing,
         width="100%",
+        **props,
     )
 
 

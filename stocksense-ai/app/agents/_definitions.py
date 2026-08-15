@@ -1,6 +1,7 @@
 import logging
 
 from agno.agent import Agent
+from app.agents._schema import SessionTitleOutput
 from app.prompt import PromptManager
 from app.skills.tools.sql import (
     verify_duckdb_sql_query_syntax,
@@ -120,15 +121,31 @@ dataset_description = Agent(
     name="Dataset description generator",
     description=pm.get_prompt("dataset_description", "description"),
     model=get_model(
-        settings.ai.text_to_sql_model,  # Reuse text_to_sql model for now
-        settings.get_model_api_keys(settings.ai.text_to_sql_model),
-        settings.get_model_base_url(settings.ai.text_to_sql_model),
+        settings.ai.dataset_description_model,
+        settings.get_model_api_keys(settings.ai.dataset_description_model),
+        settings.get_model_base_url(settings.ai.dataset_description_model),
     ),
     instructions=get_dataset_description_instruction,
     use_instruction_tags=True,
     output_schema=DatasetDescriptionOutput,
     use_json_mode=True,
     pre_hooks=[dataset_description_input_validation],
+    stream=False,
+    debug_mode=True,
+)
+
+session_title = Agent(
+    id="session-title",
+    name="Session title generator",
+    description=pm.get_prompt("session_title", "description"),
+    model=get_model(
+        settings.ai.dataset_description_model,
+        settings.get_model_api_keys(settings.ai.dataset_description_model),
+        settings.get_model_base_url(settings.ai.dataset_description_model),
+    ),
+    instructions=pm.get_prompt("session_title", "instructions"),
+    use_instruction_tags=True,
+    output_schema=SessionTitleOutput,
     stream=False,
     debug_mode=True,
 )

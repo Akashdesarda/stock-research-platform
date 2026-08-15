@@ -5,7 +5,7 @@ import reflex_enterprise as rxe
 from reflex.event import EventType
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
-from webapp.components.layout import form_field, refined_markdown
+from webapp.components.layout import form_field, refined_markdown, subsection_header
 from webapp.state.shared import ChatMixin, CommonMixin, TickerSelectionMixin
 from webapp.types import RunState, TickerChoice, TraceStep
 
@@ -65,12 +65,7 @@ def ticker_selector(state: type[TickerSelectionMixin]) -> rx.Component:
         state: A Reflex State class that inherits from TickerSelectionMixin.
     """
     return rx.vstack(
-        rx.text(
-            "Exchange and Ticker Selection",
-            size="2",
-            weight="medium",
-            color_scheme="gray",
-        ),
+        subsection_header("Exchange and Ticker Selection"),
         rx.hstack(
             form_field(
                 label="Select Exchange",

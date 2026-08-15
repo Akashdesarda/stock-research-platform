@@ -14,6 +14,8 @@ from webapp.components.layout import (
     dialog_actions,
     dialog_form,
     form_field,
+    section_header,
+    subsection_header,
 )
 from webapp.pages.shared_components import ticker_selector
 from webapp.state.playground import (
@@ -58,12 +60,7 @@ def _edit_dataset_dialog() -> rx.Component:
         ticker_selector(RegisteredDatasetState),
         rx.separator(size="4", width="100%"),
         rx.vstack(
-            rx.text(
-                "Time Range Selection",
-                size="2",
-                weight="medium",
-                color_scheme="gray",
-            ),
+            subsection_header("Time Range Selection"),
             rx.hstack(
                 form_field(
                     label="Data Interval",
@@ -157,20 +154,13 @@ def registered_data_panel() -> rx.Component:
             ),
             bordered_container(
                 rx.vstack(
-                    rx.hstack(
-                        rx.heading("Edit Dataset", size="4"),
-                        rx.spacer(),
-                        refresh_button(
+                    section_header(
+                        "Edit Dataset",
+                        "Select a dataset row from the grid, or enter a dataset ID manually, then open it in the edit dialog.",
+                        action_button=refresh_button(
                             on_click=RegisteredDatasetState.force_refresh,
                             size="2",
                         ),
-                        width="100%",
-                        align_items="center",
-                    ),
-                    rx.text(
-                        "Select a dataset row from the grid, or enter a dataset ID manually, then open it in the edit dialog.",
-                        color=rx.color("gray", 11),
-                        size="2",
                     ),
                     rx.hstack(
                         form_field(

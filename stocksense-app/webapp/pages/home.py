@@ -4,7 +4,9 @@ from webapp.components.inputs import dropdown_select
 from webapp.components.layout import (
     bordered_container,
     page_layout,
+    refined_markdown,
     responsive_grid,
+    section_header,
     status_indicator,
 )
 from webapp.state.home import HomeState
@@ -107,7 +109,7 @@ def home() -> rx.Component:
             bordered_container(
                 rx.vstack(
                     rx.heading("Welcome to StockSense", size="5"),
-                    rx.markdown(
+                    refined_markdown(
                         """
                         StockSense is your comprehensive platform for stock market research and analysis.
 
@@ -124,7 +126,7 @@ def home() -> rx.Component:
                 align="left",
             ),
             rx.divider(),
-            rx.heading("Status", size="5"),
+            section_header("Status"),
             # Status Dashboard Grid
             # rx.grid(
             responsive_grid(

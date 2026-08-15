@@ -1,4 +1,16 @@
 from agno.models.base import Model
+from headroom import HeadroomConfig, HeadroomMode
+from headroom.integrations.agno import HeadroomAgnoModel
+
+
+class FixedHeadroomAgnoModel(HeadroomAgnoModel):
+    def parse_tool_calls(self, *args, **kwargs):
+        # getting the tool call parsing method whihc Headroom agno was missing
+        parse = getattr(self.wrapped_model, "parse_tool_calls", None)
+        if callable(parse):
+            # running the tool call method as fix whihc headroom was not able to run
+            return parse(*args, **kwargs)
+        return super().parse_tool_calls(*args, **kwargs)
 
 
 def get_model(
@@ -33,12 +45,18 @@ def get_model(
 
     constructor = provider_to_constructor.get(provider)
     if constructor is not None:
-        return constructor(id=actual_model_id, api_key=api_key, **kwargs)
+        return FixedHeadroomAgnoModel(
+            wrapped_model=constructor(id=actual_model_id, api_key=api_key, **kwargs),
+            headroom_config=HeadroomConfig(default_mode=HeadroomMode.OPTIMIZE),
+        )
 
     # Fallback to OpenAI-compatible for unknown providers if base_url is present
     if base_url:
-        return OpenAILike(
-            id=actual_model_id, api_key=api_key, base_url=base_url, **kwargs
+        return FixedHeadroomAgnoModel(
+            wrapped_model=OpenAILike(
+                id=actual_model_id, api_key=api_key, base_url=base_url, **kwargs
+            ),
+            headroom_config=HeadroomConfig(default_mode=HeadroomMode.OPTIMIZE),
         )
 
     raise ValueError(

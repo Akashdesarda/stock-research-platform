@@ -43,3 +43,19 @@ class DatasetDescriptionOutput(BaseModel):
         if len(v.split()) > 20:
             raise ValueError("description must not exceed 20 words")
         return v
+
+
+class SessionTitleOutput(BaseModel):
+    title: str = Field(
+        ...,
+        description="A title for the session that must not exceed 5 words",
+        json_schema_extra={"maxWords": 5},
+    )
+
+    @field_validator("title")
+    @classmethod
+    def validate_title_word_count(cls, v: str) -> str:
+        """Validate that title does not exceed 5 words."""
+        if len(v.split()) > 5:
+            raise ValueError("title must not exceed 5 words")
+        return v

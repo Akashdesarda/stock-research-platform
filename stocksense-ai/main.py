@@ -68,7 +68,7 @@ async def rename_session(request: SessionRenameRequest) -> dict[str, str]:
     response = await client.run_agent(
         agent_id="session-title",
         message=f"Generate a title for the session based on the following user prompt: {', '.join(request.content)}",
-        session_type=SessionType.AGENT,
+        session_type=request.session_type,
         component_id=request.component_id,
         session_id=request.session_id,
     )

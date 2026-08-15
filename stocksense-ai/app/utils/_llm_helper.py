@@ -4,8 +4,13 @@ from headroom.integrations.agno import HeadroomAgnoModel
 
 
 class FixedHeadroomAgnoModel(HeadroomAgnoModel):
-    def parse_tool_calls(self, tool_calls_data):
-        return self.wrapped_model.parse_tool_calls(tool_calls_data)
+    def parse_tool_calls(self, *args, **kwargs):
+        # getting the tool call parsing method whihc Headroom agno was missing
+        parse = getattr(self.wrapped_model, "parse_tool_calls", None)
+        if callable(parse):
+            # running the tool call method as fix whihc headroom was not able to run
+            return parse(*args, **kwargs)
+        return super().parse_tool_calls(*args, **kwargs)
 
 
 def get_model(

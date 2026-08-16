@@ -1,5 +1,6 @@
 import logging
-from typing import Awaitable, Callable, Literal
+from collections.abc import Awaitable, Callable
+from typing import Literal
 
 import polars as pl
 import reflex as rx
@@ -12,6 +13,7 @@ from webapp.types import Message, RunState, TraceStep
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
+
 
 class CommonMixin(rx.State, mixin=True):
     """A mixin state for common StockDB data."""
@@ -348,6 +350,10 @@ class AgentRunMixin(rx.State, mixin=True):
 
     _active_agent_id: str = ""
 
+    @property
+    def ai_client(self) -> AgentOSClient:
+        return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
+
     @rx.var
     def has_resumable_run(self) -> bool:
         """True when the last run was cancelled/errored and could be resumed (future)."""
@@ -360,8 +366,7 @@ class AgentRunMixin(rx.State, mixin=True):
                 TraceStep(name=f"Running agent {kwargs['agent_id']}", icon="bot")
             )
         try:
-            client = self._ai_client()
-            run_output = await client.run_agent(**kwargs)
+            run_output = await self.ai_client.run_agent(**kwargs)
             async with self:
                 self.agent_run_id = run_output.run_id
                 self._record_step(
@@ -421,10 +426,9 @@ class AgentRunMixin(rx.State, mixin=True):
                 self._set_last_assistant_run_state(RunState.generating)
 
         try:
-            client = self._ai_client()
             completed = None
 
-            async for event in client.run_agent_stream(**kwargs):
+            async for event in self.ai_client.run_agent_stream(**kwargs):
                 if isinstance(event, agent_event.RunStartedEvent):
                     async with self:
                         self.agent_run_id = event.run_id
@@ -566,11 +570,10 @@ class AgentRunMixin(rx.State, mixin=True):
         if self.run_state != RunState.generating.value or not self.agent_run_id:
             return
         try:
-            client = self._ai_client()
             self._record_step(
                 TraceStep(name="Canceling agent run", icon="circle_minus", passed=False)
             )
-            await client.cancel_agent_run(
+            await self.ai_client.cancel_agent_run(
                 agent_id=self._active_agent_id,
                 run_id=self.agent_run_id,
             )
@@ -586,9 +589,6 @@ class AgentRunMixin(rx.State, mixin=True):
             return
         # TODO - Agno's resume api
         raise NotImplementedError("Resume not yet implemented — pending Agno API.")
-
-    def _ai_client(self) -> AgentOSClient:
-        return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")
 
     def _set_last_assistant_run_state(self, state: RunState):
         """Stamp the run_state onto the streaming assistant message."""

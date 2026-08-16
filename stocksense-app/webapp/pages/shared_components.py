@@ -5,7 +5,12 @@ import reflex_enterprise as rxe
 from reflex.event import EventType
 
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
-from webapp.components.layout import form_field, refined_markdown, subsection_header
+from webapp.components.layout import (
+    form_field,
+    refined_markdown,
+    subsection_header,
+    tooltip_external_link,
+)
 from webapp.state.shared import ChatMixin, CommonMixin, TickerSelectionMixin
 from webapp.types import RunState, TickerChoice, TraceStep
 
@@ -271,6 +276,30 @@ def _chat_bubble(state: type[ChatMixin], msg, index) -> rx.Component:
     )
 
 
+def _session_links(agent_id: str, type: str = "agent") -> rx.Component:
+    """External Agno OS links scoped to the page's agent."""
+    return rx.hstack(
+        tooltip_external_link(
+            "Past chats",
+            f"https://os.agno.com/chat/?type={type}&id={agent_id}",
+            icon="history",
+            tooltip="Access & continue conversation in past chats",
+        ),
+        tooltip_external_link(
+            label="Sessions",
+            href="https://os.agno.com/sessions",
+            icon="folders",
+            tooltip="Manage all the past sessions",
+        ),
+        spacing="4",
+        align="center",
+        justify="end",
+        width="100%",
+        padding_top="8px",
+        padding_bottom="4px",
+    )
+
+
 def _chat_empty_state(
     state: type[ChatMixin],
     *,
@@ -342,6 +371,7 @@ def _chat_empty_state(
 def chat_window(
     state: type[ChatMixin],
     *,
+    session_agent_id: str,
     empty_title: str | None = None,
     empty_description: str | None = None,
     example_prompts: list[str] | None = None,
@@ -378,7 +408,13 @@ def chat_window(
     )
 
     return rx.box(
-        content,
+        rx.vstack(
+            _session_links(session_agent_id),
+            content,
+            spacing="0",
+            width="100%",
+            height="100%",
+        ),
         flex="1",
         overflow_y="auto",
         width="100%",

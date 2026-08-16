@@ -44,6 +44,7 @@ def company_summary_component() -> rx.Component:
         # chat area (messages + inline steps, or empty-state purpose)
         chat_window(
             CompanySummaryState,
+            session_agent_id="company-summary",
             empty_title="Company Summary",
             empty_description=(
                 "Select a ticker and generate a summary, then ask follow-up "

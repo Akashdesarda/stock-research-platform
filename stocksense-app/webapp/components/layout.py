@@ -187,6 +187,49 @@ def subsection_header(
     return rx.text(title, size=size, weight="bold", color_scheme="gray")
 
 
+def tooltip_external_link(
+    label: str,
+    href: str,
+    *,
+    icon: str | None = None,
+    tooltip: str | None = None,
+    show_external_icon: bool = True,
+    is_external: bool = True,
+    **props,
+) -> rx.Component:
+    """Compact external link with optional leading icon, tooltip, and external indicator."""
+    children: list[rx.Component] = []
+    if icon is not None:
+        children.append(rx.icon(icon, size=14))
+    children.append(rx.text(label, size="1", weight="medium"))
+    if show_external_icon and is_external:
+        children.append(rx.icon("external-link", size=12))
+
+    link_props = {
+        "href": href,
+        "is_external": is_external,
+        "color": rx.color("gray", 11),
+        "cursor": "pointer",
+        "_hover": {"color": rx.color("accent", 11), "text_decoration": "none"},
+        "style": {"textDecoration": "none"},
+    }
+    link_props.update(props)
+
+    # box trigger: Radix tooltip does not attach reliably to rx.link alone.
+    trigger = rx.box(
+        rx.link(
+            rx.hstack(*children, spacing="1", align="center"),
+            **link_props,
+        ),
+        display="inline-flex",
+    )
+
+    if tooltip is None:
+        return trigger
+
+    return rx.tooltip(trigger, content=tooltip)
+
+
 def bullet_list(items) -> rx.Component:
     """Unordered list rendered from a list of strings / state vars."""
     return rx.list.unordered(

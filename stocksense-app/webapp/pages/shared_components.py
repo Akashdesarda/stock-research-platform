@@ -319,38 +319,42 @@ def _chat_empty_state(
         return rx.button(
             text,
             on_click=click_handler,
-            size="2",
+            size="1",
             variant="soft",
-            radius="large",
+            radius="medium",
             cursor="pointer",
             white_space="normal",
             height="auto",
-            padding_y="0.6em",
+            padding_y="0.4em",
+            padding_x="0.75em",
             text_align="left",
+            style={"font_weight": 400, "line_height": 1.45},
         )
 
     children: list[rx.Component] = []
     if empty_title:
         children.append(
-            rx.heading(empty_title, size="5", weight="medium", text_align="center")
+            rx.heading(empty_title, size="4", weight="medium", text_align="center")
         )
     if empty_description:
         children.append(
             rx.text(
                 empty_description,
-                size="3",
-                color_scheme="gray",
+                size="2",
+                weight="regular",
+                color=rx.color("gray", 11),
                 text_align="center",
-                max_width="32rem",
+                max_width="28rem",
+                line_height="1.5",
             )
         )
     if prompts:
         children.append(
             rx.vstack(
                 *[_example_button(p) for p in prompts],
-                spacing="2",
+                spacing="1",
                 width="100%",
-                max_width="28rem",
+                max_width="24rem",
                 align="stretch",
             )
         )
@@ -358,13 +362,13 @@ def _chat_empty_state(
     return rx.center(
         rx.vstack(
             *children,
-            spacing="4",
+            spacing="3",
             align="center",
             width="100%",
         ),
         width="100%",
-        min_height="16rem",
-        padding="2rem",
+        min_height="12rem",
+        padding="1.25rem",
     )
 
 

@@ -220,6 +220,17 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
             on_complete=self._on_answer_completed,
             manage_lifecycle=True,
         )
+        # rename the session in the background
+        async with self:
+            await self.ai_client._apatch(
+                endpoint="/debug/session/rename",
+                data={
+                    "session_id": session_id,
+                    "session_type": "agent",
+                    "content": [prompt],
+                },
+            )
+            logger.debug(f"renamed session {session_id} to {prompt}")
 
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""

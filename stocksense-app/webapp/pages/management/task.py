@@ -14,7 +14,9 @@ from webapp.components.layout import (
     bordered_container,
     form_field,
     page_layout,
+    refined_markdown,
     section_header,
+    subsection_header,
 )
 from webapp.state.management import TaskState
 
@@ -342,12 +344,8 @@ def task() -> rx.Component:
             rx.cond(
                 TaskState.prompt_thinking != "",
                 bordered_container(
-                    rx.heading("Thinking...", size="4"),
-                    rx.markdown(
-                        TaskState.prompt_thinking,
-                        italic=True,
-                        color=rx.color("gray", 9),
-                    ),
+                    subsection_header("Thinking..."),
+                    refined_markdown(TaskState.prompt_thinking),
                     width="100%",
                     align="left",
                 ),
@@ -356,8 +354,8 @@ def task() -> rx.Component:
             rx.cond(
                 TaskState.prompt_response != "",
                 bordered_container(
-                    rx.heading("Response:", size="4"),
-                    rx.markdown(TaskState.prompt_response),
+                    subsection_header("Response:"),
+                    refined_markdown(TaskState.prompt_response),
                     width="100%",
                     align="left",
                 ),

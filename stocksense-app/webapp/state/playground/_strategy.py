@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import uuid
 
@@ -203,7 +204,8 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
 
         async with self:
             # First turn: create a session. Later turns reuse it for multi-turn QA.
-            if not self.current_session_id:
+            first_turn = not self.current_session_id
+            if first_turn:
                 self.current_session_id = str(uuid.uuid4())
             # Do not set run_state=generating here — stream_agent_run(manage_lifecycle=True)
             # owns the busy window and will no-op if we mark generating first.
@@ -220,6 +222,23 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
             on_complete=self._on_answer_completed,
             manage_lifecycle=True,
         )
+        if first_turn:
+            # rename the session in the background with best effort fire-and-forget
+            return StrategyAIState.rename_session(session_id, prompt)
+
+    @rx.event(background=True)
+    async def rename_session(self, session_id: str, prompt: str):
+        """Best-effort session rename; fire-and-forget from generate_answer."""
+        with contextlib.suppress(Exception):
+            await self.ai_client._apatch(
+                endpoint="/debug/session/rename",
+                data={
+                    "session_id": session_id,
+                    "session_type": "agent",
+                    "content": [prompt],
+                },
+            )
+            logger.debug(f"renamed strategy-selector session: {session_id}")
 
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""

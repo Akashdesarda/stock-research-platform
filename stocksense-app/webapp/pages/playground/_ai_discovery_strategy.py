@@ -31,6 +31,7 @@ def ai_discovery_panel() -> rx.Component:
         # chat area (messages + inline steps, or empty-state purpose + examples)
         chat_window(
             StrategyAIState,
+            session_agent_id="strategy-selector",
             empty_title="AI-Powered Strategy Discovery",
             empty_description=(
                 "Describe the analysis you want, and StockSense will pick a "

@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import uuid
 
@@ -66,12 +67,13 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
             # else: same company -> reuse current_session_id and keep messages.
             self.messages.append(Message(role="user", content=prompt))
             self.messages.append(Message(role="assistant", content=""))
+            session_id = self.current_session_id
 
         # manage_lifecycle=True: AgentRunMixin owns busy flag, status, steps, error handling, UI reset
         await self.stream_agent_run(
             agent_id="company-summary",
             message=prompt,
-            session_id=self.current_session_id,
+            session_id=session_id,
             dependencies=(
                 {"exchange": exchange, "ticker": ticker} if new_session else {}
             ),
@@ -79,6 +81,23 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
             on_complete=self._on_summary_completed,
             manage_lifecycle=True,
         )
+
+        if new_session:
+            # rename the session in the background with best effort fire-and-forget
+            return CompanySummaryState.rename_session(
+                session_id,
+                f"Company Summary: {ticker} on {exchange}",
+            )
+
+    @rx.event(background=True)
+    async def rename_session(self, session_id: str, session_name: str):
+        """Best-effort session rename; fire-and-forget from generate_summary."""
+        with contextlib.suppress(Exception):
+            await self.ai_client.rename_session(
+                session_id=session_id,
+                session_name=session_name,
+            )
+            logger.debug(f"renamed company summary session {session_id}")
 
     @rx.event(background=True)
     async def generate_answer(self):

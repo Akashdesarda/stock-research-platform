@@ -187,6 +187,49 @@ def subsection_header(
     return rx.text(title, size=size, weight="bold", color_scheme="gray")
 
 
+def tooltip_external_link(
+    label: str,
+    href: str,
+    *,
+    icon: str | None = None,
+    tooltip: str | None = None,
+    show_external_icon: bool = True,
+    is_external: bool = True,
+    **props,
+) -> rx.Component:
+    """Compact external link with optional leading icon, tooltip, and external indicator."""
+    children: list[rx.Component] = []
+    if icon is not None:
+        children.append(rx.icon(icon, size=14))
+    children.append(rx.text(label, size="1", weight="medium"))
+    if show_external_icon and is_external:
+        children.append(rx.icon("external-link", size=12))
+
+    link_props = {
+        "href": href,
+        "is_external": is_external,
+        "color": rx.color("gray", 11),
+        "cursor": "pointer",
+        "_hover": {"color": rx.color("accent", 11), "textDecoration": "none"},
+        "style": {"textDecoration": "none"},
+    }
+    link_props.update(props)
+
+    # box trigger: Radix tooltip does not attach reliably to rx.link alone.
+    trigger = rx.box(
+        rx.link(
+            rx.hstack(*children, spacing="1", align="center"),
+            **link_props,
+        ),
+        display="inline-flex",
+    )
+
+    if tooltip is None:
+        return trigger
+
+    return rx.tooltip(trigger, content=tooltip)
+
+
 def bullet_list(items) -> rx.Component:
     """Unordered list rendered from a list of strings / state vars."""
     return rx.list.unordered(
@@ -518,9 +561,10 @@ def _h(size, mt, mb):
     return lambda text: rx.heading(
         text,
         size=size,
+        weight="medium",
         margin_top=mt,
         margin_bottom=mb,
-        line_height="1.3",
+        line_height="1.35",
     )
 
 
@@ -532,17 +576,20 @@ def refined_markdown(content, **props) -> rx.Component:
         "h2": _h("5", "0.9em", "0.4em"),
         "h3": _h("4", "0.8em", "0.35em"),
         "h4": _h("3", "0.7em", "0.3em"),
+        # inline emphasis — softer than browser-default bold
+        "strong": lambda text: rx.text(text, weight="medium", as_="span"),
+        "em": lambda text: rx.text(text, style={"font_style": "italic"}, as_="span"),
         # markdown paragraph and list support
         "p": lambda text: rx.text(
             text,
             margin_bottom="0.75em",
             line_height="1.7",
-            size="3",
+            size="2",
+            weight="regular",
         ),
         "li": lambda text: rx.list_item(
-            text,
+            rx.text(text, size="2", weight="regular", line_height="1.6"),
             margin_bottom="0.35em",
-            line_height="1.6",
         ),
         "ul": lambda items: rx.list.unordered(
             items,
@@ -568,7 +615,7 @@ def refined_markdown(content, **props) -> rx.Component:
         # markdown quote support
         "a": lambda text, **props: rx.link(text, **props, color_scheme="blue"),
         "blockquote": lambda text: rx.box(
-            rx.text(text, size="3", color=rx.color("gray", 11)),
+            rx.text(text, size="2", weight="regular", color=rx.color("gray", 11)),
             border_left=f"3px solid {rx.color('accent', 7)}",
             padding_left="1em",
             margin_y="0.75em",
@@ -586,14 +633,14 @@ def refined_markdown(content, **props) -> rx.Component:
         "tbody": lambda children: rx.table.body(children),
         "tr": lambda children: rx.table.row(children),
         "th": lambda text: rx.table.column_header_cell(
-            text,
+            rx.text(text, size="1", weight="medium"),
             style={
                 "white_space": "nowrap",
                 "border_right": _cell_border,  # vertical column separator
             },
         ),
         "td": lambda text: rx.table.cell(
-            text,
+            rx.text(text, size="1", weight="regular"),
             style={
                 "border_right": _cell_border,  # vertical column separator
             },

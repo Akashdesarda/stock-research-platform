@@ -18,6 +18,7 @@ from webapp.components.layout import (
     form_field,
     refined_markdown,
     section_header,
+    subsection_header,
 )
 from webapp.pages.shared_components import ticker_selector, workflow_steps
 from webapp.state.playground import DataState
@@ -159,12 +160,7 @@ def manual_panel() -> rx.Component:
             # SECTION - Time Range
             rx.vstack(  # interval --> period/date range --> callout with conditions
                 rx.spacer(),
-                rx.text(
-                    "Time Range Selection",
-                    size="2",
-                    weight="medium",
-                    color_scheme="gray",
-                ),
+                subsection_header("Time Range Selection"),
                 rx.hstack(  # interval + separator
                     form_field(
                         label="Data Interval",
@@ -295,7 +291,7 @@ def ai_panel() -> rx.Component:
             ticker_selector(DataState),
             rx.separator(size="4", width="100%"),
             rx.vstack(
-                rx.text("AI-Powered Data Query", size="3", weight="medium"),
+                subsection_header("AI-Powered Data Query"),
                 form_field(
                     label="Enter your data query prompt",
                     control=text_area(
@@ -345,7 +341,7 @@ def ai_panel() -> rx.Component:
                 rx.cond(
                     DataState.ai_generated_sql != "",
                     rx.vstack(
-                        rx.text("Generated SQL", size="2", weight="medium"),
+                        subsection_header("Generated SQL"),
                         refined_markdown("```sql\n" + DataState.ai_generated_sql + "\n```"),
                         form_field(
                             label="Edit SQL before running",

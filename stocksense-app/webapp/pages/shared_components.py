@@ -7,7 +7,7 @@ from reflex.event import EventType
 from webapp.components.inputs import dropdown_select, multi_select_dropdown
 from webapp.components.layout import form_field, refined_markdown
 from webapp.state.shared import ChatMixin, CommonMixin, TickerSelectionMixin
-from webapp.types import RunState, TickerChoice, TraceStep
+from webapp.types import ChatSessionItem, RunState, TickerChoice, TraceStep
 
 
 def _index_based_ticker_selection(
@@ -390,15 +390,161 @@ def chat_window(
     )
 
 
+def session_history_drawer(state: type[ChatMixin]) -> rx.Component:
+    """Past-session list drawer shared by all chat_input consumers."""
+
+    def _session_row(sess: ChatSessionItem) -> rx.Component:
+        is_active = sess.session_id == state.current_session_id
+        return rx.button(
+            rx.vstack(
+                rx.text(
+                    sess.session_name,
+                    size="2",
+                    weight="medium",
+                    width="100%",
+                    text_align="left",
+                    style={
+                        "overflow": "hidden",
+                        "text_overflow": "ellipsis",
+                        "white_space": "nowrap",
+                    },
+                ),
+                rx.cond(
+                    sess.updated_at != "",
+                    rx.text(
+                        sess.updated_at,
+                        size="1",
+                        color=rx.color("gray", 10),
+                        width="100%",
+                        text_align="left",
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="1",
+                width="100%",
+                align="start",
+            ),
+            on_click=state.select_session(sess.session_id),
+            variant=rx.cond(is_active, "soft", "ghost"),
+            color_scheme=rx.cond(is_active, "accent", "gray"),
+            width="100%",
+            height="auto",
+            padding="0.75em",
+            justify="start",
+            cursor="pointer",
+        )
+
+    body = rx.cond(
+        state.sessions_loading,
+        rx.center(
+            rx.spinner(size="3"),
+            width="100%",
+            padding="2rem",
+        ),
+        rx.cond(
+            state.sessions_error != "",
+            rx.callout(
+                state.sessions_error,
+                icon="triangle_alert",
+                color_scheme="red",
+                width="100%",
+            ),
+            rx.cond(
+                state.session_list.length() == 0,
+                rx.center(
+                    rx.text(
+                        "No past sessions yet.",
+                        size="2",
+                        color=rx.color("gray", 10),
+                    ),
+                    width="100%",
+                    padding="2rem",
+                ),
+                rx.vstack(
+                    rx.foreach(state.session_list, _session_row),
+                    spacing="1",
+                    width="100%",
+                    align="stretch",
+                ),
+            ),
+        ),
+    )
+
+    return rx.drawer.root(
+        rx.drawer.overlay(z_index="40"),
+        rx.drawer.portal(
+            rx.drawer.content(
+                rx.vstack(
+                    rx.hstack(
+                        rx.drawer.title(
+                            rx.heading("Past chats", size="4", weight="medium")
+                        ),
+                        rx.spacer(),
+                        rx.drawer.close(
+                            rx.icon_button(
+                                rx.icon("x", size=16),
+                                variant="ghost",
+                                size="2",
+                                cursor="pointer",
+                            )
+                        ),
+                        width="100%",
+                        align="center",
+                    ),
+                    rx.drawer.description(
+                        rx.text(
+                            "Continue a previous conversation.",
+                            size="2",
+                            color=rx.color("gray", 11),
+                        )
+                    ),
+                    body,
+                    spacing="4",
+                    width="100%",
+                    height="100%",
+                    align="start",
+                ),
+                top="0",
+                right="0",
+                left="auto",
+                height="100%",
+                width="100%",
+                max_width="22rem",
+                padding="1.25rem",
+                background_color=rx.color("gray", 1),
+                border_left=f"1px solid {rx.color('gray', 5)}",
+                overflow_y="auto",
+            )
+        ),
+        open=state.sessions_open,
+        on_open_change=state.set_sessions_open,
+        direction="right",
+    )
+
+
 def chat_input(
     state: type[ChatMixin],
     on_submit: EventType[Any],
     on_cancel: EventType[Any],
+    *,
+    include_session_drawer: bool = True,
 ) -> rx.Component:
     is_generating = state.run_state == RunState.generating.value
 
-    return rx.box(
+    controls = rx.box(
         rx.hstack(
+            # History — native to all chat_input consumers via ChatMixin sessions
+            rx.button(
+                rx.icon("history", size=16),
+                on_click=state.set_sessions_open(True),
+                disabled=is_generating,
+                size="2",
+                radius="full",
+                variant="soft",
+                cursor=rx.cond(is_generating, "not-allowed", "pointer"),
+                margin_left="0.5em",
+                title="Past chats",
+            ),
             # New chat — native to all chat_input consumers via ChatMixin.reset_chat
             rx.cond(
                 state.messages.length() > 0,
@@ -410,7 +556,6 @@ def chat_input(
                     radius="full",
                     variant="soft",
                     cursor=rx.cond(is_generating, "not-allowed", "pointer"),
-                    margin_left="0.5em",
                     title="New chat",
                 ),
                 rx.fragment(),
@@ -484,4 +629,23 @@ def chat_input(
         z_index="10",
         display="flex",
         justify_content="center",
+    )
+
+    if include_session_drawer:
+        return rx.fragment(session_history_drawer(state), controls)
+    return controls
+
+
+def chat_session_history_button(state: type[ChatMixin]) -> rx.Component:
+    """Standalone history opener when chat_input is not yet on screen."""
+    is_generating = state.run_state == RunState.generating.value
+    return rx.button(
+        rx.icon("history", size=16),
+        rx.text("Past chats", size="2"),
+        on_click=state.set_sessions_open(True),
+        disabled=is_generating,
+        size="2",
+        variant="soft",
+        cursor=rx.cond(is_generating, "not-allowed", "pointer"),
+        title="Past chats",
     )

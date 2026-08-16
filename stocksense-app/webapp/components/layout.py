@@ -210,7 +210,7 @@ def tooltip_external_link(
         "is_external": is_external,
         "color": rx.color("gray", 11),
         "cursor": "pointer",
-        "_hover": {"color": rx.color("accent", 11), "text_decoration": "none"},
+        "_hover": {"color": rx.color("accent", 11), "textDecoration": "none"},
         "style": {"textDecoration": "none"},
     }
     link_props.update(props)

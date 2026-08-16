@@ -97,7 +97,7 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
                 session_id=session_id,
                 session_name=session_name,
             )
-            logger.debug(f"renamed company-summary session {session_id}")
+            logger.debug(f"renamed company summary session {session_id}")
 
     @rx.event(background=True)
     async def generate_answer(self):

@@ -238,7 +238,7 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
                     "content": [prompt],
                 },
             )
-            logger.debug(f"renamed strategy-selector session {session_id}")
+            logger.debug(f"renamed strategy-selector session: {session_id}")
 
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""

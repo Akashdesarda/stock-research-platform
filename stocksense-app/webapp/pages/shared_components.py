@@ -276,12 +276,12 @@ def _chat_bubble(state: type[ChatMixin], msg, index) -> rx.Component:
     )
 
 
-def _session_links(agent_id: str, type: str = "agent") -> rx.Component:
+def _session_links(agent_id: str, session_type: str = "agent") -> rx.Component:
     """External Agno OS links scoped to the page's agent."""
     return rx.hstack(
         tooltip_external_link(
             "Past chats",
-            f"https://os.agno.com/chat/?type={type}&id={agent_id}",
+            f"https://os.agno.com/chat/?type={session_type}&id={agent_id}",
             icon="history",
             tooltip="Access & continue conversation in past chats",
         ),

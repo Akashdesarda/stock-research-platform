@@ -1,5 +1,4 @@
 import logging
-import uuid
 
 import reflex as rx
 from agno.run.agent import RunCompletedEvent, RunContentEvent
@@ -180,9 +179,7 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
     """State for multi-turn strategy-selector chat (no pre-chat bootstrap step)"""
 
     run_state: str = RunState.idle.value
-    # Agno session for the conversation; minted on the first user message.
-    # (Also declared on ChatMixin — kept here for clarity of this page's contract.)
-    current_session_id: str = ""
+    chat_agent_id: str = "strategy-selector"
 
     @rx.event
     def submit_example(self, text: str):
@@ -194,23 +191,20 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
 
     @rx.event(background=True)
     async def generate_answer(self):
-        if self.run_state == RunState.generating.value:
-            return
-
-        prompt = self.prompt.strip()
-        if not prompt:
-            return
-
         async with self:
-            # First turn: create a session. Later turns reuse it for multi-turn QA.
-            if not self.current_session_id:
-                self.current_session_id = str(uuid.uuid4())
+            if self.run_state == RunState.generating.value:
+                return
+            prompt = self.prompt.strip()
+            if not prompt:
+                return
+            # First turn: create a session. Later turns (including a loaded past
+            # session) reuse current_session_id so AgentOS appends to the same thread.
+            session_id = self._ensure_session_id()
             # Do not set run_state=generating here — stream_agent_run(manage_lifecycle=True)
             # owns the busy window and will no-op if we mark generating first.
             self.messages.append(Message(role="user", content=prompt))
             self.prompt = ""  # rest the user prompt input field.
             self.messages.append(Message(role="assistant", content=""))
-            session_id = self.current_session_id
 
         await self.stream_agent_run(
             agent_id="strategy-selector",

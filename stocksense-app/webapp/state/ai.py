@@ -80,12 +80,13 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
             manage_lifecycle=True,
         )
 
-        # rename the session in the background
-        async with self:
-            await self.ai_client.rename_session(
-                session_id=self.current_session_id,
-                session_name=f"Company Summary: {ticker} on {exchange}",
-            )
+        # Name the session once when a new company conversation starts.
+        if new_session:
+            async with self:
+                await self.ai_client.rename_session(
+                    session_id=self.current_session_id,
+                    session_name=f"Company Summary: {ticker} on {exchange}",
+                )
 
     @rx.event(background=True)
     async def generate_answer(self):

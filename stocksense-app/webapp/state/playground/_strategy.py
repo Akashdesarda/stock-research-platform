@@ -203,7 +203,8 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
 
         async with self:
             # First turn: create a session. Later turns reuse it for multi-turn QA.
-            if not self.current_session_id:
+            first_turn = not self.current_session_id
+            if first_turn:
                 self.current_session_id = str(uuid.uuid4())
             # Do not set run_state=generating here — stream_agent_run(manage_lifecycle=True)
             # owns the busy window and will no-op if we mark generating first.
@@ -220,17 +221,18 @@ class StrategyAIState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.State):
             on_complete=self._on_answer_completed,
             manage_lifecycle=True,
         )
-        # rename the session in the background
-        async with self:
-            await self.ai_client._apatch(
-                endpoint="/debug/session/rename",
-                data={
-                    "session_id": session_id,
-                    "session_type": "agent",
-                    "content": [prompt],
-                },
-            )
-            logger.debug(f"renamed session {session_id} to {prompt}")
+        # Title the session once at conversation start (first user message only).
+        if first_turn:
+            async with self:
+                await self.ai_client._apatch(
+                    endpoint="/debug/session/rename",
+                    data={
+                        "session_id": session_id,
+                        "session_type": "agent",
+                        "content": [prompt],
+                    },
+                )
+                logger.debug(f"renamed strategy-selector session {session_id}")
 
     async def _on_content(self, event: RunContentEvent):
         """Append each text delta to the streaming assistant message."""

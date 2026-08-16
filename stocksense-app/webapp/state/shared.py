@@ -1,17 +1,89 @@
+import asyncio
 import logging
-from typing import Awaitable, Callable, Literal
+import uuid
+from collections.abc import Awaitable, Callable
+from typing import Literal
 
 import polars as pl
 import reflex as rx
-from agno.client import AgentOSClient
+from agno.client.os import AgentOSClient, SessionType
+from agno.os.schema import AgentSessionDetailSchema
+from agno.run import RunStatus
 from agno.run import agent as agent_event
-from httpx2 import AsyncClient, Timeout
+from httpx2 import AsyncClient, HTTPStatusError, Timeout
 from stocksense.config import get_settings
 
-from webapp.types import Message, RunState, TraceStep
+from webapp.types import ChatSessionItem, Message, RunState, TraceStep
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
+
+
+def _format_session_timestamp(value) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return str(value)
+
+
+def _stringify_message_content(content) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        text = content.get("text") or content.get("content")
+        return text if isinstance(text, str) else str(text or "")
+    if isinstance(content, list):
+        return "".join(_stringify_message_content(part) for part in content)
+    return str(content)
+
+
+def _messages_from_chat_history(history: list) -> list[Message]:
+    messages: list[Message] = []
+    for item in history:
+        if isinstance(item, dict):
+            role = item.get("role")
+            content = item.get("content")
+        else:
+            role = getattr(item, "role", None)
+            content = getattr(item, "content", None)
+        if hasattr(role, "value"):
+            role = role.value
+        if role not in ("user", "assistant"):
+            continue
+        text = _stringify_message_content(content).strip()
+        if not text:
+            continue
+        messages.append(Message(role=role, content=text))
+    return messages
+
+
+def _run_sort_key(run) -> float:
+    created = getattr(run, "created_at", None)
+    if created is None:
+        return 0
+    if hasattr(created, "timestamp"):
+        return created.timestamp()
+    try:
+        return float(created)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _messages_from_session_runs(runs: list) -> list[Message]:
+    """Build user/assistant bubbles from AgentOS runs (one turn per run)."""
+    messages: list[Message] = []
+    for run in sorted(runs, key=_run_sort_key):
+        user_text = _stringify_message_content(getattr(run, "run_input", None)).strip()
+        if user_text:
+            messages.append(Message(role="user", content=user_text))
+        assistant_text = _stringify_message_content(getattr(run, "content", None)).strip()
+        if assistant_text:
+            messages.append(Message(role="assistant", content=assistant_text))
+    return messages
+
 
 class CommonMixin(rx.State, mixin=True):
     """A mixin state for common StockDB data."""
@@ -239,6 +311,13 @@ class ChatMixin(rx.State, mixin=True):
     trace_steps: list[TraceStep] = []
     # Optional Agno session id used by multi-turn chat pages.
     current_session_id: str = ""
+    # AgentOS component_id used to list/load sessions for this chat page.
+    chat_agent_id: str = ""
+    sessions_open: bool = False
+    session_list: list[ChatSessionItem] = []
+    sessions_loading: bool = False
+    sessions_error: str = ""
+    _session_titled: bool = False
 
     @rx.event
     def set_prompt(self, value: str):
@@ -258,12 +337,190 @@ class ChatMixin(rx.State, mixin=True):
         self.messages = []
         self.prompt = ""
         self.run_state = RunState.idle.value
+        self._session_titled = False
         self._reset_steps()
         # AgentRunMixin fields (present when this mixin is composed with it).
         self.agent_error = ""
         self.agent_status_message = ""
         self.agent_run_id = ""
         self._active_agent_id = ""
+
+    @rx.event
+    def set_sessions_open(self, is_open: bool):
+        """Open or close the session history drawer; refresh the list on open."""
+        self.sessions_open = is_open
+        if is_open:
+            return type(self).load_sessions
+
+    @rx.event(background=True)
+    async def load_sessions(self):
+        """Fetch recent AgentOS sessions for this chat page's agent."""
+        async with self:
+            agent_id = self.chat_agent_id
+            if not agent_id:
+                self.sessions_loading = False
+                self.sessions_error = "No agent configured for this chat."
+                return
+            self.sessions_loading = True
+            self.sessions_error = ""
+
+        try:
+            client = self._ai_client()
+            result = await client.get_sessions(
+                session_type=SessionType.AGENT,
+                component_id=agent_id,
+                sort_by="updated_at",
+                sort_order="desc",
+                limit=20,
+            )
+            items = [
+                ChatSessionItem(
+                    session_id=sess.session_id,
+                    session_name=sess.session_name or sess.session_id[:8],
+                    updated_at=_format_session_timestamp(sess.updated_at),
+                )
+                for sess in result.data
+            ]
+            async with self:
+                self.session_list = items
+                self.sessions_loading = False
+        except Exception as e:
+            logger.exception("Failed to load chat sessions", extra={"error": str(e)})
+            async with self:
+                self.session_list = []
+                self.sessions_loading = False
+                self.sessions_error = "Failed to load sessions."
+
+    @rx.event(background=True)
+    async def select_session(self, session_id: str):
+        """Restore a past session into the chat window and continue it."""
+        async with self:
+            if self.run_state == RunState.generating.value or not session_id:
+                return
+
+        try:
+            client = self._ai_client()
+            detail = await client.get_session(
+                session_id, session_type=SessionType.AGENT
+            )
+            loaded_id = getattr(detail, "session_id", None) or session_id
+            runs = await client.get_session_runs(
+                loaded_id, session_type=SessionType.AGENT
+            )
+            messages = _messages_from_session_runs(runs)
+            if not messages:
+                messages = _messages_from_chat_history(
+                    getattr(detail, "chat_history", None) or []
+                )
+            async with self:
+                self.current_session_id = loaded_id
+                self.messages = messages
+                self.prompt = ""
+                self.run_state = RunState.idle.value
+                self._session_titled = True
+                self.sessions_open = False
+                self.sessions_error = ""
+                self._reset_steps()
+                self.agent_error = ""
+                self.agent_status_message = ""
+                self.agent_run_id = ""
+            await self._apply_loaded_session(detail)
+        except Exception as e:
+            logger.exception(
+                "Failed to load chat session", extra={"error": str(e)}
+            )
+            async with self:
+                self.sessions_error = "Failed to load session."
+
+    def _ensure_session_id(self) -> str:
+        """Return the active Agno session id, minting one only for a new chat.
+
+        Must be called inside `async with self` in background events.
+        Once set (new chat or loaded past session), the same id is reused for
+        every subsequent run in this thread. AgentOS treats session_id="" as
+        missing and starts a new session.
+        """
+        if not self.current_session_id:
+            self.current_session_id = str(uuid.uuid4())
+            self._session_titled = False
+        return self.current_session_id
+
+    async def _apply_loaded_session(self, detail: AgentSessionDetailSchema) -> None:
+        """Hook for page-specific restore after a session is loaded."""
+        return
+
+    async def _after_run_completed(self) -> None:
+        """Auto-title the conversation after the first successful run."""
+        await self._maybe_auto_title_session()
+
+    async def _maybe_auto_title_session(self) -> None:
+        """Name a new session via AgentOS session-title + rename_session."""
+        async with self:
+            if self._session_titled or not self.current_session_id:
+                return
+            session_id = self.current_session_id
+            first_user = next(
+                (
+                    msg.content
+                    for msg in self.messages
+                    if msg.role == "user" and msg.content.strip()
+                ),
+                "",
+            )
+            if not first_user:
+                return
+            # Claim the title slot so concurrent completions don't double-rename.
+            self._session_titled = True
+
+        try:
+            client = self._ai_client()
+            response = await client.run_agent(
+                agent_id="session-title",
+                message=(
+                    "Generate a title for the session based on the following "
+                    f"user prompt: {first_user}"
+                ),
+            )
+            if response.status != RunStatus.completed:
+                raise RuntimeError(
+                    f"session-title run did not complete (status={response.status})"
+                )
+
+            content = response.content
+            if isinstance(content, dict):
+                title = content.get("title")
+            else:
+                title = getattr(content, "title", None)
+            if not title or not str(title).strip():
+                raise RuntimeError("session-title returned no title")
+
+            last_error: Exception | None = None
+            for attempt in range(3):
+                try:
+                    await client.rename_session(
+                        session_id=session_id,
+                        session_name=str(title).strip(),
+                        session_type=SessionType.AGENT,
+                    )
+                    last_error = None
+                    break
+                except HTTPStatusError as e:
+                    last_error = e
+                    status = e.response.status_code if e.response is not None else None
+                    if status == 404 and attempt < 2:
+                        # Session upsert may still be flushing; retry briefly.
+                        await asyncio.sleep(0.5 * (attempt + 1))
+                        continue
+                    raise
+            if last_error is not None:
+                raise last_error
+        except Exception as e:
+            logger.exception(
+                "Failed to auto-title chat session (session may not be persisted)",
+                extra={"error": str(e), "session_id": session_id},
+            )
+            async with self:
+                self._session_titled = False
 
     @rx.event
     async def append_message(self, role: Literal["user", "assistant"], content: str):
@@ -428,6 +685,22 @@ class AgentRunMixin(rx.State, mixin=True):
                 if isinstance(event, agent_event.RunStartedEvent):
                     async with self:
                         self.agent_run_id = event.run_id
+                        # In background events `self` is a StateProxy — use hasattr,
+                        # not type(self).get_fields().
+                        if event.session_id and hasattr(self, "current_session_id"):
+                            current = self.current_session_id
+                            if not current:
+                                # First turn with no client-minted id: adopt server id.
+                                self.current_session_id = event.session_id
+                            elif current != event.session_id:
+                                # Keep the intentional thread id (new chat or loaded past).
+                                logger.warning(
+                                    "Ignoring AgentOS session_id=%s; keeping "
+                                    "intentional session_id=%s for agent=%s",
+                                    event.session_id,
+                                    current,
+                                    event.agent_id,
+                                )
                         self._record_step(
                             TraceStep(
                                 name="Running model",
@@ -534,6 +807,8 @@ class AgentRunMixin(rx.State, mixin=True):
                 self.run_state = RunState.completed.value
                 self._set_last_assistant_run_state(RunState.completed)
 
+            await self._after_run_completed()
+
         except Exception as e:
             logger.exception("Agent stream failed", exc_info=e)
             async with self:
@@ -586,6 +861,10 @@ class AgentRunMixin(rx.State, mixin=True):
             return
         # TODO - Agno's resume api
         raise NotImplementedError("Resume not yet implemented — pending Agno API.")
+
+    async def _after_run_completed(self) -> None:
+        """Hook after a successful streamed run. ChatMixin auto-titles sessions."""
+        return
 
     def _ai_client(self) -> AgentOSClient:
         return AgentOSClient(f"{settings.ai.ai_url}:{settings.ai.port}")

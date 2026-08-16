@@ -31,3 +31,9 @@ class Message(BaseModel):
     steps: list[TraceStep] = []
     steps_open: bool = False
     run_state: str = RunState.idle.value
+
+
+class ChatSessionItem(BaseModel):
+    session_id: str
+    session_name: str
+    updated_at: str = ""

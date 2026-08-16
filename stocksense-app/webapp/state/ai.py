@@ -1,11 +1,13 @@
 import logging
 import uuid
 
+import polars as pl
 import reflex as rx
+from agno.os.schema import AgentSessionDetailSchema
 from agno.run.agent import RunCompletedEvent, RunContentEvent
 
-from webapp.state.shared import AgentRunMixin, ChatMixin, Message, TickerSelectionMixin
-from webapp.types import RunState, TickerChoice
+from webapp.state.shared import AgentRunMixin, ChatMixin, TickerSelectionMixin
+from webapp.types import Message, RunState, TickerChoice
 
 logger = logging.getLogger("stocksense")
 
@@ -22,8 +24,7 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
     allow_ticker_choice: bool = False
     ticker_choice: str = TickerChoice.desired.value
     desired_choice_as_multi_select: bool = False
-    # Agno session used for the (summary + follow-up QA) conversation.
-    current_session_id: str = ""
+    chat_agent_id: str = "company-summary"
     # Last (exchange, ticker) the active session was created for — used to
     # decide whether a new Generate Summary click reuses the session.
     last_summary_exchange: str = ""
@@ -41,18 +42,65 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
         self.last_summary_exchange = ""
         self.last_summary_ticker = ""
 
-    @rx.event(background=True)
-    async def generate_summary(self):
-        if (self.run_state == RunState.generating.value) or not self.selected_ticker:
-            return
-
-        prompt = f"Generate company summary for {self.selected_ticker[0]} in the {self.selected_exchange} exchange"
-        exchange, ticker = self.selected_exchange, self.selected_ticker[0]
-        new_session = (exchange != self.last_summary_exchange) or (
-            ticker != self.last_summary_ticker
-        )
+    async def _apply_loaded_session(self, detail: AgentSessionDetailSchema) -> None:
+        """Restore ticker context and unlock chat_input after loading a session."""
+        session_state = detail.session_state or {}
+        exchange = session_state.get("exchange") or ""
+        ticker = session_state.get("ticker") or ""
 
         async with self:
+            messages = list(self.messages)
+
+        first_assistant = next(
+            (
+                msg.content
+                for msg in messages
+                if msg.role == "assistant" and msg.content.strip()
+            ),
+            "",
+        )
+
+        exchange_dropdown = ""
+        ticker_label = ""
+        if exchange:
+            exchanges = await self.available_exchanges
+            match = exchanges.filter(pl.col("symbol") == exchange)
+            if match.height > 0:
+                exchange_dropdown = match.select("dropdown").item()
+        if exchange and ticker:
+            tickers = await self.available_tickers
+            df = tickers.get(exchange)
+            if df is not None and df.height > 0:
+                match = df.filter(pl.col("ticker") == ticker)
+                if match.height > 0:
+                    ticker_label = match.select("dropdown").item()
+
+        async with self:
+            if exchange:
+                self.selected_exchange = exchange
+                if exchange_dropdown:
+                    self.selected_exchange_dropdown = exchange_dropdown
+            if ticker:
+                self.selected_ticker = [ticker]
+                self.selected_ticker_dropdown = ticker_label
+                self.selected_ticker_dropdowns = [ticker_label] if ticker_label else []
+            self.last_summary_exchange = exchange
+            self.last_summary_ticker = ticker
+            self.summary_result = first_assistant
+
+    @rx.event(background=True)
+    async def generate_summary(self):
+        async with self:
+            if (self.run_state == RunState.generating.value) or not self.selected_ticker:
+                return
+            exchange, ticker = self.selected_exchange, self.selected_ticker[0]
+            prompt = (
+                f"Generate company summary for {ticker} in the {exchange} exchange"
+            )
+            new_session = (exchange != self.last_summary_exchange) or (
+                ticker != self.last_summary_ticker
+            )
+
             if new_session:
                 # Different company (or first run): mint a fresh Agno session and
                 # reset the UI conversation. Dependencies populate session_state.
@@ -62,8 +110,10 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
                 self.messages = []
                 self.summary_result = ""
                 self.run_state = RunState.idle.value
+                self._session_titled = False
 
             # else: same company -> reuse current_session_id and keep messages.
+            session_id = self._ensure_session_id()
             self.messages.append(Message(role="user", content=prompt))
             self.messages.append(Message(role="assistant", content=""))
 
@@ -71,7 +121,7 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
         await self.stream_agent_run(
             agent_id="company-summary",
             message=prompt,
-            session_id=self.current_session_id,
+            session_id=session_id,
             dependencies=(
                 {"exchange": exchange, "ticker": ticker} if new_session else {}
             ),
@@ -82,20 +132,18 @@ class CompanySummaryState(ChatMixin, TickerSelectionMixin, AgentRunMixin, rx.Sta
 
     @rx.event(background=True)
     async def generate_answer(self):
-        if (self.run_state == RunState.generating.value) or not self.current_session_id:
-            return
-
-        prompt = self.prompt.strip()
-        if not prompt:
-            return
-
         async with self:
+            if (self.run_state == RunState.generating.value) or not self.current_session_id:
+                return
+            prompt = self.prompt.strip()
+            if not prompt:
+                return
+            session_id = self.current_session_id
             # Do not set run_state=generating here — stream_agent_run(manage_lifecycle=True)
             # owns the busy window and will no-op if we mark generating first.
             self.messages.append(Message(role="user", content=prompt))
             self.prompt = ""  # rest the user prompt input field.
             self.messages.append(Message(role="assistant", content=""))
-            session_id = self.current_session_id
 
         # Reuse the exact session generate_summary created earlier (no dependencies:
         # exchange/ticker already live in the agent's session_state).

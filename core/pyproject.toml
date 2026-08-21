@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-data = ["nsetools>=2.0.1", "scipy>=1.16.3", "yfinance>=1.2.1"]
+data = ["jugaad-data>=0.35.2", "scipy>=1.16.3", "yfinance>=1.2.1"]
 ai = [
     "arize-phoenix-client>=1.29.0",
     "arize-phoenix-otel>=0.14.0",

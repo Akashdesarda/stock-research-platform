@@ -23,7 +23,12 @@ def get_all_tickers(exchange: str) -> list[str]:
 def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
     data = []
     for ticker in track(tickers, description="Downloading NSE equity data"):
-        ticker_info = exch.nse.get_stock_info(ticker)
+        try:
+            ticker_info = exch.nse.get_stock_info(ticker)
+        except Exception as e:
+            logger.warning(f"Skipping {ticker} due to NSE request/response error: {e}")
+            continue
+
         # NOTE - Not all tickers may have complete info, so need to handle those cases
         # getting symbol and company name
         info = ticker_info.get("info", None)
@@ -41,6 +46,7 @@ def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
                 listing_date = datetime.strptime(listing_date_str, "%d-%b-%Y").date()
             except (ValueError, TypeError):
                 listing_date = None
+
         # Parse Index Symbol
         raw_index = metadata.get("pdSectorIndAll", "NA")
         if isinstance(raw_index, list):
@@ -49,6 +55,7 @@ def download_nse_equity_table_info(tickers: list[str]) -> pl.LazyFrame:
             index = [raw_index]
         else:
             index = ["No Index"]
+
         # Parse Series
         series = metadata.get("series", None)
 

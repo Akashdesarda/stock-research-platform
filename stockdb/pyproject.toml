@@ -1,6 +1,6 @@
 [project]
 name = "StockSense-Stockdb"
-version = "1.5.1"
+version = "1.5.3"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -16,6 +16,7 @@ dependencies = [
     "scalar-fastapi>=1.6.1",
     "scipy>=1.16.2",
     "stocksense-core[data]",
+    "tenacity>=9.1.4",
     "uvicorn>=0.41.0",
 ]
 
@@ -23,7 +24,6 @@ dependencies = [
 dev = [
     "httpx>=0.28.1",
     "ipykernel>=6.30.1",
-    "jupyterlab>=4.5.6",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=7.1.0",

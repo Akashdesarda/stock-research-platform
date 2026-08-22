@@ -3,6 +3,7 @@ import logging
 from datetime import date, timedelta
 
 import polars as pl
+from api.models import StockExchange
 from rich.progress import track
 from rich.prompt import Prompt
 from stocksense.config import get_settings
@@ -12,8 +13,6 @@ from stocksense.types import (
     DataPeriod,
     StockExchangeYahooIdentifier,
 )
-
-from api.models import StockExchange
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -33,7 +32,8 @@ def calculate_batches(n: int, batch_size: int) -> int:
 def prepare_ticker_history_table(symbol: str, df: pl.DataFrame) -> pl.LazyFrame:
     if not df.is_empty():
         return (
-            df.lazy()  # converting to lazyframe
+            df
+            .lazy()  # converting to lazyframe
             .with_columns(
                 # creating primary key
                 # key=pl.lit(symbol.lower())
@@ -77,11 +77,9 @@ def download_specific_date_ticker_history(
     )
 
     return (
-        pl.concat(
-            [
-                prepare_ticker_history_table(symbol, result[symbol])
-                for symbol in result
-            ],
+        pl
+        .concat(
+            [prepare_ticker_history_table(symbol, result[symbol]) for symbol in result],
             how="vertical_relaxed",
         )
         .drop_nulls()
@@ -113,16 +111,12 @@ def download_entire_ticker_history(
         exchange_market=getattr(StockExchangeYahooIdentifier, exchange.value),
     )
     logger.debug("downloading entire historical data")
-    result = yf.get_ticker_history(
-        period=DataPeriod.MAX, interval=DataInterval.ONE_DAY
-    )
+    result = yf.get_ticker_history(period=DataPeriod.MAX, interval=DataInterval.ONE_DAY)
 
     return (
-        pl.concat(
-            [
-                prepare_ticker_history_table(symbol, result[symbol])
-                for symbol in result
-            ],
+        pl
+        .concat(
+            [prepare_ticker_history_table(symbol, result[symbol]) for symbol in result],
             how="vertical_relaxed",
         )
         .drop_nulls()
@@ -151,9 +145,8 @@ async def download_ticker_history(
 ) -> dict:
     batch_size = settings.stockdb.download_batch_size
     tickers = (
-        await pl.scan_delta(
-            settings.stockdb.data_base_path / f"{exchange.value}/equity"
-        )
+        await pl
+        .scan_delta(settings.stockdb.data_base_path / f"{exchange.value}/equity")
         .select(pl.col("symbol").alias("ticker"))
         .collect_async()
     )
@@ -167,9 +160,8 @@ async def download_ticker_history(
     logger.info("getting last inserted date")
 
     latest_date_df = (
-        await ticker_history_table.table_data.select(
-            pl.col("date").max()
-        )  # to get latest available date
+        await ticker_history_table.table_data
+        .select(pl.col("date").max())  # to get latest available date
         # NOTE - polars return null row if no date found, which makes `is_empty()` `False`
         .filter(~pl.col("date").is_null())
         .collect_async()
@@ -188,16 +180,15 @@ async def download_ticker_history(
 
     # running batch job
     batched_data = []
-    no_of_batches = calculate_batches(
-        ticker_length.item(), batch_size=batch_size
-    )
+    no_of_batches = calculate_batches(ticker_length.item(), batch_size=batch_size)
     for batch in track(
         range(no_of_batches),
         description="Downloading ticker history data",
         total=no_of_batches,
     ):
         current_tickers = (
-            tickers.slice(batch * batch_size, batch_size)
+            tickers
+            .slice(batch * batch_size, batch_size)
             .select("ticker")
             .to_series()
             .to_list()
@@ -216,9 +207,7 @@ async def download_ticker_history(
                 )
             )
 
-    complete_ticker_history_data = pl.concat(
-        batched_data, how="vertical_relaxed"
-    )
+    complete_ticker_history_data = pl.concat(batched_data, how="vertical_relaxed")
     logger.info("downloading complete of ticker history data")
 
     # merging data into respective deltalake table

@@ -94,6 +94,10 @@ def delete_button(**props) -> rx.Component:
     return action_button("Delete", left_icon="trash-2", kind="danger", **props)
 
 
+def reset_button(**props) -> rx.Component:
+    return action_button("Reset", left_icon="rotate-ccw", kind="secondary", **props)
+
+
 def refresh_button(**props) -> rx.Component:
     return action_button(
         "Refresh", left_icon="refresh-cw", kind="outline", **props

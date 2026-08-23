@@ -380,6 +380,35 @@ def empty_state_card(
     )
 
 
+_CALLOUT_TONES: dict[str, tuple[str, str]] = {
+    "error": ("triangle_alert", "red"),
+    "warning": ("triangle_alert", "yellow"),
+    "info": ("info", "blue"),
+    "success": ("circle_check", "green"),
+}
+
+
+def callout_message(
+    message: str | rx.Var,
+    *,
+    tone: Literal["error", "warning", "info", "success"] = "info",
+    **props,
+) -> rx.Component:
+    """Inline callout whose icon and colour come from `tone`.
+
+    Mirrors `action_button(kind=...)`: the tone map keeps the icon/colour pairing
+    consistent everywhere instead of each call site restating it.
+    """
+    icon, color_scheme = _CALLOUT_TONES[tone]
+    return rx.callout(
+        message,
+        icon=props.pop("icon", icon),
+        color_scheme=props.pop("color_scheme", color_scheme),
+        width=props.pop("width", "100%"),
+        **props,
+    )
+
+
 def labeled_bullet_columns(
     *columns: tuple[str | rx.Var, Any, str],
 ) -> rx.Component:

@@ -1,14 +1,23 @@
 import reflex as rx
+import reflex_enterprise as rxe
 
-from webapp.components.inputs import dropdown_select, text_input
+from webapp.components.inputs import (
+    cancel_button,
+    dropdown_select,
+    reset_button,
+    submit_button,
+    text_input,
+)
 from webapp.components.layout import (
     callout_message,
     empty_state_card,
     form_field,
     responsive_grid,
+    section_header,
     subsection_header,
 )
 from webapp.state.playground._strategy import ApplyStrategyState
+from webapp.types import RunState
 
 
 def _param_field(row: rx.Var[dict[str, str]]) -> rx.Component:
@@ -82,18 +91,6 @@ def _parameters_section() -> rx.Component:
                         size="1",
                     ),
                 ),
-                rx.vstack(
-                    rx.text("Resolved parameters", size="1", weight="medium"),
-                    rx.code_block(
-                        ApplyStrategyState.resolved_params_json,
-                        language="json",
-                        width="100%",
-                        wrap_long_lines=True,
-                    ),
-                    spacing="2",
-                    width="100%",
-                    align_items="stretch",
-                ),
                 spacing="5",
                 width="100%",
                 align_items="stretch",
@@ -103,6 +100,64 @@ def _parameters_section() -> rx.Component:
         spacing="4",
         width="100%",
         align_items="stretch",
+    )
+
+
+def _submit_workflow() -> rx.Component:
+    """Submit / reset controls, with an in-flight spinner and cancel."""
+    is_applying = ApplyStrategyState.apply_state == RunState.generating.value
+
+    return rx.hstack(
+        submit_button(
+            on_click=ApplyStrategyState.apply_strategy,
+            disabled=~ApplyStrategyState.can_apply | is_applying,
+        ),
+        reset_button(
+            on_click=ApplyStrategyState.reset_params,
+            disabled=~ApplyStrategyState.has_params | is_applying,
+        ),
+        rx.cond(
+            is_applying,
+            rx.hstack(
+                rx.spinner(size="3"),
+                rx.text(
+                    "Applying Strategy...",
+                    size="3",
+                    color=rx.color("blue", 11),
+                ),
+                cancel_button(on_click=ApplyStrategyState.cancel_applying),
+                spacing="3",
+                align="center",
+            ),
+        ),
+        spacing="4",
+        align="center",
+        width="100%",
+    )
+
+
+def _results_view() -> rx.Component:
+    """Preview of the data returned by applying the strategy."""
+    return rx.cond(
+        ApplyStrategyState.apply_data_ready,
+        rx.vstack(
+            rx.spacer(size="3", width="100%"),
+            subsection_header(
+                "Preview of the applied strategy output", size="3"
+            ),
+            rxe.ag_grid(
+                id="apply_strategy_preview_grid",
+                row_data=ApplyStrategyState.data,
+                column_defs=ApplyStrategyState.columns_def,
+                pagination=True,
+                pagination_page_size=10,
+                pagination_page_size_selector=[10, 40, 100],
+                width="100%",
+                height="500px",
+            ),
+            width="100%",
+            spacing="4",
+        ),
     )
 
 
@@ -134,6 +189,12 @@ def apply_strategy_panel() -> rx.Component:
             spacing="5",
         ),
         _parameters_section(),
+        rx.cond(
+            ApplyStrategyState.apply_error != "",
+            callout_message(ApplyStrategyState.apply_error, tone="error"),
+        ),
+        _submit_workflow(),
+        _results_view(),
         spacing="8",
         width="100%",
     )

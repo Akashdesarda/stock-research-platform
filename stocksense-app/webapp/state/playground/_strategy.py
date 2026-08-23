@@ -1,5 +1,5 @@
+import asyncio
 import contextlib
-import json
 import logging
 import uuid
 from typing import Any
@@ -21,6 +21,7 @@ from stocksense.strategy.catalog.registry import (
     get_registry,
 )
 
+from webapp.state.playground._data import POLARS_AG_GRID_FILTER_MAP
 from webapp.state.shared import AgentRunMixin, ChatMixin, TickerSelectionMixin
 from webapp.types import Message, RunState, TraceStep
 
@@ -28,6 +29,15 @@ logger = logging.getLogger("stocksense")
 settings = get_settings()
 
 _NUMERIC_PARAM_TYPES = ("int", "float")
+
+
+def _api_detail(response) -> str:
+    """Pull FastAPI's ``{"detail": ...}`` message out of an error response."""
+    with contextlib.suppress(Exception):
+        detail = response.json().get("detail")
+        if detail:
+            return str(detail)
+    return response.text
 
 
 # Try multiple ways to parse domain keys since they can come from different sources
@@ -342,11 +352,19 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
     select_strategy_id: str = ""
 
     # Parameter state is split into three layers for clean separation of concerns:
-    available_params: dict[str, Any] = {} # raw API response
-    param_specs: list[dict[str, str]] = [] # flattened, UI-ready rows with metadata
-    param_inputs: dict[str, str] = {} # user inputs
+    available_params: dict[str, Any] = {}  # raw API response
+    param_specs: list[dict[str, str]] = []  # flattened, UI-ready rows with metadata
+    param_inputs: dict[str, str] = {}  # user inputs
     param_errors: dict[str, str] = {}
     params_error: str = ""
+
+    # Result of `POST /strategy/apply`, shaped for ag_grid.
+    data: list[dict] = []
+    columns_def: list[dict] = []
+    apply_data_ready: bool = False
+    apply_state: str = RunState.idle.value
+    apply_error: str = ""
+    _cancel_event: asyncio.Event = asyncio.Event()
 
     # LLM Agent state
     run_state: str = RunState.idle.value
@@ -442,10 +460,6 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         return payload
 
     @rx.var(cache=True)
-    def resolved_params_json(self) -> str:
-        return json.dumps(self.resolved_params, indent=2, default=str)
-
-    @rx.var(cache=True)
     def can_apply(self) -> bool:
         # All green lights: dataset selected, strategy selected, and no validation errors
         # This gates the "Apply" button to prevent incomplete submissions
@@ -463,6 +477,7 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         self.select_dataset_id = (
             _.filter(pl.col("dropdown") == value).select("id").item()
         )
+        self._clear_results()
 
     @rx.event
     async def set_select_strategy_id(self, value: str):
@@ -509,6 +524,81 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             name: _validate_param(value, spec),
         }
 
+    @rx.event(background=True)
+    async def apply_strategy(self):
+        """Apply the selected strategy to the selected dataset and preview the result."""
+        async with self:
+            if self.apply_state == RunState.generating.value:
+                return
+            self.apply_state = RunState.generating.value
+            self.apply_data_ready = False
+            self.apply_error = ""
+            self.data = []
+            self.columns_def = []
+            self._cancel_event.clear()
+            # Blank/invalid inputs are already omitted, so the backend falls back
+            # to each strategy function's own default.
+            payload = {
+                "strategy_id": self.select_strategy_id,
+                "registered_dataset_id": self.select_dataset_id,
+                "parameters": self.resolved_params,
+            }
+
+        try:
+            async with self._stockdb_client() as client:
+                response = await client.post(url="/strategy/apply", json=payload)
+            if response.is_error:
+                async with self:
+                    self.apply_error = (
+                        f"Failed to apply strategy: {_api_detail(response)}"
+                    )
+                    self.apply_state = RunState.error.value
+                return
+            result = response.json()
+        except Exception as e:
+            logger.exception("failed to apply strategy", exc_info=e)
+            async with self:
+                self.apply_error = f"Failed to apply strategy: {e}"
+                self.apply_state = RunState.error.value
+            return
+
+        if not result:
+            async with self:
+                self.apply_state = RunState.idle.value
+            return rx.toast.warning(
+                "Strategy applied but returned no rows.",
+                position="bottom-right",
+            )
+
+        await self._process_results(pl.LazyFrame(result))
+
+    @rx.event
+    def cancel_applying(self):
+        """Cancel the in-flight apply and drop any partial result."""
+        self._cancel_event.set()
+        self.apply_state = RunState.cancelled.value
+        self._clear_results()
+
+    async def _process_results(self, data: pl.LazyFrame):
+        """Collect the result frame into ag_grid row data + column defs."""
+        schema = data.collect_schema()
+        column_def = [
+            {
+                "field": col,
+                "filter": POLARS_AG_GRID_FILTER_MAP[schema[col]],
+                "sortable": True,
+            }
+            for col in schema
+        ]
+
+        async with self:
+            if not self._cancel_event.is_set():
+                _ = await data.collect_async()
+                self.data = _.to_dicts()
+                self.columns_def = column_def
+                self.apply_data_ready = True
+                self.apply_state = RunState.idle.value
+
     @rx.event
     def reset_params(self):
         """Reset every parameter back to its catalog default."""
@@ -524,6 +614,13 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         # Different from reset: this removes user overrides entirely
         self.param_inputs = dict.fromkeys(self.param_inputs, "")
         self.param_errors = dict.fromkeys(self.param_inputs, "")
+
+    def _clear_results(self):
+        self.data = []
+        self.columns_def = []
+        self.apply_data_ready = False
+        self.apply_error = ""
+        self.apply_state = RunState.idle.value
 
     def _clear_params(self):
         self.available_params = {}

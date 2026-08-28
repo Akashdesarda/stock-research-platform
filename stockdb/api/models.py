@@ -186,7 +186,11 @@ class TickerHistoryQuery(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -222,7 +226,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
         StockExchange.nse,
         description="Stock Exchange to download ticker history for",
     )
-    task_mode: TaskMode = Field(TaskMode.auto, description="Mode of task execution")
+    task_mode: TaskMode = Field(
+        TaskMode.auto, description="Mode of task execution"
+    )
     download_mode: TickerHistoryDownloadMode = Field(
         TickerHistoryDownloadMode.incremental,
         description="Download mode. `full` mode downloads complete history. `incremental` mode downloads only latest/missing data.",
@@ -257,7 +263,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             )
         if self.task_mode == TaskMode.manual:
             if self.start_date is None or self.end_date is None:
-                raise ValueError("start_date and end_date are required in manual mode")
+                raise ValueError(
+                    "start_date and end_date are required in manual mode"
+                )
             if self.start_date > self.end_date:
                 raise ValueError("start_date must be less than end_date")
         return self
@@ -286,7 +294,9 @@ class TaskTickerHistoryDownloadInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t,
                 exchange=self.exchange.name,
-                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
+                exch_id=getattr(
+                    StockExchangeYahooIdentifier, self.exchange.name
+                ),
             )
             for t in self.ticker
         ]
@@ -349,7 +359,11 @@ class BulkTickerHistoryInput(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
@@ -359,7 +373,9 @@ class BulkTickerHistoryInput(BaseModel):
             YahooTickerIdentifier(
                 symbol=t.upper(),  # ticker symbol must be always Upper case
                 exchange=self.exchange.name,
-                exch_id=getattr(StockExchangeYahooIdentifier, self.exchange.name),
+                exch_id=getattr(
+                    StockExchangeYahooIdentifier, self.exchange.name
+                ),
             )
             for t in self.ticker
         ]
@@ -465,8 +481,12 @@ class LogicalPlan(BaseModel):
     ticker: list[str] | None = Field(None, examples=["INFY", "TCS"])
     interval: DataInterval | None = Field(None, examples=["1d", "1mo"])
     period: DataPeriod | None = Field(None, examples=["3mo", "1y"])
-    start_date: date | None = Field(None, examples=[date(2023, 1, 1), date(2024, 1, 1)])
-    end_date: date | None = Field(None, examples=[date(2023, 1, 30), date(2024, 1, 30)])
+    start_date: date | None = Field(
+        None, examples=[date(2023, 1, 1), date(2024, 1, 1)]
+    )
+    end_date: date | None = Field(
+        None, examples=[date(2023, 1, 30), date(2024, 1, 30)]
+    )
     sql_query: str | None = Field(
         None,
         examples=[
@@ -478,21 +498,29 @@ class LogicalPlan(BaseModel):
     def check_start_end_date(self):
         if (self.start_date is not None) and (self.end_date is None):
             raise ValueError("end_date is required when start_date is set")
-        if self.start_date and self.end_date and self.start_date > self.end_date:
+        if (
+            self.start_date
+            and self.end_date
+            and self.start_date > self.end_date
+        ):
             raise ValueError("Start date must be less than end date")
         return self
 
     @model_validator(mode="after")
     def check_sql_or_query_params(self):
         # When sql_query is provided, other query parameters should not be provided and vice versa.
-        if self.sql_query is not None and any([
-            self.ticker,
-            self.interval,
-            self.period,
-            self.start_date,
-            self.end_date,
-        ]):
-            raise ValueError("sql_query cannot be provided with other query parameters")
+        if self.sql_query is not None and any(
+            [
+                self.ticker,
+                self.interval,
+                self.period,
+                self.start_date,
+                self.end_date,
+            ]
+        ):
+            raise ValueError(
+                "sql_query cannot be provided with other query parameters"
+            )
 
         # When sql_query is not provided, ticker and interval are required. Also, either period or
         # start_date & end_date should be provided.
@@ -517,7 +545,9 @@ class DataRegistrationInput(BaseModel):
         default_factory=lambda: str(uuid4()),
         description="Unique identifier for the dataset. If not provided, a UUID will be generated.",
     )
-    name: str | None = Field(None, description="Name of the dataset to be registered")
+    name: str | None = Field(
+        None, description="Name of the dataset to be registered"
+    )
     description: str | None = Field(
         None, description="Description of the dataset to be registered"
     )
@@ -590,15 +620,17 @@ class DataRegistrationInput(BaseModel):
             schema_overrides={"tags": pl.List(pl.String)},
         ).with_columns(
             pl.col("logical_plan").cast(
-                pl.Struct({
-                    "exchange": pl.String,
-                    "ticker": pl.List(pl.String),
-                    "interval": pl.String,
-                    "period": pl.String,
-                    "start_date": pl.Date,
-                    "end_date": pl.Date,
-                    "sql_query": pl.String,
-                })
+                pl.Struct(
+                    {
+                        "exchange": pl.String,
+                        "ticker": pl.List(pl.String),
+                        "interval": pl.String,
+                        "period": pl.String,
+                        "start_date": pl.Date,
+                        "end_date": pl.Date,
+                        "sql_query": pl.String,
+                    }
+                )
             )
         )
 
@@ -734,21 +766,29 @@ class CompanySummaryAgentQA(BaseModel):
 
 
 # SECTION - Strategy related models
-class ApplyStrategyInput(BaseModel):
+class StrategyApplication(BaseModel):
     strategy_id: str = Field(
         ...,
         description="Unique identifier of the strategy to be applied.",
         examples=["momentum.rsi", "trend.macd"],
     )
-    registered_dataset_id: str = Field(
-        ...,
-        description="Unique identifier of the registered dataset on which the strategy needs to be applied.",
-    )
     parameters: dict = Field(
-        ...,
+        default_factory=dict,
         description="Dictionary of parameters to be passed to the strategy. The required parameters depend on the specific strategy being applied.",
         examples=[
             {"period": 14},
             {"fast_period": 12, "slow_period": 26, "signal_period": 9},
         ],
+    )
+
+
+class ApplyStrategyInput(BaseModel):
+    registered_dataset_id: str = Field(
+        ...,
+        description="Unique identifier of the registered dataset on which the strategies need to be applied.",
+    )
+    strategies: list[StrategyApplication] = Field(
+        ...,
+        min_length=1,
+        description="Strategies to apply sequentially to the registered dataset.",
     )

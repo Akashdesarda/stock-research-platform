@@ -6,14 +6,15 @@ from pathlib import Path
 
 import polars as pl
 from about_time import about_time
-from api.models import APITags, StockExchange
-from api.routers import bulk, ops, per_security, strategy
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from scalar_fastapi import get_scalar_api_reference
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
+
+from api.models import APITags, StockExchange
+from api.routers import bulk, ops, per_security, strategy
 
 logger = logging.getLogger("stockdb")
 settings = get_settings()
@@ -22,7 +23,7 @@ STATIC_DIR = Path(__file__).parent / "static"  # points to stockdb/static
 app = FastAPI(
     debug=True,
     title="StockDB API",
-    version="1.5.3",
+    version="1.5.4",
     docs_url=None,
     redoc_url=None,
 )
@@ -41,7 +42,9 @@ async def _log_request_information(request: Request, call_next):
     # tracking time taken by request to be fulfilled
     with about_time() as t:  # type: ignore
         # NOTE - Here the actual http function will be executed in the middleware.
-        logger.info(f"received request --> {request.method} {path_and_query_url}")
+        logger.info(
+            f"received request --> {request.method} {path_and_query_url}"
+        )
         response = await call_next(request)
         logger.info(
             f"fulfilled request --> {request.method} {path_and_query_url} {response.status_code}"
@@ -84,20 +87,25 @@ async def _stockdb_data_health() -> dict:
     """StockDB Data Health check"""
     all_exchanges = dict.fromkeys(StockExchange.__members__.keys())
     now = datetime.now()
-    latest_data_date = now.date() if now.hour >= 18 else now.date() - timedelta(days=1)
+    latest_data_date = (
+        now.date() if now.hour >= 18 else now.date() - timedelta(days=1)
+    )
 
     # Getting data health loop
     for exch in all_exchanges:
         stock_db = StockDataDB(
             settings.stockdb.data_base_path / f"{exch}/ticker_history"
         )
-        count = await stock_db.table_data.select("close").count().collect_async()
+        count = (
+            await stock_db.table_data.select("close").count().collect_async()
+        )
         if count.item() == 0:
             all_exchanges[exch] = "NO DATA"
             continue
         date_check = (
-            await stock_db
-            .polars_filter(pl.col("date").max().cast(pl.Date) < latest_data_date)
+            await stock_db.polars_filter(
+                pl.col("date").max().cast(pl.Date) < latest_data_date
+            )
             .select("close")
             .count()
             .collect_async()
@@ -128,6 +136,7 @@ async def _internal_scalar_html():
 
 if __name__ == "__main__":
     import uvicorn
+
     from api import setup
 
     setup()

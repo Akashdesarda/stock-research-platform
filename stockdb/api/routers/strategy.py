@@ -2,10 +2,14 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 from stocksense.config import get_settings
-from stocksense.strategy import TechnicalAnalysis, catalog
+from stocksense.strategy import catalog
 
-from api.models import APITags, ApplyStrategyInput, RegisteredDataOutput
-from api.routers import _logical_plan_to_lf
+from api.models import (
+    APITags,
+    ApplyStrategyInput,
+    RegisteredDataOutput,
+)
+from api.routers import _apply_strategy, _logical_plan_to_lf
 from api.routers.ops import get_registered_data
 
 logger = logging.getLogger("stockdb")
@@ -52,8 +56,10 @@ async def get_strategy_by_id(strategy_id: str) -> catalog.StrategyDescriptor:
 
 
 @router.post("/apply")
-async def apply_strategy_to_registered_dataset(input: ApplyStrategyInput) -> list[dict]:
-    """Apply a strategy to a registered dataset and get the results"""
+async def apply_strategy_to_registered_dataset(
+    input: ApplyStrategyInput,
+) -> list[dict]:
+    """Apply strategies to a registered dataset and get the results"""
     # getting the data directly via python function call
     try:
         dataset_info = await get_registered_data(input.registered_dataset_id)
@@ -66,25 +72,24 @@ async def apply_strategy_to_registered_dataset(input: ApplyStrategyInput) -> lis
             ) from e
         raise
 
+    strategy_ids = [strategy.strategy_id for strategy in input.strategies]
     logger.info(
         f"using dataset:{dataset.name} last modified: {dataset.last_modified}"
-        f" to apply strategy: {input.strategy_id}"
+        f" to apply strategies: {strategy_ids}"
     )
 
     # getting the data for the dataset by hydrating the logical plan directly
-    data = _logical_plan_to_lf(dataset.logical_plan)
+    data = _logical_plan_to_lf(dataset.logical_plan).sort("ticker", "date")
     logger.debug(f"successfully hydrated dataset: {dataset.name}")
 
-    # getting the strategy accessor
-    logger.debug(f"applying strategy: {input.strategy_id} to dataset: {dataset.name}")
-    strategy_descriptor = catalog.get_strategy_by_id(input.strategy_id)
-    accessor, method = strategy_descriptor.id.split(".")
-    ta = TechnicalAnalysis(data)
-    strategy_method = getattr(ta, accessor)
-    strategy_func = getattr(strategy_method, method)
-    result = strategy_func(**input.parameters)
-    result = await result.collect_async()
+    for strategy in input.strategies:
+        logger.debug(
+            f"applying strategy: {strategy.strategy_id} to dataset: {dataset.name}"
+        )
+        data = _apply_strategy(data, strategy)
+
+    result = await data.collect_async()
     logger.info(
-        f"successfully applied strategy: {input.strategy_id} to dataset: {dataset.name}"
+        f"successfully applied strategies: {strategy_ids} to dataset: {dataset.name}"
     )
     return result.to_dicts()

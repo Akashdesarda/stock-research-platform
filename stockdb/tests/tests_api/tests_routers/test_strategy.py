@@ -1,18 +1,18 @@
-from typing import AsyncGenerator
-from uuid import uuid4
+from collections.abc import AsyncGenerator
 
 import polars as pl
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from main import app
 from stocksense.config import get_settings
+
+from main import app
 
 settings = get_settings()
 
 
 @pytest_asyncio.fixture(scope="module")
-async def async_client() -> AsyncGenerator[AsyncClient, None]:
+async def async_client() -> AsyncGenerator[AsyncClient]:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
@@ -21,7 +21,7 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest_asyncio.fixture
 async def registered_dataset_id(async_client: AsyncClient) -> str:
-    dataset_id = f"unit-test-strategy-{uuid4().hex}"
+    dataset_id = "unit-test-strategy"
     registration_payload = {
         "dataset_id": dataset_id,
         "name": "test_strategy_dataset",
@@ -95,9 +95,13 @@ async def test_apply_strategy_to_registered_dataset(
     async_client: AsyncClient, registered_dataset_id: str
 ):
     payload = {
-        "strategy_id": "momentum.rsi",
         "registered_dataset_id": registered_dataset_id,
-        "parameters": {"period": 14},
+        "strategies": [
+            {
+                "strategy_id": "momentum.rsi",
+                "parameters": {"period": 14},
+            }
+        ],
     }
 
     response = await async_client.post("/api/strategy/apply", json=payload)
@@ -111,13 +115,49 @@ async def test_apply_strategy_to_registered_dataset(
 
 
 @pytest.mark.asyncio
+async def test_apply_multiple_strategies_to_registered_dataset(
+    async_client: AsyncClient, registered_dataset_id: str
+):
+    payload = {
+        "registered_dataset_id": registered_dataset_id,
+        "strategies": [
+            {
+                "strategy_id": "momentum.rsi",
+                "parameters": {"period": 14},
+            },
+            {
+                "strategy_id": "trend.sma_crossover",
+                "parameters": {"fast": 10, "slow": 20},
+            },
+        ],
+    }
+
+    response = await async_client.post("/api/strategy/apply", json=payload)
+
+    assert response.status_code == 200
+
+    # checking if data is returned with columns from both strategies
+    data = pl.from_dicts(response.json()).lazy()
+    assert not data.limit(1).collect().is_empty()
+    schema_names = data.collect_schema().names()
+    assert "RSI_14" in schema_names
+    assert "SMA_10" in schema_names
+    assert "SMA_20" in schema_names
+    assert "SMA_crossover_10_20" in schema_names
+
+
+@pytest.mark.asyncio
 async def test_apply_strategy_to_nonexistent_registered_dataset(
     async_client: AsyncClient,
 ):
     payload = {
-        "strategy_id": "momentum.rsi",
         "registered_dataset_id": "nonexistent-dataset",
-        "parameters": {"period": 14},
+        "strategies": [
+            {
+                "strategy_id": "momentum.rsi",
+                "parameters": {"period": 14},
+            }
+        ],
     }
 
     response = await async_client.post("/api/strategy/apply", json=payload)

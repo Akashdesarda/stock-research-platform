@@ -3,9 +3,10 @@ from datetime import date, datetime
 import polars as pl
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
+from stocksense.strategy import TechnicalAnalysis, catalog
 from stocksense.types import DataInterval, DataPeriod
 
-from api.models import LogicalPlan
+from api.models import LogicalPlan, StrategyApplication
 
 settings = get_settings()
 
@@ -57,11 +58,12 @@ def _build_history_lf_from_query(
         interval_value = "1w"
 
     return (
-        result
-        .sort([
-            "ticker",
-            "date",
-        ])  # dynamic grouping requires ascending data within each ticker
+        result.sort(
+            [
+                "ticker",
+                "date",
+            ]
+        )  # dynamic grouping requires ascending data within each ticker
         .group_by_dynamic(
             index_column="date",
             group_by="ticker",
@@ -87,7 +89,8 @@ def _build_history_lf_from_query(
 def _logical_plan_to_lf(plan: LogicalPlan) -> pl.LazyFrame:
     """Hydrate & return registered data based on the logical plan provided in the request body"""
     sdb = StockDataDB(
-        settings.stockdb.data_base_path / f"{plan.exchange.value}/ticker_history"
+        settings.stockdb.data_base_path
+        / f"{plan.exchange.value}/ticker_history"
     )
     # 1st priority to sql query
     if plan.sql_query:
@@ -104,7 +107,17 @@ def _logical_plan_to_lf(plan: LogicalPlan) -> pl.LazyFrame:
         )
 
 
+def _apply_strategy(data, strategy: StrategyApplication):
+    strategy_descriptor = catalog.get_strategy_by_id(strategy.strategy_id)
+    accessor, method = strategy_descriptor.id.split(".")
+    ta = TechnicalAnalysis(data)
+    strategy_method = getattr(ta, accessor)
+    strategy_func = getattr(strategy_method, method)
+    return strategy_func(**strategy.parameters)
+
+
 __all__ = [
+    "_apply_strategy",
     "_build_history_lf_from_query",
     "_logical_plan_to_lf",
 ]

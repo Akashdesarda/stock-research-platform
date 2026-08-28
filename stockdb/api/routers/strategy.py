@@ -52,7 +52,9 @@ async def get_strategy_by_id(strategy_id: str) -> catalog.StrategyDescriptor:
 
 
 @router.post("/apply")
-async def apply_strategy_to_registered_dataset(input: ApplyStrategyInput) -> list[dict]:
+async def apply_strategy_to_registered_dataset(
+    input: ApplyStrategyInput,
+) -> list[dict]:
     """Apply a strategy to a registered dataset and get the results"""
     # getting the data directly via python function call
     try:
@@ -72,11 +74,13 @@ async def apply_strategy_to_registered_dataset(input: ApplyStrategyInput) -> lis
     )
 
     # getting the data for the dataset by hydrating the logical plan directly
-    data = _logical_plan_to_lf(dataset.logical_plan)
+    data = _logical_plan_to_lf(dataset.logical_plan).sort("ticker", "date")
     logger.debug(f"successfully hydrated dataset: {dataset.name}")
 
     # getting the strategy accessor
-    logger.debug(f"applying strategy: {input.strategy_id} to dataset: {dataset.name}")
+    logger.debug(
+        f"applying strategy: {input.strategy_id} to dataset: {dataset.name}"
+    )
     strategy_descriptor = catalog.get_strategy_by_id(input.strategy_id)
     accessor, method = strategy_descriptor.id.split(".")
     ta = TechnicalAnalysis(data)

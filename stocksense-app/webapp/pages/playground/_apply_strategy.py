@@ -4,16 +4,17 @@ import reflex_enterprise as rxe
 from webapp.components.inputs import (
     cancel_button,
     dropdown_select,
+    multi_select_dropdown,
     reset_button,
     submit_button,
     text_input,
 )
 from webapp.components.layout import (
+    bordered_container,
     callout_message,
     empty_state_card,
     form_field,
     responsive_grid,
-    section_header,
     subsection_header,
 )
 from webapp.state.playground._strategy import ApplyStrategyState
@@ -47,7 +48,7 @@ def _param_field(row: rx.Var[dict[str, str]]) -> rx.Component:
         text_input(
             placeholder=row["placeholder"],
             on_change=lambda value: ApplyStrategyState.set_param_value(
-                row["name"], value
+                row["strategy_id"], row["name"], value
             ),
             type=row["input_type"],
             value=row["value"],
@@ -68,19 +69,42 @@ def _param_field(row: rx.Var[dict[str, str]]) -> rx.Component:
     )
 
 
+def _strategy_param_group(strategy: rx.Var[dict[str, str]]) -> rx.Component:
+    """One selected strategy's parameter form, boxed and driven by its own param rows."""
+    return bordered_container(
+        subsection_header(strategy["name"], size="2"),
+        responsive_grid(
+            rx.foreach(
+                ApplyStrategyState.param_rows_by_strategy[strategy["id"]],
+                _param_field,
+            ),
+            columns=[1, 2, 2],
+            spacing="5",
+        ),
+        width="100%",
+        max_width="100%",
+        padding="20px",
+    )
+
+
 def _parameters_section() -> rx.Component:
     return rx.vstack(
         subsection_header("Edit Strategy Parameters", size="3"),
         rx.cond(
             ApplyStrategyState.params_error != "",
-            callout_message(ApplyStrategyState.params_error, tone="error", size="1"),
+            callout_message(
+                ApplyStrategyState.params_error, tone="error", size="1"
+            ),
         ),
         rx.cond(
             ApplyStrategyState.has_params,
             rx.vstack(
                 responsive_grid(
-                    rx.foreach(ApplyStrategyState.param_rows, _param_field),
-                    columns=[1, 2, 2],
+                    rx.foreach(
+                        ApplyStrategyState.selected_strategies_info,
+                        _strategy_param_group,
+                    ),
+                    columns=[1, 1, 2],
                     spacing="5",
                 ),
                 rx.cond(
@@ -95,7 +119,9 @@ def _parameters_section() -> rx.Component:
                 width="100%",
                 align_items="stretch",
             ),
-            empty_state_card("Select a strategy to configure its parameters"),
+            empty_state_card(
+                "Select at least one strategy to configure its parameters"
+            ),
         ),
         spacing="4",
         width="100%",
@@ -177,11 +203,12 @@ def apply_strategy_panel() -> rx.Component:
             ),
             form_field(
                 label="Select Strategy",
-                control=dropdown_select(
-                    label="Select Strategy",
+                control=multi_select_dropdown(
+                    label=None,
                     options=ApplyStrategyState.available_strategies_dropdown,
                     value=ApplyStrategyState.select_strategy_dropdown,
-                    on_change=ApplyStrategyState.set_select_strategy_id,
+                    on_change=ApplyStrategyState.set_select_strategy_ids,
+                    placeholder="Select one or more strategies",
                     width="100%",
                 ),
             ),

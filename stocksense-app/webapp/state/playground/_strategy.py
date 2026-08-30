@@ -138,6 +138,60 @@ def _validate_param(value: str, spec: dict[str, str]) -> str:
     return ""
 
 
+def _rows_for_strategy(
+    strategy_id: str,
+    specs: list[dict[str, str]],
+    inputs: dict[str, str],
+    errors: dict[str, str],
+) -> list[dict[str, str]]:
+    """Merge one strategy's specs with its current input state, for `rx.foreach`."""
+    rows: list[dict[str, str]] = []
+    for spec in specs:
+        name, param_type, default = spec["name"], spec["type"], spec["default"]
+        rows.append(
+            {
+                **spec,
+                "strategy_id": strategy_id,
+                "value": inputs.get(name, ""),
+                "error": errors.get(name, ""),
+                "placeholder": default or "value",
+                # Smart input types: numeric fields get number inputs with steppers,
+                # everything else stays text for maximum flexibility (like column names)
+                "input_type": (
+                    "number" if param_type in _NUMERIC_PARAM_TYPES else "text"
+                ),
+                "step": "1" if param_type == "int" else "any",
+                "hint": (
+                    f"Default: {default}"
+                    if default
+                    else "Blank uses the strategy default"
+                ),
+            }
+        )
+    return rows
+
+
+def _resolved_params_for_strategy(
+    specs: list[dict[str, str]], inputs: dict[str, str]
+) -> dict[str, Any]:
+    """Cast, validated payload for one strategy's parameters."""
+    payload: dict[str, Any] = {}
+    for spec in specs:
+        raw = inputs.get(spec["name"], "")
+        if not raw.strip() or _validate_param(raw, spec):
+            continue
+        value, error = _cast_param(raw, spec["type"])
+        if error:
+            continue
+        payload[spec["name"]] = value
+    return payload
+
+
+def _lookup_id(df: pl.DataFrame, dropdown_value: str) -> str:
+    """Resolve a "Name (ID)" dropdown label back to its raw ID."""
+    return df.filter(pl.col("dropdown") == dropdown_value).select("id").item()
+
+
 class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
     # Manages the hierarchical selection flow: Domain → Category → Strategy
 
@@ -357,18 +411,21 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
     # Selection state
     select_dataset_dropdown: str = ""
-    select_strategy_dropdown: str = ""
     select_dataset_id: str = ""
-    select_strategy_id: str = ""
+    # Multiple strategies can now be applied in one go, so selection is a list.
+    select_strategy_dropdown: list[str] = []
+    select_strategy_ids: list[str] = []
 
-    # Parameter state is split into three layers for clean separation of concerns:
-    available_params: dict[str, Any] = {}  # raw API response
-    param_specs: list[
-        dict[str, str]
-    ] = []  # flattened, UI-ready rows with metadata
-    param_inputs: dict[str, str] = {}  # user inputs
-    param_errors: dict[str, str] = {}
-    params_error: str = ""
+    # Parameter state is split into per-strategy layers for clean separation of concerns.
+    # Every mapping below is keyed by strategy_id so each selected strategy keeps its
+    # own independent set of parameters.
+    strategy_params: dict[str, dict[str, Any]] = {}  # raw API response
+    strategy_param_specs: dict[
+        str, list[dict[str, str]]
+    ] = {}  # flattened, UI-ready rows with metadata
+    param_inputs: dict[str, dict[str, str]] = {}  # user inputs
+    param_errors: dict[str, dict[str, str]] = {}
+    params_errors: dict[str, str] = {}  # load failures, keyed by strategy_id
 
     # Result of `POST /strategy/apply`, shaped for ag_grid.
     data: list[dict] = []
@@ -424,72 +481,61 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         return _.select("dropdown").to_series().to_list()
 
     @rx.var(cache=True)
-    def param_rows(self) -> list[dict[str, str]]:
+    async def selected_strategies_info(self) -> list[dict[str, str]]:
+        """Selected strategies as ``{"id", "name"}`` pairs, in selection order."""
+        strategies = await self.available_strategies
+        infos: list[dict[str, str]] = []
+        for strategy_id in self.select_strategy_ids:
+            match = strategies.filter(pl.col("id") == strategy_id)
+            name = match.select("name").item() if match.height else strategy_id
+            infos.append({"id": strategy_id, "name": name})
+        return infos
+
+    @rx.var(cache=True)
+    def params_error(self) -> str:
+        return "; ".join(self.params_errors.values())
+
+    @rx.var(cache=True)
+    def param_rows_by_strategy(self) -> dict[str, list[dict[str, str]]]:
         """Specs merged with the current input value and error, for `rx.foreach`."""
-        # Merge parameter specs with current input state for rendering
-        # Each row gets its value, error, and UI hints for a complete form field
-        rows: list[dict[str, str]] = []
-        for spec in self.param_specs:
-            name, param_type, default = (
-                spec["name"],
-                spec["type"],
-                spec["default"],
+        return {
+            strategy_id: _rows_for_strategy(
+                strategy_id,
+                specs,
+                self.param_inputs.get(strategy_id, {}),
+                self.param_errors.get(strategy_id, {}),
             )
-            rows.append(
-                {
-                    **spec,
-                    "value": self.param_inputs.get(name, ""),
-                    "error": self.param_errors.get(name, ""),
-                    "placeholder": default or "value",
-                    # Smart input types: numeric fields get number inputs with steppers,
-                    # everything else stays text for maximum flexibility (like column names)
-                    "input_type": (
-                        "number"
-                        if param_type in _NUMERIC_PARAM_TYPES
-                        else "text"
-                    ),
-                    "step": "1" if param_type == "int" else "any",
-                    "hint": (
-                        f"Default: {default}"
-                        if default
-                        else "Blank uses the strategy default"
-                    ),
-                }
-            )
-        return rows
+            for strategy_id, specs in self.strategy_param_specs.items()
+        }
 
     @rx.var(cache=True)
     def has_params(self) -> bool:
-        return len(self.param_specs) > 0
+        return any(self.strategy_param_specs.values())
 
     @rx.var(cache=True)
     def has_param_errors(self) -> bool:
-        return any(self.param_errors.values())
+        return any(
+            any(errors.values()) for errors in self.param_errors.values()
+        )
 
     @rx.var(cache=True)
-    def resolved_params(self) -> dict[str, Any]:
-        """Cast, validated payload for `POST /strategy/apply`"""
-        # Build the final API payload by casting and validating each parameter
-        # Blank or invalid inputs are skipped so the backend uses its defaults
-        payload: dict[str, Any] = {}
-        for spec in self.param_specs:
-            raw = self.param_inputs.get(spec["name"], "")
-            if not raw.strip() or _validate_param(raw, spec):
-                continue
-            value, error = _cast_param(raw, spec["type"])
-            if error:
-                continue
-            payload[spec["name"]] = value
-        return payload
+    def resolved_params_by_strategy(self) -> dict[str, dict[str, Any]]:
+        """Cast, validated payload per strategy for `POST /strategy/apply`."""
+        return {
+            strategy_id: _resolved_params_for_strategy(
+                specs, self.param_inputs.get(strategy_id, {})
+            )
+            for strategy_id, specs in self.strategy_param_specs.items()
+        }
 
     @rx.var(cache=True)
     def can_apply(self) -> bool:
-        # All green lights: dataset selected, strategy selected, and no validation errors
-        # This gates the "Apply" button to prevent incomplete submissions
+        # All green lights: dataset selected, at least one strategy selected, and no
+        # validation errors. This gates the "Apply" button to prevent incomplete submissions
         return bool(
             self.select_dataset_id
-            and self.select_strategy_id
-            and not self.params_error
+            and self.select_strategy_ids
+            and not any(self.params_errors.values())
             and not self.has_param_errors
         )
 
@@ -497,58 +543,77 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
     async def set_select_dataset_id(self, value: str):
         self.select_dataset_dropdown = value
         _ = await self.available_datasets
-        self.select_dataset_id = (
-            _.filter(pl.col("dropdown") == value).select("id").item()
-        )
+        self.select_dataset_id = _lookup_id(_, value)
         self._clear_results()
 
     @rx.event
-    async def set_select_strategy_id(self, value: str):
+    async def set_select_strategy_ids(self, value: list[str]):
+        """Multi-select on_change: resolve IDs, then load/drop params to match."""
         self.select_strategy_dropdown = value
-        _ = await self.available_strategies
-        self.select_strategy_id = (
-            _.filter(pl.col("dropdown") == value).select("id").item()
-        )
-        # Auto-load parameters whenever the strategy changes
-        # This keeps the form in sync with the selected strategy's requirements
-        await self.load_params()
+        strategies = await self.available_strategies
+        new_ids = [_lookup_id(strategies, v) for v in value]
+        previous_ids = set(self.select_strategy_ids)
+        self.select_strategy_ids = new_ids
+
+        # Drop parameter state for strategies that got deselected
+        for strategy_id in previous_ids - set(new_ids):
+            self._drop_strategy_params(strategy_id)
+
+        # Auto-load parameters for newly selected strategies
+        # This keeps the form in sync with the selected strategies' requirements
+        for strategy_id in set(new_ids) - previous_ids:
+            await self.load_params(strategy_id)
+
+        self._clear_results()
 
     @rx.event
-    async def load_params(self):
-        """Fetch the selected strategy's parameters and seed the input fields."""
+    async def load_params(self, strategy_id: str):
+        """Fetch one strategy's parameters and seed its input fields."""
         # Fetch parameter definitions from the API and initialize the input form
-        # Clears any stale state first to avoid mixing parameters from different strategies
-        self._clear_params()
-        if not self.select_strategy_id:
-            return
+        self.params_errors = {
+            k: v for k, v in self.params_errors.items() if k != strategy_id
+        }
         try:
             async with self._stockdb_client() as client:
-                response = await client.get(
-                    f"/strategy/id/{self.select_strategy_id}"
-                )
+                response = await client.get(f"/strategy/id/{strategy_id}")
                 response.raise_for_status()
-                self.available_params = (
-                    response.json().get("parameters", {}) or {}
-                )
+                parameters = response.json().get("parameters", {}) or {}
         except Exception as e:
             logger.exception("failed to load strategy parameters", exc_info=e)
-            self.params_error = f"Failed to load parameters: {e}"
+            self.params_errors = {
+                **self.params_errors,
+                strategy_id: f"Failed to load parameters: {e}",
+            }
             return
-        self.param_specs = _parameter_specs(self.available_params)
-        self.reset_params()
+        self.strategy_params = {**self.strategy_params, strategy_id: parameters}
+        self.strategy_param_specs = {
+            **self.strategy_param_specs,
+            strategy_id: _parameter_specs(parameters),
+        }
+        self._reset_strategy_params(strategy_id)
 
     @rx.event
-    def set_param_value(self, name: str, value: str):
+    def set_param_value(self, strategy_id: str, name: str, value: str):
         """Update a single parameter and re-validate just that field."""
-        spec = next((s for s in self.param_specs if s["name"] == name), None)
+        specs = self.strategy_param_specs.get(strategy_id, [])
+        spec = next((s for s in specs if s["name"] == name), None)
         if spec is None:
             return
         # Live validation: check the input immediately as the user types
         # Keeps error messages in sync without waiting for form submission
-        self.param_inputs = {**self.param_inputs, name: value}
+        self.param_inputs = {
+            **self.param_inputs,
+            strategy_id: {
+                **self.param_inputs.get(strategy_id, {}),
+                name: value,
+            },
+        }
         self.param_errors = {
             **self.param_errors,
-            name: _validate_param(value, spec),
+            strategy_id: {
+                **self.param_errors.get(strategy_id, {}),
+                name: _validate_param(value, spec),
+            },
         }
 
     @rx.event(background=True)
@@ -565,13 +630,17 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             self._cancel_event.clear()
             # Blank/invalid inputs are already omitted, so the backend falls back
             # to each strategy function's own default.
+            resolved_params_by_strategy = self.resolved_params_by_strategy
             payload = {
                 "registered_dataset_id": self.select_dataset_id,
                 "strategies": [
                     {
-                        "strategy_id": self.select_strategy_id,
-                        "parameters": self.resolved_params,
+                        "strategy_id": strategy_id,
+                        "parameters": resolved_params_by_strategy.get(
+                            strategy_id, {}
+                        ),
                     }
+                    for strategy_id in self.select_strategy_ids
                 ],
             }
 
@@ -634,19 +703,25 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
     @rx.event
     def reset_params(self):
-        """Reset every parameter back to its catalog default."""
+        """Reset every selected strategy's parameters back to its catalog default."""
         # Restore all parameters to their catalog defaults
         # Useful when users want to start fresh after experimenting with values
-        self.param_inputs = {s["name"]: s["default"] for s in self.param_specs}
-        self.param_errors = dict.fromkeys(self.param_inputs, "")
+        for strategy_id in self.strategy_param_specs:
+            self._reset_strategy_params(strategy_id)
 
     @rx.event
     def clear_params(self):
         """Blank every parameter so the backend defaults are used."""
         # Blank out all inputs to let the backend apply its own defaults
         # Different from reset: this removes user overrides entirely
-        self.param_inputs = dict.fromkeys(self.param_inputs, "")
-        self.param_errors = dict.fromkeys(self.param_inputs, "")
+        self.param_inputs = {
+            strategy_id: dict.fromkeys(inputs, "")
+            for strategy_id, inputs in self.param_inputs.items()
+        }
+        self.param_errors = {
+            strategy_id: dict.fromkeys(inputs, "")
+            for strategy_id, inputs in self.param_errors.items()
+        }
 
     def _clear_results(self):
         self.data = []
@@ -655,9 +730,30 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         self.apply_error = ""
         self.apply_state = RunState.idle.value
 
-    def _clear_params(self):
-        self.available_params = {}
-        self.param_specs = []
-        self.param_inputs = {}
-        self.param_errors = {}
-        self.params_error = ""
+    def _reset_strategy_params(self, strategy_id: str):
+        specs = self.strategy_param_specs.get(strategy_id, [])
+        inputs = {s["name"]: s["default"] for s in specs}
+        self.param_inputs = {**self.param_inputs, strategy_id: inputs}
+        self.param_errors = {
+            **self.param_errors,
+            strategy_id: dict.fromkeys(inputs, ""),
+        }
+
+    def _drop_strategy_params(self, strategy_id: str):
+        self.strategy_params = {
+            k: v for k, v in self.strategy_params.items() if k != strategy_id
+        }
+        self.strategy_param_specs = {
+            k: v
+            for k, v in self.strategy_param_specs.items()
+            if k != strategy_id
+        }
+        self.param_inputs = {
+            k: v for k, v in self.param_inputs.items() if k != strategy_id
+        }
+        self.param_errors = {
+            k: v for k, v in self.param_errors.items() if k != strategy_id
+        }
+        self.params_errors = {
+            k: v for k, v in self.params_errors.items() if k != strategy_id
+        }

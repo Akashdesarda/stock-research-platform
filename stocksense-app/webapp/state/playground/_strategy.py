@@ -71,17 +71,21 @@ def _parameter_specs(parameters: dict[str, Any]) -> list[dict[str, str]]:
         param_type = str(meta.get("type", "") or "")
         min_v, max_v = meta.get("min"), meta.get("max")
         default = meta.get("default")
-        specs.append({
-            "name": name,
-            "type": param_type,
-            "default": "" if default is None else str(default),
-            "min": "" if min_v is None else str(min_v),
-            "max": "" if max_v is None else str(max_v),
-            "range": (
-                f"{min_v}–{max_v}" if min_v is not None and max_v is not None else ""
-            ),
-            "description": str(meta.get("description", "") or ""),
-        })
+        specs.append(
+            {
+                "name": name,
+                "type": param_type,
+                "default": "" if default is None else str(default),
+                "min": "" if min_v is None else str(min_v),
+                "max": "" if max_v is None else str(max_v),
+                "range": (
+                    f"{min_v}–{max_v}"
+                    if min_v is not None and max_v is not None
+                    else ""
+                ),
+                "description": str(meta.get("description", "") or ""),
+            }
+        )
     return specs
 
 
@@ -177,7 +181,9 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
         domain = _resolve_analysis_domain(self.selected_domain)
         if domain is None:
             return {}
-        category = self.available_strategy_category.get(self.selected_strategy_category)
+        category = self.available_strategy_category.get(
+            self.selected_strategy_category
+        )
         if category is None:
             return {}
         strategy = filter_strategies(domain=domain, category=category)
@@ -186,7 +192,11 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
     @rx.var(cache=True)
     def strategy_json(self) -> str:
-        return "" if self.strategy is None else self.strategy.model_dump_json(indent=2)
+        return (
+            ""
+            if self.strategy is None
+            else self.strategy.model_dump_json(indent=2)
+        )
 
     @rx.var(cache=True)
     def strategy_category_label(self) -> str:
@@ -353,7 +363,9 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
     # Parameter state is split into three layers for clean separation of concerns:
     available_params: dict[str, Any] = {}  # raw API response
-    param_specs: list[dict[str, str]] = []  # flattened, UI-ready rows with metadata
+    param_specs: list[
+        dict[str, str]
+    ] = []  # flattened, UI-ready rows with metadata
     param_inputs: dict[str, str] = {}  # user inputs
     param_errors: dict[str, str] = {}
     params_error: str = ""
@@ -376,9 +388,12 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
     async def available_datasets(self) -> pl.DataFrame:
         async with self._stockdb_client() as client:
             response = await client.get("/operation/data")
-            datasets = pl.DataFrame([
-                {"id": i["dataset_id"], "name": i["name"]} for i in response.json()
-            ])
+            datasets = pl.DataFrame(
+                [
+                    {"id": i["dataset_id"], "name": i["name"]}
+                    for i in response.json()
+                ]
+            )
             # Format dropdown labels as "Name (ID)" for easy identification
             # while keeping the actual ID separate for API calls
             datasets = datasets.with_columns(
@@ -395,9 +410,9 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
     async def available_strategies(self) -> pl.DataFrame:
         async with self._stockdb_client() as client:
             response = await client.get("/strategy")
-            strategies = pl.DataFrame([
-                {"id": i["id"], "name": i["name"]} for i in response.json()
-            ])
+            strategies = pl.DataFrame(
+                [{"id": i["id"], "name": i["name"]} for i in response.json()]
+            )
             strategies = strategies.with_columns(
                 dropdown=pl.col("name") + " (" + pl.col("id") + ")"
             )
@@ -415,24 +430,32 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         # Each row gets its value, error, and UI hints for a complete form field
         rows: list[dict[str, str]] = []
         for spec in self.param_specs:
-            name, param_type, default = spec["name"], spec["type"], spec["default"]
-            rows.append({
-                **spec,
-                "value": self.param_inputs.get(name, ""),
-                "error": self.param_errors.get(name, ""),
-                "placeholder": default or "value",
-                # Smart input types: numeric fields get number inputs with steppers,
-                # everything else stays text for maximum flexibility (like column names)
-                "input_type": (
-                    "number" if param_type in _NUMERIC_PARAM_TYPES else "text"
-                ),
-                "step": "1" if param_type == "int" else "any",
-                "hint": (
-                    f"Default: {default}"
-                    if default
-                    else "Blank uses the strategy default"
-                ),
-            })
+            name, param_type, default = (
+                spec["name"],
+                spec["type"],
+                spec["default"],
+            )
+            rows.append(
+                {
+                    **spec,
+                    "value": self.param_inputs.get(name, ""),
+                    "error": self.param_errors.get(name, ""),
+                    "placeholder": default or "value",
+                    # Smart input types: numeric fields get number inputs with steppers,
+                    # everything else stays text for maximum flexibility (like column names)
+                    "input_type": (
+                        "number"
+                        if param_type in _NUMERIC_PARAM_TYPES
+                        else "text"
+                    ),
+                    "step": "1" if param_type == "int" else "any",
+                    "hint": (
+                        f"Default: {default}"
+                        if default
+                        else "Blank uses the strategy default"
+                    ),
+                }
+            )
         return rows
 
     @rx.var(cache=True)
@@ -500,9 +523,13 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             return
         try:
             async with self._stockdb_client() as client:
-                response = await client.get(f"/strategy/id/{self.select_strategy_id}")
+                response = await client.get(
+                    f"/strategy/id/{self.select_strategy_id}"
+                )
                 response.raise_for_status()
-                self.available_params = response.json().get("parameters", {}) or {}
+                self.available_params = (
+                    response.json().get("parameters", {}) or {}
+                )
         except Exception as e:
             logger.exception("failed to load strategy parameters", exc_info=e)
             self.params_error = f"Failed to load parameters: {e}"
@@ -539,14 +566,20 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             # Blank/invalid inputs are already omitted, so the backend falls back
             # to each strategy function's own default.
             payload = {
-                "strategy_id": self.select_strategy_id,
                 "registered_dataset_id": self.select_dataset_id,
-                "parameters": self.resolved_params,
+                "strategies": [
+                    {
+                        "strategy_id": self.select_strategy_id,
+                        "parameters": self.resolved_params,
+                    }
+                ],
             }
 
         try:
             async with self._stockdb_client() as client:
-                response = await client.post(url="/strategy/apply", json=payload)
+                response = await client.post(
+                    url="/strategy/apply", json=payload
+                )
             if response.is_error:
                 async with self:
                     self.apply_error = (

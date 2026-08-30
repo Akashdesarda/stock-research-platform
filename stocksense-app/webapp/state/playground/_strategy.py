@@ -552,16 +552,30 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         self.select_strategy_dropdown = value
         strategies = await self.available_strategies
         new_ids = [_lookup_id(strategies, v) for v in value]
-        previous_ids = set(self.select_strategy_ids)
+        keep = set(new_ids)
+        added_ids = keep - set(self.select_strategy_ids)
         self.select_strategy_ids = new_ids
 
         # Drop parameter state for strategies that got deselected
-        for strategy_id in previous_ids - set(new_ids):
-            self._drop_strategy_params(strategy_id)
+        self.strategy_params = {
+            k: v for k, v in self.strategy_params.items() if k in keep
+        }
+        self.strategy_param_specs = {
+            k: v for k, v in self.strategy_param_specs.items() if k in keep
+        }
+        self.param_inputs = {
+            k: v for k, v in self.param_inputs.items() if k in keep
+        }
+        self.param_errors = {
+            k: v for k, v in self.param_errors.items() if k in keep
+        }
+        self.params_errors = {
+            k: v for k, v in self.params_errors.items() if k in keep
+        }
 
         # Auto-load parameters for newly selected strategies
         # This keeps the form in sync with the selected strategies' requirements
-        for strategy_id in set(new_ids) - previous_ids:
+        for strategy_id in added_ids:
             await self.load_params(strategy_id)
 
         self._clear_results()
@@ -739,21 +753,3 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             strategy_id: dict.fromkeys(inputs, ""),
         }
 
-    def _drop_strategy_params(self, strategy_id: str):
-        self.strategy_params = {
-            k: v for k, v in self.strategy_params.items() if k != strategy_id
-        }
-        self.strategy_param_specs = {
-            k: v
-            for k, v in self.strategy_param_specs.items()
-            if k != strategy_id
-        }
-        self.param_inputs = {
-            k: v for k, v in self.param_inputs.items() if k != strategy_id
-        }
-        self.param_errors = {
-            k: v for k, v in self.param_errors.items() if k != strategy_id
-        }
-        self.params_errors = {
-            k: v for k, v in self.params_errors.items() if k != strategy_id
-        }

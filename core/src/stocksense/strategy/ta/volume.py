@@ -3,42 +3,44 @@ from dataclasses import dataclass
 import polars as pl
 import talib
 
+from stocksense.strategy.ta import BaseAccessor
+
 
 @dataclass
-class VolumeAccessor:
-    df: pl.LazyFrame
+class VolumeAccessor(BaseAccessor):
+    """Accessor for volume-based technical indicators."""
 
     def ad(self) -> pl.LazyFrame:
         """Chaikin A/D Line."""
 
-        highs, lows, closes, volumes = (
-            self.df.select(["high", "low", "close", "volume"]).collect().get_columns()
+        def calculate(high, low, close, volume):
+            ad = talib.AD(high, low, close, volume)
+            return [pl.Series("AD", ad)]
+
+        return self._apply_to_groups(
+            ["high", "low", "close", "volume"], calculate
         )
-        ad = talib.AD(
-            highs.to_numpy(), lows.to_numpy(), closes.to_numpy(), volumes.to_numpy()
-        )
-        return self.df.with_columns(pl.Series("AD", ad))
 
     def adosc(self, fastperiod: int = 3, slowperiod: int = 10) -> pl.LazyFrame:
         """Chaikin A/D Oscillator."""
 
-        highs, lows, closes, volumes = (
-            self.df.select(["high", "low", "close", "volume"]).collect().get_columns()
-        )
-        adosc = talib.ADOSC(
-            highs.to_numpy(),
-            lows.to_numpy(),
-            closes.to_numpy(),
-            volumes.to_numpy(),
-            fastperiod=fastperiod,
-            slowperiod=slowperiod,
-        )
-        return self.df.with_columns(
-            pl.Series(f"ADOSC_{fastperiod}_{slowperiod}", adosc)
+        def calculate(high, low, close, volume):
+            adosc = talib.ADOSC(
+                high, low, close, volume, fastperiod, slowperiod
+            )
+            return [pl.Series(f"ADOSC_{fastperiod}_{slowperiod}", adosc)]
+
+        return self._apply_to_groups(
+            ["high", "low", "close", "volume"], calculate
         )
 
     def obv(self, col: str = "close") -> pl.LazyFrame:
         """On Balance Volume."""
-        close, volume = self.df.select([col, "volume"]).collect().get_columns()
-        obv = talib.OBV(close.to_numpy(), volume.to_numpy())
-        return self.df.with_columns(pl.Series("OBV", obv))
+
+        def calculate(real, volume):
+            obv = talib.OBV(real, volume)
+            return [pl.Series("OBV", obv)]
+
+        return self._apply_to_groups(
+            {"real": col, "volume": "volume"}, calculate
+        )

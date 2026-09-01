@@ -3,54 +3,71 @@ from dataclasses import dataclass
 import polars as pl
 import talib
 
+from stocksense.strategy.ta import BaseAccessor
+
 
 @dataclass
-class TrendAccessor:
-    df: pl.LazyFrame
+class TrendAccessor(BaseAccessor):
+    """Accessor for trend-based technical indicators."""
 
     def sma(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
-        """Simple Moving Average"""
-        return self.df.with_columns(
-            pl.col(col).rolling_mean(window_size=period).alias(f"SMA_{period}")
-        )
+        """Simple Moving Average."""
+        expr = pl.col(col).rolling_mean(window_size=period)
+
+        if self.group_by:
+            expr = expr.over(self.group_by)
+
+        return self.df.with_columns(expr.alias(f"SMA_{period}"))
 
     def sma_crossover(
         self, fast: int = 10, slow: int = 20, col: str = "close"
     ) -> pl.LazyFrame:
         """Compute SMA fast/slow and crossover signal."""
+        result = []
+        for df in self.df_group:
+            close = df.select(col).collect().to_series().to_numpy()
+            fast_sma = talib.SMA(close, timeperiod=fast)
+            slow_sma = talib.SMA(close, timeperiod=slow)
 
-        close = self.df.select(col).collect().to_series().to_numpy()
-        fast_sma = talib.SMA(close, timeperiod=fast)
-        slow_sma = talib.SMA(close, timeperiod=slow)
-
-        return self.df.with_columns([
-            pl.Series(f"SMA_{fast}", fast_sma),
-            pl.Series(f"SMA_{slow}", slow_sma),
-        ]).with_columns(
-            # computing new column based runtime columns needs `with_columns` again
-            (pl.col(f"SMA_{fast}") > pl.col(f"SMA_{slow}")).alias(
-                f"SMA_crossover_{fast}_{slow}"
+            result.append(
+                df.with_columns(
+                    [
+                        pl.Series(f"SMA_{fast}", fast_sma),
+                        pl.Series(f"SMA_{slow}", slow_sma),
+                    ]
+                ).with_columns(
+                    # computing new column based runtime columns needs `with_columns` again
+                    (pl.col(f"SMA_{fast}") > pl.col(f"SMA_{slow}")).alias(
+                        f"SMA_crossover_{fast}_{slow}"
+                    )
+                )
             )
-        )
+        return pl.concat(result)
 
     def ema_crossover(
         self, fast: int = 12, slow: int = 26, col: str = "close"
     ) -> pl.LazyFrame:
         """Compute EMA fast/slow and crossover signal."""
+        result = []
+        for df in self.df_group:
+            close = df.select(col).collect().to_series().to_numpy()
+            fast_ema = talib.EMA(close, timeperiod=fast)
+            slow_ema = talib.EMA(close, timeperiod=slow)
 
-        close = self.df.select(col).collect().to_series().to_numpy()
-        fast_ema = talib.EMA(close, timeperiod=fast)
-        slow_ema = talib.EMA(close, timeperiod=slow)
-
-        return self.df.with_columns([
-            pl.Series(f"EMA_{fast}", fast_ema),
-            pl.Series(f"EMA_{slow}", slow_ema),
-        ]).with_columns(
-            # computing new column based runtime columns needs `with_columns` again
-            (pl.col(f"EMA_{fast}") > pl.col(f"EMA_{slow}")).alias(
-                f"EMA_crossover_{fast}_{slow}"
+            result.append(
+                df.with_columns(
+                    [
+                        pl.Series(f"EMA_{fast}", fast_ema),
+                        pl.Series(f"EMA_{slow}", slow_ema),
+                    ]
+                ).with_columns(
+                    # computing new column based runtime columns needs `with_columns` again
+                    (pl.col(f"EMA_{fast}") > pl.col(f"EMA_{slow}")).alias(
+                        f"EMA_crossover_{fast}_{slow}"
+                    )
+                )
             )
-        )
+        return pl.concat(result)
 
     def macd(
         self,
@@ -61,64 +78,93 @@ class TrendAccessor:
     ) -> pl.LazyFrame:
         """MACD line, signal, and histogram."""
 
-        close = self.df.select(col).collect().to_series().to_numpy()
-        macd, macdsignal, macdhist = talib.MACD(
-            close,
-            fastperiod=fastperiod,
-            slowperiod=slowperiod,
-            signalperiod=signalperiod,
-        )
-        return self.df.with_columns([
-            pl.Series("MACD", macd),
-            pl.Series("MACD_signal", macdsignal),
-            pl.Series("MACD_hist", macdhist),
-        ])
+        def calculate(real):
+            macd, macdsignal, macdhist = talib.MACD(
+                real,
+                fastperiod=fastperiod,
+                slowperiod=slowperiod,
+                signalperiod=signalperiod,
+            )
+            return [
+                pl.Series("MACD", macd),
+                pl.Series("MACD_signal", macdsignal),
+                pl.Series("MACD_hist", macdhist),
+            ]
+
+        return self._apply_to_groups({"real": col}, calculate)
 
     def adx_dmi(self, period: int = 14) -> pl.LazyFrame:
         """Average Directional Index with +DI and -DI."""
 
-        high = self.df.select("high").collect().to_series().to_numpy()
-        low = self.df.select("low").collect().to_series().to_numpy()
-        close = self.df.select("close").collect().to_series().to_numpy()
-        adx = talib.ADX(high, low, close, timeperiod=period)
-        plus_di = talib.PLUS_DI(high, low, close, timeperiod=period)
-        minus_di = talib.MINUS_DI(high, low, close, timeperiod=period)
-        return self.df.with_columns([
-            pl.Series(f"ADX_{period}", adx),
-            pl.Series(f"DI_plus_{period}", plus_di),
-            pl.Series(f"DI_minus_{period}", minus_di),
-        ])
+        def calculate(high, low, close):
+            adx = talib.ADX(high, low, close, timeperiod=period)
+            plus_di = talib.PLUS_DI(high, low, close, timeperiod=period)
+            minus_di = talib.MINUS_DI(high, low, close, timeperiod=period)
+            return [
+                pl.Series(f"ADX_{period}", adx),
+                pl.Series(f"DI_plus_{period}", plus_di),
+                pl.Series(f"DI_minus_{period}", minus_di),
+            ]
+
+        return self._apply_to_groups(["high", "low", "close"], calculate)
 
     def parabolic_sar(
         self, acceleration: float = 0.02, maximum: float = 0.2
     ) -> pl.LazyFrame:
         """Parabolic SAR."""
 
-        sar = talib.SAR(
-            self.df.select("high").collect().to_series().to_numpy(),
-            self.df.select("low").collect().to_series().to_numpy(),
-            acceleration=acceleration,
-            maximum=maximum,
-        )
-        return self.df.with_columns(pl.Series("SAR", sar))
+        def calculate(high, low):
+            sar = talib.SAR(
+                high,
+                low,
+                acceleration=acceleration,
+                maximum=maximum,
+            )
+            return [pl.Series("SAR", sar)]
+
+        return self._apply_to_groups(["high", "low"], calculate)
 
     def kama(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
         """Kaufman Adaptive Moving Average."""
 
-        kama = talib.KAMA(
-            self.df.select(col).collect().to_series().to_numpy(), timeperiod=period
-        )
-        return self.df.with_columns(pl.Series(f"KAMA_{period}", kama))
+        def calculate(real):
+            kama = talib.KAMA(real, timeperiod=period)
+            return [pl.Series(f"KAMA_{period}", kama)]
+
+        return self._apply_to_groups({"real": col}, calculate)
 
     def t3(
         self, period: int = 5, vfactor: float = 0.7, col: str = "close"
     ) -> pl.LazyFrame:
         """T3 moving average variant."""
 
-        t3 = talib.T3(
-            self.df.select(col).collect().to_series().to_numpy(),
-            timeperiod=period,
-            vfactor=vfactor,
-        )
-        suffix = f"{vfactor}".replace(".", "_")
-        return self.df.with_columns(pl.Series(f"T3_{period}_{suffix}", t3))
+        def calculate(real):
+            t3 = talib.T3(real, timeperiod=period, vfactor=vfactor)
+            suffix = f"{vfactor}".replace(".", "_")
+            return [pl.Series(f"T3_{period}_{suffix}", t3)]
+
+        return self._apply_to_groups({"real": col}, calculate)
+
+    # def _apply_to_groups(
+    #     self,
+    #     input_cols: list[str] | dict[str, str],
+    #     calculate: Callable[..., list[pl.Series]],
+    # ) -> pl.LazyFrame:
+    #     result = []
+
+    #     # creating a mapping dict of param name with its associated actual column name
+    #     if isinstance(input_cols, dict):
+    #         col_map = input_cols
+    #     else:
+    #         col_map = {col: col for col in input_cols}
+
+    #     for df in self.df_group:
+    #         # param name: actual column name
+    #         inputs = {
+    #             # Collect input columns as numpy arrays
+    #             param_name: df.select(col_name).collect().to_series().to_numpy()
+    #             for param_name, col_name in col_map.items()
+    #         }
+    #         result.append(df.with_columns(calculate(**inputs)))
+
+    #     return pl.concat(result)

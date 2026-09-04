@@ -10,6 +10,7 @@ ACCESSOR_NAMES = {
     "momentum",
     "overlap",
     "pattern",
+    "stats",
     "trend",
     "volatility",
     "volume",

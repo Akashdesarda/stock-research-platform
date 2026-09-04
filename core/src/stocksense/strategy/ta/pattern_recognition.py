@@ -3,23 +3,21 @@ from dataclasses import dataclass
 import polars as pl
 import talib
 
+from stocksense.strategy.ta import BaseAccessor
+
 
 @dataclass
-class PatternRecognitionAccessor:
-    df: pl.LazyFrame
+class PatternRecognitionAccessor(BaseAccessor):
+    """Accessor for candlestick pattern recognition indicators."""
 
     def _apply_pattern(self, func, name: str, **kwargs) -> pl.LazyFrame:
-        opens, highs, lows, closes = (
-            self.df.select(["open", "high", "low", "close"]).collect().get_columns()
+        def calculate(open, high, low, close):
+            values = func(open, high, low, close, **kwargs)
+            return [pl.Series(name, values)]
+
+        return self._apply_to_groups(
+            ["open", "high", "low", "close"], calculate
         )
-        values = func(
-            opens.to_numpy(),
-            highs.to_numpy(),
-            lows.to_numpy(),
-            closes.to_numpy(),
-            **kwargs,
-        )
-        return self.df.with_columns(pl.Series(name, values))
 
     def cdl2crows(self) -> pl.LazyFrame:
         """Two Crows."""
@@ -81,12 +79,16 @@ class PatternRecognitionAccessor:
     def cdlclosingmarubozu(self) -> pl.LazyFrame:
         """Closing Marubozu."""
 
-        return self._apply_pattern(talib.CDLCLOSINGMARUBOZU, "CDLCLOSINGMARUBOZU")
+        return self._apply_pattern(
+            talib.CDLCLOSINGMARUBOZU, "CDLCLOSINGMARUBOZU"
+        )
 
     def cdlconcealbabyswall(self) -> pl.LazyFrame:
         """Concealing Baby Swallow."""
 
-        return self._apply_pattern(talib.CDLCONCEALBABYSWALL, "CDLCONCEALBABYSWALL")
+        return self._apply_pattern(
+            talib.CDLCONCEALBABYSWALL, "CDLCONCEALBABYSWALL"
+        )
 
     def cdlcounterattack(self) -> pl.LazyFrame:
         """Counterattack."""
@@ -97,7 +99,9 @@ class PatternRecognitionAccessor:
         """Dark Cloud Cover."""
 
         return self._apply_pattern(
-            talib.CDLDARKCLOUDCOVER, "CDLDARKCLOUDCOVER", penetration=penetration
+            talib.CDLDARKCLOUDCOVER,
+            "CDLDARKCLOUDCOVER",
+            penetration=penetration,
         )
 
     def cdldoji(self) -> pl.LazyFrame:
@@ -139,7 +143,9 @@ class PatternRecognitionAccessor:
     def cdlgapsidesidewhite(self) -> pl.LazyFrame:
         """Up/Down-gap side-by-side white lines."""
 
-        return self._apply_pattern(talib.CDLGAPSIDESIDEWHITE, "CDLGAPSIDESIDEWHITE")
+        return self._apply_pattern(
+            talib.CDLGAPSIDESIDEWHITE, "CDLGAPSIDESIDEWHITE"
+        )
 
     def cdlgravestonedoji(self) -> pl.LazyFrame:
         """Gravestone Doji."""
@@ -189,7 +195,9 @@ class PatternRecognitionAccessor:
     def cdlidentical3crows(self) -> pl.LazyFrame:
         """Identical Three Crows."""
 
-        return self._apply_pattern(talib.CDLIDENTICAL3CROWS, "CDLIDENTICAL3CROWS")
+        return self._apply_pattern(
+            talib.CDLIDENTICAL3CROWS, "CDLIDENTICAL3CROWS"
+        )
 
     def cdlinneck(self) -> pl.LazyFrame:
         """In-Neck Pattern."""
@@ -209,7 +217,9 @@ class PatternRecognitionAccessor:
     def cdlkickingbylength(self) -> pl.LazyFrame:
         """Kicking by length."""
 
-        return self._apply_pattern(talib.CDLKICKINGBYLENGTH, "CDLKICKINGBYLENGTH")
+        return self._apply_pattern(
+            talib.CDLKICKINGBYLENGTH, "CDLKICKINGBYLENGTH"
+        )
 
     def cdlladderbottom(self) -> pl.LazyFrame:
         """Ladder Bottom."""
@@ -277,12 +287,16 @@ class PatternRecognitionAccessor:
     def cdlrisefall3methods(self) -> pl.LazyFrame:
         """Rising/Falling Three Methods."""
 
-        return self._apply_pattern(talib.CDLRISEFALL3METHODS, "CDLRISEFALL3METHODS")
+        return self._apply_pattern(
+            talib.CDLRISEFALL3METHODS, "CDLRISEFALL3METHODS"
+        )
 
     def cdlseparatinglines(self) -> pl.LazyFrame:
         """Separating Lines."""
 
-        return self._apply_pattern(talib.CDLSEPARATINGLINES, "CDLSEPARATINGLINES")
+        return self._apply_pattern(
+            talib.CDLSEPARATINGLINES, "CDLSEPARATINGLINES"
+        )
 
     def cdlshootingstar(self) -> pl.LazyFrame:
         """Shooting Star."""
@@ -337,9 +351,13 @@ class PatternRecognitionAccessor:
     def cdlupsidegap2crows(self) -> pl.LazyFrame:
         """Upside Gap Two Crows."""
 
-        return self._apply_pattern(talib.CDLUPSIDEGAP2CROWS, "CDLUPSIDEGAP2CROWS")
+        return self._apply_pattern(
+            talib.CDLUPSIDEGAP2CROWS, "CDLUPSIDEGAP2CROWS"
+        )
 
     def cdlxsidegap3methods(self) -> pl.LazyFrame:
         """Upside/Downside Gap Three Methods."""
 
-        return self._apply_pattern(talib.CDLXSIDEGAP3METHODS, "CDLXSIDEGAP3METHODS")
+        return self._apply_pattern(
+            talib.CDLXSIDEGAP3METHODS, "CDLXSIDEGAP3METHODS"
+        )

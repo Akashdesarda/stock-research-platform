@@ -30,49 +30,40 @@ def multi_ticker_data() -> pl.DataFrame:
     return make_multi_ticker_data()
 
 
-def test_ad_resets_per_ticker(multi_ticker_data: pl.DataFrame):
+def test_stats_accessor_instantiation(ta: TechnicalAnalysis):
+    stats_accessor = ta.stats
+    assert stats_accessor is not None
+
+
+def test_beta_resets_per_ticker(multi_ticker_data: pl.DataFrame):
     assert_grouped_matches_single_ticker(
         multi_ticker_data,
-        accessor_name="volume",
-        method_name="ad",
-        output_cols=["AD"],
+        accessor_name="stats",
+        method_name="beta",
+        output_cols=["BETA_5"],
+        period=5,
     )
 
 
-def test_adosc_resets_per_ticker(multi_ticker_data: pl.DataFrame):
+def test_stddev_resets_per_ticker(multi_ticker_data: pl.DataFrame):
     assert_grouped_matches_single_ticker(
         multi_ticker_data,
-        accessor_name="volume",
-        method_name="adosc",
-        output_cols=["ADOSC_3_5"],
-        fastperiod=3,
-        slowperiod=5,
+        accessor_name="stats",
+        method_name="stddev",
+        output_cols=["STDDEV_5"],
+        period=5,
     )
 
 
-def test_obv_resets_per_ticker(multi_ticker_data: pl.DataFrame):
-    assert_grouped_matches_single_ticker(
-        multi_ticker_data,
-        accessor_name="volume",
-        method_name="obv",
-        output_cols=["OBV"],
-    )
-
-
-def test_ad(ta: TechnicalAnalysis):
-    result = ta.volume.ad().collect()
-    assert "AD" in result.columns
-    assert _has_non_null(result, "AD")
-
-
-def test_adosc(ta: TechnicalAnalysis):
-    result = ta.volume.adosc(fastperiod=3, slowperiod=10).collect()
-    col = "ADOSC_3_10"
+def test_linearreg(ta: TechnicalAnalysis):
+    result = ta.stats.linearreg(period=14).collect()
+    col = "LINEARREG_14"
     assert col in result.columns
     assert _has_non_null(result, col)
 
 
-def test_obv(ta: TechnicalAnalysis):
-    result = ta.volume.obv().collect()
-    assert "OBV" in result.columns
-    assert _has_non_null(result, "OBV")
+def test_stddev(ta: TechnicalAnalysis):
+    result = ta.stats.stddev(period=5).collect()
+    col = "STDDEV_5"
+    assert col in result.columns
+    assert _has_non_null(result, col)

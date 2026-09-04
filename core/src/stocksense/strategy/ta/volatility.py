@@ -3,38 +3,36 @@ from dataclasses import dataclass
 import polars as pl
 import talib
 
+from stocksense.strategy.ta import BaseAccessor
+
 
 @dataclass
-class VolatilityAccessor:
-    df: pl.LazyFrame
+class VolatilityAccessor(BaseAccessor):
+    """Accessor for volatility-based technical indicators."""
 
     def atr(self, period: int = 14) -> pl.LazyFrame:
         """Average True Range."""
 
-        highs, lows, closes = (
-            self.df.select(["high", "low", "close"]).collect().get_columns()
-        )
-        atr = talib.ATR(
-            highs.to_numpy(), lows.to_numpy(), closes.to_numpy(), timeperiod=period
-        )
-        return self.df.with_columns(pl.Series(f"ATR_{period}", atr))
+        def calculate(high, low, close):
+            atr = talib.ATR(high, low, close, timeperiod=period)
+            return [pl.Series(f"ATR_{period}", atr)]
+
+        return self._apply_to_groups(["high", "low", "close"], calculate)
 
     def natr(self, period: int = 14) -> pl.LazyFrame:
         """Normalized Average True Range."""
 
-        highs, lows, closes = (
-            self.df.select(["high", "low", "close"]).collect().get_columns()
-        )
-        natr = talib.NATR(
-            highs.to_numpy(), lows.to_numpy(), closes.to_numpy(), timeperiod=period
-        )
-        return self.df.with_columns(pl.Series(f"NATR_{period}", natr))
+        def calculate(high, low, close):
+            natr = talib.NATR(high, low, close, timeperiod=period)
+            return [pl.Series(f"NATR_{period}", natr)]
+
+        return self._apply_to_groups(["high", "low", "close"], calculate)
 
     def trange(self) -> pl.LazyFrame:
         """True Range."""
 
-        highs, lows, closes = (
-            self.df.select(["high", "low", "close"]).collect().get_columns()
-        )
-        tr = talib.TRANGE(highs.to_numpy(), lows.to_numpy(), closes.to_numpy())
-        return self.df.with_columns(pl.Series("TRANGE", tr))
+        def calculate(high, low, close):
+            tr = talib.TRANGE(high, low, close)
+            return [pl.Series("TRANGE", tr)]
+
+        return self._apply_to_groups(["high", "low", "close"], calculate)

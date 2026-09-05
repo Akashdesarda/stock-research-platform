@@ -110,7 +110,7 @@ def _logical_plan_to_lf(plan: LogicalPlan) -> pl.LazyFrame:
 def _apply_strategy(data, strategy: StrategyApplication):
     strategy_descriptor = catalog.get_strategy_by_id(strategy.strategy_id)
     accessor, method = strategy_descriptor.id.split(".")
-    ta = TechnicalAnalysis(data)
+    ta = TechnicalAnalysis(data, group_by="ticker", sort_by="date")
     strategy_method = getattr(ta, accessor)
     strategy_func = getattr(strategy_method, method)
     return strategy_func(**strategy.parameters)

@@ -79,7 +79,7 @@ async def apply_strategy_to_registered_dataset(
     )
 
     # getting the data for the dataset by hydrating the logical plan directly
-    data = _logical_plan_to_lf(dataset.logical_plan).sort("ticker", "date")
+    data = _logical_plan_to_lf(dataset.logical_plan)
     logger.debug(f"successfully hydrated dataset: {dataset.name}")
 
     for strategy in input.strategies:

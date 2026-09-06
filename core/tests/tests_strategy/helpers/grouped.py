@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from typing import Any
 
 import polars as pl
-
 from stocksense.strategy import TechnicalAnalysis
 
 ACCESSOR_NAMES = {
@@ -22,7 +21,7 @@ def make_multi_ticker_data(row_count: int = 60) -> pl.DataFrame:
     start = date(2024, 1, 1)
 
     for idx in range(row_count):
-        rows.append(
+        rows.extend((
             {
                 "date": start + timedelta(days=idx),
                 "ticker": "AAA",
@@ -32,9 +31,7 @@ def make_multi_ticker_data(row_count: int = 60) -> pl.DataFrame:
                 "close": 101 + idx,
                 "volume": 1000 + idx * 10,
                 "adjusted_close": 101.5 + idx,
-            }
-        )
-        rows.append(
+            },
             {
                 "date": start + timedelta(days=idx),
                 "ticker": "BBB",
@@ -44,9 +41,8 @@ def make_multi_ticker_data(row_count: int = 60) -> pl.DataFrame:
                 "close": 201 + idx * 2,
                 "volume": 2000 + idx * 20,
                 "adjusted_close": 201.5 + idx * 2,
-            }
-        )
-
+            },
+        ))
     return pl.DataFrame(rows)
 
 
@@ -77,20 +73,12 @@ def assert_grouped_matches_single_ticker(
         accessor_name,
     )
 
-    grouped_result = getattr(grouped_accessor, method_name)(**kwargs).collect()
-    grouped = grouped_result.filter(pl.col("ticker") == ticker).select(
-        output_cols
-    )
-    single = (
-        getattr(single_accessor, method_name)(**kwargs)
-        .collect()
-        .select(output_cols)
-    )
+    grouped_result = getattr(grouped_accessor, method_name)(**kwargs)
+    grouped = grouped_result.filter(pl.col("ticker") == ticker).select(output_cols)
+    single = getattr(single_accessor, method_name)(**kwargs).select(output_cols)
 
     assert grouped_result.height == data.height
-    assert set(grouped_result["ticker"].unique()) == set(
-        data["ticker"].unique()
-    )
+    assert set(grouped_result["ticker"].unique()) == set(data["ticker"].unique())
     assert (
         normalize_talib_output(grouped).to_dicts()
         == normalize_talib_output(single).to_dicts()

@@ -10,7 +10,7 @@ from stocksense.strategy.ta import BaseAccessor
 class MomentumAccessor(BaseAccessor):
     """Accessor for momentum-based technical indicators."""
 
-    def rsi(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
+    def rsi(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Relative Strength Index."""
 
         def calculate(real):
@@ -25,13 +25,11 @@ class MomentumAccessor(BaseAccessor):
         fastk_period: int = 5,
         fastd_period: int = 3,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Stochastic RSI fast %K and %D."""
 
         def calculate(real):
-            fastk, fastd = talib.STOCHRSI(
-                real, timeperiod, fastk_period, fastd_period
-            )
+            fastk, fastd = talib.STOCHRSI(real, timeperiod, fastk_period, fastd_period)
             return [
                 pl.Series(f"StochRSI_fastk_{timeperiod}", fastk),
                 pl.Series(f"StochRSI_fastd_{timeperiod}", fastd),
@@ -44,7 +42,7 @@ class MomentumAccessor(BaseAccessor):
         fastk_period: int = 5,
         slowk_period: int = 3,
         slowd_period: int = 3,
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Stochastic Oscillator %K and %D."""
 
         def calculate(high, low, close):
@@ -63,7 +61,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def cci(self, period: int = 14) -> pl.LazyFrame:
+    def cci(self, period: int = 14) -> pl.DataFrame:
         """Commodity Channel Index."""
 
         def calculate(high, low, close):
@@ -72,7 +70,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def roc(self, period: int = 10, col: str = "close") -> pl.LazyFrame:
+    def roc(self, period: int = 10, col: str = "close") -> pl.DataFrame:
         """Rate of Change."""
 
         def calculate(real):
@@ -81,7 +79,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def momentum(self, period: int = 10, col: str = "close") -> pl.LazyFrame:
+    def momentum(self, period: int = 10, col: str = "close") -> pl.DataFrame:
         """Momentum indicator (MOM)."""
 
         def calculate(real):
@@ -90,7 +88,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def williams_r(self, period: int = 14) -> pl.LazyFrame:
+    def williams_r(self, period: int = 14) -> pl.DataFrame:
         """Williams %R."""
 
         def calculate(high, low, close):
@@ -99,7 +97,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def trix(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def trix(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Triple Exponential Average (TRIX)."""
 
         def calculate(real):
@@ -108,7 +106,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def adx(self, period: int = 14) -> pl.LazyFrame:
+    def adx(self, period: int = 14) -> pl.DataFrame:
         """Average Directional Movement Index."""
 
         def calculate(high, low, close):
@@ -117,7 +115,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def adxr(self, period: int = 14) -> pl.LazyFrame:
+    def adxr(self, period: int = 14) -> pl.DataFrame:
         """Average Directional Movement Index Rating."""
 
         def calculate(high, low, close):
@@ -128,7 +126,7 @@ class MomentumAccessor(BaseAccessor):
 
     def apo(
         self, fastperiod: int = 12, slowperiod: int = 26, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Absolute Price Oscillator."""
 
         def calculate(real):
@@ -137,7 +135,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def aroon(self, period: int = 14) -> pl.LazyFrame:
+    def aroon(self, period: int = 14) -> pl.DataFrame:
         """Aroon up and down."""
 
         def calculate(high, low):
@@ -149,7 +147,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low"], calculate)
 
-    def aroonosc(self, period: int = 14) -> pl.LazyFrame:
+    def aroonosc(self, period: int = 14) -> pl.DataFrame:
         """Aroon Oscillator."""
 
         def calculate(high, low):
@@ -158,18 +156,16 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low"], calculate)
 
-    def bop(self) -> pl.LazyFrame:
+    def bop(self) -> pl.DataFrame:
         """Balance of Power."""
 
         def calculate(open, high, low, close):
             bop = talib.BOP(open, high, low, close)
             return [pl.Series("BOP", bop)]
 
-        return self._apply_to_groups(
-            ["open", "high", "low", "close"], calculate
-        )
+        return self._apply_to_groups(["open", "high", "low", "close"], calculate)
 
-    def cmo(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
+    def cmo(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Chande Momentum Oscillator."""
 
         def calculate(real):
@@ -178,7 +174,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def dx(self, period: int = 14) -> pl.LazyFrame:
+    def dx(self, period: int = 14) -> pl.DataFrame:
         """Directional Movement Index."""
 
         def calculate(high, low, close):
@@ -193,7 +189,7 @@ class MomentumAccessor(BaseAccessor):
         slowperiod: int = 26,
         signalperiod: int = 9,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """MACD line, signal, and histogram."""
 
         def calculate(real):
@@ -214,7 +210,7 @@ class MomentumAccessor(BaseAccessor):
         slowperiod: int = 26,
         signalperiod: int = 9,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """MACD with configurable MA types."""
 
         def calculate(real):
@@ -232,15 +228,11 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def macdfix(
-        self, signalperiod: int = 9, col: str = "close"
-    ) -> pl.LazyFrame:
+    def macdfix(self, signalperiod: int = 9, col: str = "close") -> pl.DataFrame:
         """MACD Fix 12/26 with variable signal period."""
 
         def calculate(real):
-            macd, macdsignal, macdhist = talib.MACDFIX(
-                real, signalperiod=signalperiod
-            )
+            macd, macdsignal, macdhist = talib.MACDFIX(real, signalperiod=signalperiod)
             return [
                 pl.Series("MACDFIX", macd),
                 pl.Series("MACDFIX_signal", macdsignal),
@@ -249,18 +241,16 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def mfi(self, period: int = 14) -> pl.LazyFrame:
+    def mfi(self, period: int = 14) -> pl.DataFrame:
         """Money Flow Index."""
 
         def calculate(high, low, close, volume):
             mfi = talib.MFI(high, low, close, volume, timeperiod=period)
             return [pl.Series(f"MFI_{period}", mfi)]
 
-        return self._apply_to_groups(
-            ["high", "low", "close", "volume"], calculate
-        )
+        return self._apply_to_groups(["high", "low", "close", "volume"], calculate)
 
-    def minus_di(self, period: int = 14) -> pl.LazyFrame:
+    def minus_di(self, period: int = 14) -> pl.DataFrame:
         """Minus Directional Indicator."""
 
         def calculate(high, low, close):
@@ -269,7 +259,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def minus_dm(self, period: int = 14) -> pl.LazyFrame:
+    def minus_dm(self, period: int = 14) -> pl.DataFrame:
         """Minus Directional Movement."""
 
         def calculate(high, low):
@@ -278,7 +268,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low"], calculate)
 
-    def plus_di(self, period: int = 14) -> pl.LazyFrame:
+    def plus_di(self, period: int = 14) -> pl.DataFrame:
         """Plus Directional Indicator."""
 
         def calculate(high, low, close):
@@ -287,7 +277,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def plus_dm(self, period: int = 14) -> pl.LazyFrame:
+    def plus_dm(self, period: int = 14) -> pl.DataFrame:
         """Plus Directional Movement."""
 
         def calculate(high, low):
@@ -298,7 +288,7 @@ class MomentumAccessor(BaseAccessor):
 
     def ppo(
         self, fastperiod: int = 12, slowperiod: int = 26, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Percentage Price Oscillator."""
 
         def calculate(real):
@@ -307,7 +297,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def rocp(self, period: int = 10, col: str = "close") -> pl.LazyFrame:
+    def rocp(self, period: int = 10, col: str = "close") -> pl.DataFrame:
         """Rate of Change Percentage."""
 
         def calculate(real):
@@ -316,7 +306,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def rocr(self, period: int = 10, col: str = "close") -> pl.LazyFrame:
+    def rocr(self, period: int = 10, col: str = "close") -> pl.DataFrame:
         """Rate of Change Ratio."""
 
         def calculate(real):
@@ -325,7 +315,7 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def rocr100(self, period: int = 10, col: str = "close") -> pl.LazyFrame:
+    def rocr100(self, period: int = 10, col: str = "close") -> pl.DataFrame:
         """Rate of Change Ratio scaled to 100."""
 
         def calculate(real):
@@ -334,15 +324,11 @@ class MomentumAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def stochf(
-        self, fastk_period: int = 5, fastd_period: int = 3
-    ) -> pl.LazyFrame:
+    def stochf(self, fastk_period: int = 5, fastd_period: int = 3) -> pl.DataFrame:
         """Stochastic Fast %K and %D."""
 
         def calculate(high, low, close):
-            fastk, fastd = talib.STOCHF(
-                high, low, close, fastk_period, fastd_period
-            )
+            fastk, fastd = talib.STOCHF(high, low, close, fastk_period, fastd_period)
             return [
                 pl.Series("STOCHF_fastk", fastk),
                 pl.Series("STOCHF_fastd", fastd),
@@ -352,13 +338,11 @@ class MomentumAccessor(BaseAccessor):
 
     def ultosc(
         self, timeperiod1: int = 7, timeperiod2: int = 14, timeperiod3: int = 28
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Ultimate Oscillator."""
 
         def calculate(high, low, close):
-            ult = talib.ULTOSC(
-                high, low, close, timeperiod1, timeperiod2, timeperiod3
-            )
+            ult = talib.ULTOSC(high, low, close, timeperiod1, timeperiod2, timeperiod3)
             return [pl.Series("ULTOSC", ult)]
 
         return self._apply_to_groups(["high", "low", "close"], calculate)

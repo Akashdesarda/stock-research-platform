@@ -12,31 +12,27 @@ class StatsAccessor(BaseAccessor):
 
     def beta(
         self, period: int = 5, high_col: str = "high", low_col: str = "low"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Beta."""
 
         def calculate(high, low):
             res = talib.BETA(high, low, timeperiod=period)
             return [pl.Series(f"BETA_{period}", res)]
 
-        return self._apply_to_groups(
-            {"high": high_col, "low": low_col}, calculate
-        )
+        return self._apply_to_groups({"high": high_col, "low": low_col}, calculate)
 
     def correl(
         self, period: int = 30, high_col: str = "high", low_col: str = "low"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Pearson's Correlation Coefficient (r)."""
 
         def calculate(high, low):
             res = talib.CORREL(high, low, timeperiod=period)
             return [pl.Series(f"CORREL_{period}", res)]
 
-        return self._apply_to_groups(
-            {"high": high_col, "low": low_col}, calculate
-        )
+        return self._apply_to_groups({"high": high_col, "low": low_col}, calculate)
 
-    def linearreg(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
+    def linearreg(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Linear Regression."""
 
         def calculate(real):
@@ -45,9 +41,7 @@ class StatsAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def linearreg_angle(
-        self, period: int = 14, col: str = "close"
-    ) -> pl.LazyFrame:
+    def linearreg_angle(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Linear Regression Angle."""
 
         def calculate(real):
@@ -56,9 +50,7 @@ class StatsAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def linearreg_intercept(
-        self, period: int = 14, col: str = "close"
-    ) -> pl.LazyFrame:
+    def linearreg_intercept(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Linear Regression Intercept."""
 
         def calculate(real):
@@ -67,9 +59,7 @@ class StatsAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def linearreg_slope(
-        self, period: int = 14, col: str = "close"
-    ) -> pl.LazyFrame:
+    def linearreg_slope(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Linear Regression Slope."""
 
         def calculate(real):
@@ -80,7 +70,7 @@ class StatsAccessor(BaseAccessor):
 
     def stddev(
         self, period: int = 5, nbdev: float = 1.0, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Standard Deviation."""
 
         def calculate(real):
@@ -89,7 +79,7 @@ class StatsAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def tsf(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
+    def tsf(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Time Series Forecast."""
 
         def calculate(real):
@@ -100,7 +90,7 @@ class StatsAccessor(BaseAccessor):
 
     def var(
         self, period: int = 5, nbdev: float = 1.0, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Variance."""
 
         def calculate(real):
@@ -108,4 +98,3 @@ class StatsAccessor(BaseAccessor):
             return [pl.Series(f"VAR_{period}", res)]
 
         return self._apply_to_groups({"real": col}, calculate)
-

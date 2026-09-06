@@ -10,7 +10,7 @@ from stocksense.strategy.ta import BaseAccessor
 class VolatilityAccessor(BaseAccessor):
     """Accessor for volatility-based technical indicators."""
 
-    def atr(self, period: int = 14) -> pl.LazyFrame:
+    def atr(self, period: int = 14) -> pl.DataFrame:
         """Average True Range."""
 
         def calculate(high, low, close):
@@ -19,7 +19,7 @@ class VolatilityAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def natr(self, period: int = 14) -> pl.LazyFrame:
+    def natr(self, period: int = 14) -> pl.DataFrame:
         """Normalized Average True Range."""
 
         def calculate(high, low, close):
@@ -28,7 +28,7 @@ class VolatilityAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low", "close"], calculate)
 
-    def trange(self) -> pl.LazyFrame:
+    def trange(self) -> pl.DataFrame:
         """True Range."""
 
         def calculate(high, low, close):

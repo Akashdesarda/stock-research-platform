@@ -10,7 +10,7 @@ from stocksense.strategy.ta import BaseAccessor
 class TrendAccessor(BaseAccessor):
     """Accessor for trend-based technical indicators."""
 
-    def sma(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
+    def sma(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """Simple Moving Average."""
         expr = pl.col(col).rolling_mean(window_size=period)
 
@@ -21,21 +21,19 @@ class TrendAccessor(BaseAccessor):
 
     def sma_crossover(
         self, fast: int = 10, slow: int = 20, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Compute SMA fast/slow and crossover signal."""
         result = []
         for df in self.df_group:
-            close = df.select(col).collect().to_series().to_numpy()
+            close = df[col].to_numpy()
             fast_sma = talib.SMA(close, timeperiod=fast)
             slow_sma = talib.SMA(close, timeperiod=slow)
 
             result.append(
-                df.with_columns(
-                    [
-                        pl.Series(f"SMA_{fast}", fast_sma),
-                        pl.Series(f"SMA_{slow}", slow_sma),
-                    ]
-                ).with_columns(
+                df.with_columns([
+                    pl.Series(f"SMA_{fast}", fast_sma),
+                    pl.Series(f"SMA_{slow}", slow_sma),
+                ]).with_columns(
                     # computing new column based runtime columns needs `with_columns` again
                     (pl.col(f"SMA_{fast}") > pl.col(f"SMA_{slow}")).alias(
                         f"SMA_crossover_{fast}_{slow}"
@@ -46,21 +44,19 @@ class TrendAccessor(BaseAccessor):
 
     def ema_crossover(
         self, fast: int = 12, slow: int = 26, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Compute EMA fast/slow and crossover signal."""
         result = []
         for df in self.df_group:
-            close = df.select(col).collect().to_series().to_numpy()
+            close = df[col].to_numpy()
             fast_ema = talib.EMA(close, timeperiod=fast)
             slow_ema = talib.EMA(close, timeperiod=slow)
 
             result.append(
-                df.with_columns(
-                    [
-                        pl.Series(f"EMA_{fast}", fast_ema),
-                        pl.Series(f"EMA_{slow}", slow_ema),
-                    ]
-                ).with_columns(
+                df.with_columns([
+                    pl.Series(f"EMA_{fast}", fast_ema),
+                    pl.Series(f"EMA_{slow}", slow_ema),
+                ]).with_columns(
                     # computing new column based runtime columns needs `with_columns` again
                     (pl.col(f"EMA_{fast}") > pl.col(f"EMA_{slow}")).alias(
                         f"EMA_crossover_{fast}_{slow}"
@@ -75,7 +71,7 @@ class TrendAccessor(BaseAccessor):
         slowperiod: int = 26,
         signalperiod: int = 9,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """MACD line, signal, and histogram."""
 
         def calculate(real):
@@ -93,7 +89,7 @@ class TrendAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def adx_dmi(self, period: int = 14) -> pl.LazyFrame:
+    def adx_dmi(self, period: int = 14) -> pl.DataFrame:
         """Average Directional Index with +DI and -DI."""
 
         def calculate(high, low, close):
@@ -110,7 +106,7 @@ class TrendAccessor(BaseAccessor):
 
     def parabolic_sar(
         self, acceleration: float = 0.02, maximum: float = 0.2
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Parabolic SAR."""
 
         def calculate(high, low):
@@ -124,7 +120,7 @@ class TrendAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low"], calculate)
 
-    def kama(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def kama(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Kaufman Adaptive Moving Average."""
 
         def calculate(real):
@@ -135,7 +131,7 @@ class TrendAccessor(BaseAccessor):
 
     def t3(
         self, period: int = 5, vfactor: float = 0.7, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """T3 moving average variant."""
 
         def calculate(real):
@@ -144,27 +140,3 @@ class TrendAccessor(BaseAccessor):
             return [pl.Series(f"T3_{period}_{suffix}", t3)]
 
         return self._apply_to_groups({"real": col}, calculate)
-
-    # def _apply_to_groups(
-    #     self,
-    #     input_cols: list[str] | dict[str, str],
-    #     calculate: Callable[..., list[pl.Series]],
-    # ) -> pl.LazyFrame:
-    #     result = []
-
-    #     # creating a mapping dict of param name with its associated actual column name
-    #     if isinstance(input_cols, dict):
-    #         col_map = input_cols
-    #     else:
-    #         col_map = {col: col for col in input_cols}
-
-    #     for df in self.df_group:
-    #         # param name: actual column name
-    #         inputs = {
-    #             # Collect input columns as numpy arrays
-    #             param_name: df.select(col_name).collect().to_series().to_numpy()
-    #             for param_name, col_name in col_map.items()
-    #         }
-    #         result.append(df.with_columns(calculate(**inputs)))
-
-    #     return pl.concat(result)

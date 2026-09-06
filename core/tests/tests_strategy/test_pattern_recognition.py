@@ -4,7 +4,6 @@ from helpers.grouped import (
     assert_grouped_matches_single_ticker,
     make_multi_ticker_data,
 )
-
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.strategy import TechnicalAnalysis
@@ -73,30 +72,30 @@ def test_cdldarkcloudcover_resets_per_ticker(
 
 
 def test_cdldoji(ta: TechnicalAnalysis):
-    result = ta.pattern.cdldoji().collect()
+    result = ta.pattern.cdldoji()
     assert "CDLDOJI" in result.columns
     assert _has_non_null(result, "CDLDOJI")
 
 
 def test_cdlengulfing(ta: TechnicalAnalysis):
-    result = ta.pattern.cdlengulfing().collect()
+    result = ta.pattern.cdlengulfing()
     assert "CDLENGULFING" in result.columns
     assert _has_non_null(result, "CDLENGULFING")
 
 
 def test_cdlhammer(ta: TechnicalAnalysis):
-    result = ta.pattern.cdlhammer().collect()
+    result = ta.pattern.cdlhammer()
     assert "CDLHAMMER" in result.columns
     assert _has_non_null(result, "CDLHAMMER")
 
 
 def test_cdlmorningstar(ta: TechnicalAnalysis):
-    result = ta.pattern.cdlmorningstar(penetration=0.3).collect()
+    result = ta.pattern.cdlmorningstar(penetration=0.3)
     assert "CDLMORNINGSTAR" in result.columns
     assert _has_non_null(result, "CDLMORNINGSTAR")
 
 
 def test_cdldarkcloudcover(ta: TechnicalAnalysis):
-    result = ta.pattern.cdldarkcloudcover(penetration=0.5).collect()
+    result = ta.pattern.cdldarkcloudcover(penetration=0.5)
     assert "CDLDARKCLOUDCOVER" in result.columns
     assert _has_non_null(result, "CDLDARKCLOUDCOVER")

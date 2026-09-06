@@ -53,6 +53,13 @@ class TechnicalAnalysis:
         elif self.sort_by:
             self._df = self._df.sort(self.sort_by, descending=self.sort_desc)
 
+    def apply(self, accessor: str, method: str, **parameters) -> pl.DataFrame:
+        """Apply a technical analysis method to the dataframe"""
+        # get the accessor and method E.G. ta.trend.sma(period=10)
+        strategy_method = getattr(getattr(self, accessor), method)
+        self._df = strategy_method(**parameters)
+        return self._df
+
     @property
     def trend(self) -> TrendAccessor:
 

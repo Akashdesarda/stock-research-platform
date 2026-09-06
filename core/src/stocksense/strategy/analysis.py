@@ -40,12 +40,12 @@ class TechnicalAnalysis:
         if any(col not in schema_names for col in required):
             # Only warn or check subset to allow flexible usage
             pass
-
+        # validation for group by
         if self.group_by and self.group_by not in schema_names:
             raise ValueError(
                 f"Group by column '{self.group_by}' not found in dataframe"
             )
-
+        # validation for sort by
         if self.sort_by and self.sort_by not in schema_names:
             raise ValueError(
                 f"Sort by column '{self.sort_by}' not found in dataframe"

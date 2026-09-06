@@ -25,9 +25,9 @@ class TrendAccessor(BaseAccessor):
         """Compute SMA fast/slow and crossover signal."""
         result = []
         for df in self.df_group:
-            close = df[col].to_numpy()
-            fast_sma = talib.SMA(close, timeperiod=fast)
-            slow_sma = talib.SMA(close, timeperiod=slow)
+            close = df[col]
+            fast_sma = talib.SMA(close, timeperiod=fast)  # pyrefly: ignore [bad-argument-type]
+            slow_sma = talib.SMA(close, timeperiod=slow)  # pyrefly: ignore [bad-argument-type]
 
             result.append(
                 df.with_columns([
@@ -48,9 +48,9 @@ class TrendAccessor(BaseAccessor):
         """Compute EMA fast/slow and crossover signal."""
         result = []
         for df in self.df_group:
-            close = df[col].to_numpy()
-            fast_ema = talib.EMA(close, timeperiod=fast)
-            slow_ema = talib.EMA(close, timeperiod=slow)
+            close = df[col]
+            fast_ema = talib.EMA(close, timeperiod=fast)  # pyrefly: ignore [bad-argument-type]
+            slow_ema = talib.EMA(close, timeperiod=slow)  # pyrefly: ignore [bad-argument-type]
 
             result.append(
                 df.with_columns([

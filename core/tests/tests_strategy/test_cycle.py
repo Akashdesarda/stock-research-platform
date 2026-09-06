@@ -4,7 +4,6 @@ from helpers.grouped import (
     assert_grouped_matches_single_ticker,
     make_multi_ticker_data,
 )
-
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.strategy import TechnicalAnalysis
@@ -76,34 +75,32 @@ def test_ht_trendmode_resets_per_ticker(multi_ticker_data: pl.DataFrame):
 
 
 def test_ht_dcperiod(ta: TechnicalAnalysis):
-    result = ta.cycle.ht_dcperiod().collect()
+    result = ta.cycle.ht_dcperiod()
     assert "HT_DCPERIOD" in result.columns
     assert _has_non_null(result, "HT_DCPERIOD")
 
 
 def test_ht_dcphase(ta: TechnicalAnalysis):
-    result = ta.cycle.ht_dcphase().collect()
+    result = ta.cycle.ht_dcphase()
     assert "HT_DCPHASE" in result.columns
     assert _has_non_null(result, "HT_DCPHASE")
 
 
 def test_ht_phasor(ta: TechnicalAnalysis):
-    result = ta.cycle.ht_phasor().collect()
-    assert {"HT_PHASOR_inphase", "HT_PHASOR_quadrature"}.issubset(
-        result.columns
-    )
+    result = ta.cycle.ht_phasor()
+    assert {"HT_PHASOR_inphase", "HT_PHASOR_quadrature"}.issubset(result.columns)
     assert _has_non_null(result, "HT_PHASOR_inphase")
     assert _has_non_null(result, "HT_PHASOR_quadrature")
 
 
 def test_ht_sine(ta: TechnicalAnalysis):
-    result = ta.cycle.ht_sine().collect()
+    result = ta.cycle.ht_sine()
     assert {"HT_SINE", "HT_LEADSINE"}.issubset(result.columns)
     assert _has_non_null(result, "HT_SINE")
     assert _has_non_null(result, "HT_LEADSINE")
 
 
 def test_ht_trendmode(ta: TechnicalAnalysis):
-    result = ta.cycle.ht_trendmode().collect()
+    result = ta.cycle.ht_trendmode()
     assert "HT_TRENDMODE" in result.columns
     assert _has_non_null(result, "HT_TRENDMODE")

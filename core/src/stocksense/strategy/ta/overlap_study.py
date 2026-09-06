@@ -16,7 +16,7 @@ class OverlapStudyAccessor(BaseAccessor):
         nbdevup: float = 2.0,
         nbdevdn: float = 2.0,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Bollinger Bands upper/middle/lower."""
 
         def calculate(real):
@@ -31,7 +31,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def dema(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def dema(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Double Exponential Moving Average."""
 
         def calculate(real):
@@ -40,7 +40,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ema(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def ema(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Exponential Moving Average."""
 
         def calculate(real):
@@ -49,7 +49,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ht_trendline(self, col: str = "close") -> pl.LazyFrame:
+    def ht_trendline(self, col: str = "close") -> pl.DataFrame:
         """Hilbert Transform - Instantaneous Trendline."""
 
         def calculate(real):
@@ -58,7 +58,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def kama(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def kama(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Kaufman Adaptive Moving Average."""
 
         def calculate(real):
@@ -67,14 +67,12 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ma(
-        self, period: int = 30, matype: int = 0, col: str = "close"
-    ) -> pl.LazyFrame:
+    def ma(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Generic Moving Average with type."""
 
         def calculate(real):
-            ma = talib.MA(real, timeperiod=period, matype=matype)
-            return [pl.Series(f"MA_{period}_{matype}", ma)]
+            ma = talib.MA(real, timeperiod=period)
+            return [pl.Series(f"MA_{period}", ma)]
 
         return self._apply_to_groups({"real": col}, calculate)
 
@@ -83,13 +81,11 @@ class OverlapStudyAccessor(BaseAccessor):
         fastlimit: float = 0.5,
         slowlimit: float = 0.05,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """MESA Adaptive Moving Average."""
 
         def calculate(real):
-            mama, fama = talib.MAMA(
-                real, fastlimit=fastlimit, slowlimit=slowlimit
-            )
+            mama, fama = talib.MAMA(real, fastlimit=fastlimit, slowlimit=slowlimit)
             return [
                 pl.Series("MAMA", mama),
                 pl.Series("FAMA", fama),
@@ -103,7 +99,7 @@ class OverlapStudyAccessor(BaseAccessor):
         minperiod: int = 2,
         maxperiod: int = 30,
         col: str = "close",
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Moving average with variable periods (expects period_col present)."""
 
         if period_col not in self.df.collect_schema().names():
@@ -118,11 +114,9 @@ class OverlapStudyAccessor(BaseAccessor):
             )
             return [pl.Series(f"MAVP_{minperiod}_{maxperiod}", mavp)]
 
-        return self._apply_to_groups(
-            {"real": col, "periods": period_col}, calculate
-        )
+        return self._apply_to_groups({"real": col, "periods": period_col}, calculate)
 
-    def midpoint(self, period: int = 14, col: str = "close") -> pl.LazyFrame:
+    def midpoint(self, period: int = 14, col: str = "close") -> pl.DataFrame:
         """MidPoint over period."""
 
         def calculate(real):
@@ -131,7 +125,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def midprice(self, period: int = 14) -> pl.LazyFrame:
+    def midprice(self, period: int = 14) -> pl.DataFrame:
         """Midpoint Price over period."""
 
         def calculate(high, low):
@@ -140,15 +134,11 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low"], calculate)
 
-    def sar(
-        self, acceleration: float = 0.02, maximum: float = 0.2
-    ) -> pl.LazyFrame:
+    def sar(self, acceleration: float = 0.02, maximum: float = 0.2) -> pl.DataFrame:
         """Parabolic SAR."""
 
         def calculate(high, low):
-            sar = talib.SAR(
-                high, low, acceleration=acceleration, maximum=maximum
-            )
+            sar = talib.SAR(high, low, acceleration=acceleration, maximum=maximum)
             return [pl.Series("SAR", sar)]
 
         return self._apply_to_groups(["high", "low"], calculate)
@@ -163,7 +153,7 @@ class OverlapStudyAccessor(BaseAccessor):
         accelerationinitshort: float = 0.02,
         accelerationshort: float = 0.02,
         accelerationmaxshort: float = 0.2,
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Extended Parabolic SAR."""
 
         def calculate(high, low):
@@ -183,7 +173,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups(["high", "low"], calculate)
 
-    def sma(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def sma(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Simple Moving Average."""
 
         def calculate(real):
@@ -194,7 +184,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
     def t3(
         self, period: int = 5, vfactor: float = 0.7, col: str = "close"
-    ) -> pl.LazyFrame:
+    ) -> pl.DataFrame:
         """Triple Exponential Moving Average (T3)."""
 
         def calculate(real):
@@ -204,7 +194,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def tema(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def tema(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Triple Exponential Moving Average."""
 
         def calculate(real):
@@ -213,7 +203,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def trima(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def trima(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Triangular Moving Average."""
 
         def calculate(real):
@@ -222,7 +212,7 @@ class OverlapStudyAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def wma(self, period: int = 30, col: str = "close") -> pl.LazyFrame:
+    def wma(self, period: int = 30, col: str = "close") -> pl.DataFrame:
         """Weighted Moving Average."""
 
         def calculate(real):

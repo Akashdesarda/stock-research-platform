@@ -28,81 +28,67 @@ class TechnicalAnalysis:
     sort_desc: bool = False
 
     def __post_init__(self):
-        self._df = (
-            self.df.lazy() if isinstance(self.df, pl.DataFrame) else self.df
-        )
-        # NOTE - cast to Float64 since TA-Lib expects float inputs
-        self._df = self._df.cast({cs.numeric(): pl.Float64})
+        self._df = self.df.collect() if isinstance(self.df, pl.LazyFrame) else self.df
 
-        schema_names = self._df.collect_schema().names()
-        # Basic validation - can be relaxed if needed
+        self._df = self._df.cast({cs.numeric(): pl.Float32})
+
+        schema_names = self._df.columns
+
         required = {"open", "high", "low", "close", "volume"}
         if any(col not in schema_names for col in required):
-            # Only warn or check subset to allow flexible usage
             pass
-        # validation for group by
+
         if self.group_by and self.group_by not in schema_names:
             raise ValueError(
                 f"Group by column '{self.group_by}' not found in dataframe"
             )
-        # validation for sort by
+
         if self.sort_by and self.sort_by not in schema_names:
-            raise ValueError(
-                f"Sort by column '{self.sort_by}' not found in dataframe"
+            raise ValueError(f"Sort by column '{self.sort_by}' not found in dataframe")
+
+        if self.group_by and self.sort_by:
+            self._df = self._df.sort(
+                [self.group_by, self.sort_by], descending=self.sort_desc
             )
+        elif self.sort_by:
+            self._df = self._df.sort(self.sort_by, descending=self.sort_desc)
 
     @property
     def trend(self) -> TrendAccessor:
 
-        return TrendAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return TrendAccessor(self._df, self.group_by)
 
     @property
     def momentum(self) -> MomentumAccessor:
 
-        return MomentumAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return MomentumAccessor(self._df, self.group_by)
 
     @property
     def volatility(self) -> VolatilityAccessor:
 
-        return VolatilityAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return VolatilityAccessor(self._df, self.group_by)
 
     @property
     def volume(self) -> VolumeAccessor:
 
-        return VolumeAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return VolumeAccessor(self._df, self.group_by)
 
     @property
     def cycle(self) -> CycleAccessor:
 
-        return CycleAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return CycleAccessor(self._df, self.group_by)
 
     @property
     def pattern(self) -> PatternRecognitionAccessor:
 
-        return PatternRecognitionAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return PatternRecognitionAccessor(self._df, self.group_by)
 
     @property
     def stats(self) -> StatsAccessor:
 
-        return StatsAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return StatsAccessor(self._df, self.group_by)
 
     @property
     def overlap(self) -> OverlapStudyAccessor:
 
-        return OverlapStudyAccessor(
-            self._df, self.group_by, self.sort_by, self.sort_desc
-        )
+        return OverlapStudyAccessor(self._df, self.group_by)

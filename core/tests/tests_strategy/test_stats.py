@@ -4,7 +4,6 @@ from helpers.grouped import (
     assert_grouped_matches_single_ticker,
     make_multi_ticker_data,
 )
-
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.strategy import TechnicalAnalysis
@@ -56,14 +55,14 @@ def test_stddev_resets_per_ticker(multi_ticker_data: pl.DataFrame):
 
 
 def test_linearreg(ta: TechnicalAnalysis):
-    result = ta.stats.linearreg(period=14).collect()
+    result = ta.stats.linearreg(period=14)
     col = "LINEARREG_14"
     assert col in result.columns
     assert _has_non_null(result, col)
 
 
 def test_stddev(ta: TechnicalAnalysis):
-    result = ta.stats.stddev(period=5).collect()
+    result = ta.stats.stddev(period=5)
     col = "STDDEV_5"
     assert col in result.columns
     assert _has_non_null(result, col)

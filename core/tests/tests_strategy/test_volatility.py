@@ -4,7 +4,6 @@ from helpers.grouped import (
     assert_grouped_matches_single_ticker,
     make_multi_ticker_data,
 )
-
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.strategy import TechnicalAnalysis
@@ -60,20 +59,20 @@ def test_trange_resets_per_ticker(multi_ticker_data: pl.DataFrame):
 
 
 def test_atr(ta: TechnicalAnalysis):
-    result = ta.volatility.atr(period=14).collect()
+    result = ta.volatility.atr(period=14)
     col = "ATR_14"
     assert col in result.columns
     assert _has_non_null(result, col)
 
 
 def test_natr(ta: TechnicalAnalysis):
-    result = ta.volatility.natr(period=14).collect()
+    result = ta.volatility.natr(period=14)
     col = "NATR_14"
     assert col in result.columns
     assert _has_non_null(result, col)
 
 
 def test_trange(ta: TechnicalAnalysis):
-    result = ta.volatility.trange().collect()
+    result = ta.volatility.trange()
     assert "TRANGE" in result.columns
     assert _has_non_null(result, "TRANGE")

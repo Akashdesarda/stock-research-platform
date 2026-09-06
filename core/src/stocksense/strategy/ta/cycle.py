@@ -10,7 +10,7 @@ from stocksense.strategy.ta import BaseAccessor
 class CycleAccessor(BaseAccessor):
     """Accessor for cycle-based technical indicators."""
 
-    def ht_dcperiod(self, col: str = "close") -> pl.LazyFrame:
+    def ht_dcperiod(self, col: str = "close") -> pl.DataFrame:
         """Hilbert Transform - Dominant Cycle Period."""
 
         def calculate(real):
@@ -19,7 +19,7 @@ class CycleAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ht_dcphase(self, col: str = "close") -> pl.LazyFrame:
+    def ht_dcphase(self, col: str = "close") -> pl.DataFrame:
         """Hilbert Transform - Dominant Cycle Phase."""
 
         def calculate(real):
@@ -28,7 +28,7 @@ class CycleAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ht_phasor(self, col: str = "close") -> pl.LazyFrame:
+    def ht_phasor(self, col: str = "close") -> pl.DataFrame:
         """Hilbert Transform - Phasor Components (inphase, quadrature)."""
 
         def calculate(real):
@@ -40,7 +40,7 @@ class CycleAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ht_sine(self, col: str = "close") -> pl.LazyFrame:
+    def ht_sine(self, col: str = "close") -> pl.DataFrame:
         """Hilbert Transform - Sine and Lead Sine."""
 
         def calculate(real):
@@ -52,7 +52,7 @@ class CycleAccessor(BaseAccessor):
 
         return self._apply_to_groups({"real": col}, calculate)
 
-    def ht_trendmode(self, col: str = "close") -> pl.LazyFrame:
+    def ht_trendmode(self, col: str = "close") -> pl.DataFrame:
         """Hilbert Transform - Trend vs Cycle Mode."""
 
         def calculate(real):

@@ -4,7 +4,6 @@ from helpers.grouped import (
     assert_grouped_matches_single_ticker,
     make_multi_ticker_data,
 )
-
 from stocksense.config import get_settings
 from stocksense.data import StockDataDB
 from stocksense.strategy import TechnicalAnalysis
@@ -60,19 +59,19 @@ def test_obv_resets_per_ticker(multi_ticker_data: pl.DataFrame):
 
 
 def test_ad(ta: TechnicalAnalysis):
-    result = ta.volume.ad().collect()
+    result = ta.volume.ad()
     assert "AD" in result.columns
     assert _has_non_null(result, "AD")
 
 
 def test_adosc(ta: TechnicalAnalysis):
-    result = ta.volume.adosc(fastperiod=3, slowperiod=10).collect()
+    result = ta.volume.adosc(fastperiod=3, slowperiod=10)
     col = "ADOSC_3_10"
     assert col in result.columns
     assert _has_non_null(result, col)
 
 
 def test_obv(ta: TechnicalAnalysis):
-    result = ta.volume.obv().collect()
+    result = ta.volume.obv()
     assert "OBV" in result.columns
     assert _has_non_null(result, "OBV")

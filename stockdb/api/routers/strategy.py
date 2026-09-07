@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 from stocksense.config import get_settings
-from stocksense.strategy import catalog
+from stocksense.strategy import TechnicalAnalysis, catalog
 
 from api.models import (
     APITags,
@@ -82,13 +82,13 @@ async def apply_strategy_to_registered_dataset(
     data = _logical_plan_to_lf(dataset.logical_plan)
     logger.debug(f"successfully hydrated dataset: {dataset.name}")
 
+    analysis = TechnicalAnalysis(data, group_by="ticker", sort_by="date")
     for strategy in input.strategies:
         logger.debug(
             f"applying strategy: {strategy.strategy_id} to dataset: {dataset.name}"
         )
-        data = _apply_strategy(data, strategy)
+        result = _apply_strategy(analysis, strategy)
 
-    result = await data.collect_async()
     logger.info(
         f"successfully applied strategies: {strategy_ids} to dataset: {dataset.name}"
     )

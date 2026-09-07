@@ -1821,7 +1821,7 @@ wheels = [
 [[package]]
 name = "stocksense-core"
 version = "0.13.0"
-source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#5cad79e1cfc9f4178c1202ae771c323e9a089fe1" }
+source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#4af8f500fef6e775d7b8630d1414f4287152d683" }
 dependencies = [
     { name = "duckdb" },
     { name = "httpx" },
@@ -1845,7 +1845,7 @@ data = [
 
 [[package]]
 name = "stocksense-stockdb"
-version = "1.5.5"
+version = "1.5.6"
 source = { editable = "." }
 dependencies = [
     { name = "agno" },

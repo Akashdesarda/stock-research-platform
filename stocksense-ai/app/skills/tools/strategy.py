@@ -128,9 +128,7 @@ class StrategyDiscoveryTools(Toolkit):
 
         if not normalized:
             valid = ", ".join(d.value for d in AnalysisDomainTypes)
-            raise RetryAgentRun(
-                f"Domain cannot be empty. Valid values: {valid}."
-            )
+            raise RetryAgentRun(f"Domain cannot be empty. Valid values: {valid}.")
         try:
             chosen = AnalysisDomainTypes(normalized)
         except ValueError as e:
@@ -174,9 +172,7 @@ class StrategyDiscoveryTools(Toolkit):
             )
 
         return [
-            i.model_dump(
-                mode="json", include=_STRATEGY_CATEGORY_DISCOVERY_FIELDS
-            )
+            i.model_dump(mode="json", include=_STRATEGY_CATEGORY_DISCOVERY_FIELDS)
             for i in self._registry.strategy_catalogs
             if i.domain == AnalysisDomainTypes(domain_value)
         ]
@@ -401,15 +397,12 @@ class StockDBTools(Toolkit):
         df = pl.DataFrame(flattened)
         words = company_name.lower().split()
         if (
-            result := df.filter(
-                pl.all_horizontal(
-                    [
-                        pl.col("company_name")
-                        .str.to_lowercase()
-                        .str.contains(word)
-                        for word in words
-                    ]
-                )
+            result := df
+            .filter(
+                pl.all_horizontal([
+                    pl.col("company_name").str.to_lowercase().str.contains(word)
+                    for word in words
+                ])
             )
             .select(["exchange", "ticker", "company_name"])
             .to_dicts()
@@ -495,28 +488,21 @@ class StockDBTools(Toolkit):
                 f"Failed to get company information due to: {err_detail}"
             ) from e
 
+    async def list_registered_datasets(self) -> list[dict[str, str]]:
+        """Use this tool to get available datasets that the user can apply strategies to.
 
-def list_registered_datasets() -> list[dict[str, str]]:
-    """Get available datasets that the user can apply strategies to."""
-    return [
-        {
-            "dataset_id": "dataset-1",
-            "name": "Nifty50 Daily Prices",
-            "description": "Daily NSE Nifty50 OHLCV complete historic data ",
-        },
-        {
-            "dataset_id": "dataset-2",
-            "name": "Nifty50 Daily Prices 3M",
-            "description": "Daily NSE Nifty50 OHLCV last 3 months data from present day",
-        },
-        {
-            "dataset_id": "dataset-3",
-            "name": "Nifty50 Daily Prices 6M",
-            "description": "Daily NSE Nifty50 OHLCV last 6 months data from present day",
-        },
-        {
-            "dataset_id": "dataset-4",
-            "name": "Nifty Next 50 Daily Prices",
-            "description": "Daily NSE Nifty Next 50 OHLCV complete historic data",
-        },
-    ]
+        Returns:
+            list[dict[str, str]]: A list of datasets with dataset_id, name, description.
+        """
+
+        response = await self._aclient.get("/api/operation/data")
+        # NOTE - Output is a list of dictionaries with dataset_id, name, description, logical_plan, tags, last_modified
+        data = response.json()
+        return [
+            {
+                "dataset_id": item["dataset_id"],
+                "name": item["name"],
+                "description": item["description"],
+            }
+            for item in data
+        ]

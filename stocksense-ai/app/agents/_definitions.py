@@ -16,7 +16,6 @@ from app.skills.tools.strategy import (
     TICKER_KEY,
     StockDBTools,
     StrategyDiscoveryTools,
-    list_registered_datasets,
 )
 from app.utils import async_sqlite_db, get_model
 from stocksense.config import get_settings
@@ -169,7 +168,7 @@ dataset_resolver = Agent(
     ),
     instructions=pm.get_prompt("dataset_resolver", "instructions"),
     use_instruction_tags=True,
-    tools=[list_registered_datasets],
+    tools=[StockDBTools(include_tools=["list_registered_datasets"])],
     output_schema=DatasetSelection,
     stream=False,
     debug_mode=True,

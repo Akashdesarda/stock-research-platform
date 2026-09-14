@@ -4,12 +4,14 @@ from agno.client.os import AgentOSClient, SessionType
 from agno.os import AgentOS
 from agno.os.settings import AgnoAPISettings
 from agno.run import RunStatus
-from app.agents import AGENTS_BY_ID, ALL_AGENTS
-from app.utils import async_sqlite_db
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from scalar_fastapi import get_scalar_api_reference
 from stocksense.config import get_settings
+
+from app.agents import AGENTS_BY_ID, ALL_AGENTS
+from app.utils import async_sqlite_db
+from app.workflows import ALL_WORKFLOWS
 
 settings = get_settings()
 STATIC_DIR = Path(__file__).parent / "static"
@@ -32,6 +34,7 @@ agent_os = AgentOS(
     name="StockSense AI API",
     version="0.1.1",
     agents=ALL_AGENTS,
+    workflows=ALL_WORKFLOWS,
     db=async_sqlite_db,
     tracing=True,
     settings=AgnoAPISettings(docs_enabled=False),
@@ -73,7 +76,9 @@ async def rename_session(request: SessionRenameRequest) -> dict[str, str]:
         session_name=response.content["title"],
         session_type=request.session_type,
     )
-    return {"message": f"session renamed successfully as: {response.content['title']}"}
+    return {
+        "message": f"session renamed successfully as: {response.content['title']}"
+    }
 
 
 @app.get("/debug/headroom-savings", tags=["Debug"])
@@ -106,4 +111,6 @@ def headroom_savings() -> dict:
 
 
 if __name__ == "__main__":
-    agent_os.serve(app=app, host="0.0.0.0", port=settings.ai.port, access_log=True)
+    agent_os.serve(
+        app=app, host="0.0.0.0", port=settings.ai.port, access_log=True
+    )

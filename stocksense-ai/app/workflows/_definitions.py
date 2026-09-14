@@ -7,6 +7,7 @@ from agno.workflow import (
     StepOutput,
     Workflow,
 )
+
 from app.agents._definitions import (
     DatasetSelection,
     StrategySelection,
@@ -69,15 +70,33 @@ async def parameters_selection_step(step_input: StepInput) -> StepOutput:
         step_input.get_step_output(StrategyApplyLabel.strategy.value),
         StrategySelection,
     )
-    if not param_input or not param_input.strategy_ids:
+    if param_input is None or not param_input.strategy_ids:
         return fail_step_output(
             f"No strategy IDs available to {StrategyApplyLabel.parameters.value} step"
         )
 
+    strategy_ids = param_input.strategy_ids
     response = await strategy_param_resolver.arun(
         param_input.model_dump_json(include={"strategy_ids"})
     )
-    return StepOutput(content=response.content, success=True)
+    param_selection = response.content
+    if not isinstance(param_selection, StrategyParamSelection):
+        return fail_step_output(
+            "Strategy parameter resolution returned invalid output"
+        )
+    if param_selection.needs_clarification:
+        return StepOutput(content=param_selection, success=False, stop=True)
+
+    resolved_strategy_ids = {
+        strategy.strategy_id for strategy in param_selection.strategies
+    }
+    if resolved_strategy_ids != set(strategy_ids):
+        return fail_step_output(
+            "Strategy parameter resolution must return parameters for every selected "
+            "strategy and no additional strategies"
+        )
+
+    return StepOutput(content=param_selection, success=True)
 
 
 def draft_apply_step(step_input: StepInput) -> StepOutput:
@@ -127,7 +146,9 @@ strategy_apply_workflow = Workflow(
     db=async_sqlite_db,
     steps=[
         # pyrefly: ignore [bad-argument-type]
-        Parallel(dataset_step, strategy_step, name=StrategyApplyLabel.parallel.value),
+        Parallel(
+            dataset_step, strategy_step, name=StrategyApplyLabel.parallel.value
+        ),
         Step(
             name=StrategyApplyLabel.verify_parallel.value,
             executor=verify_parallel_step_output,

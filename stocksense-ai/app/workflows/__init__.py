@@ -16,4 +16,4 @@ def _discover_workflow() -> list[Workflow]:
 ALL_WORKFLOWS = _discover_workflow()
 WORKFLOW_BY_ID = {wf.id: wf for wf in ALL_WORKFLOWS if wf.id is not None}
 
-__all__ = ["ALL_WORKFLOW", "WORKFLOW_BY_ID"]
+__all__ = ["ALL_WORKFLOWS", "WORKFLOW_BY_ID"]

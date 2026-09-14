@@ -146,7 +146,7 @@ session_title = Agent(
     name="Session title generator",
     description=pm.get_prompt("session_title", "description"),
     model=get_model(
-        settings.ai.dataset_description_model,
+        settings.ai.session_title_model,
         settings.get_model_api_keys(settings.ai.session_title_model),
         settings.get_model_base_url(settings.ai.session_title_model),
     ),

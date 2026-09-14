@@ -93,7 +93,7 @@ class DatasetSelection(BaseModel):
                 raise ValueError(
                     "dataset_name must be empty when clarification is needed"
                 )
-            if self.clarification_question:
+            if not self.clarification_question:
                 raise ValueError(
                     "clarification_question must be provided when needs_clarification is True"
                 )
@@ -126,7 +126,7 @@ class StrategySelection(BaseModel):
                 raise ValueError(
                     "strategy_ids must be empty when clarification is needed"
                 )
-            if self.clarification_question is None:
+            if not self.clarification_question:
                 raise ValueError(
                     "clarification_question is required when clarification is needed"
                 )

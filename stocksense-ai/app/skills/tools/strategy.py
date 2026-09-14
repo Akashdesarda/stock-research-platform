@@ -128,7 +128,9 @@ class StrategyDiscoveryTools(Toolkit):
 
         if not normalized:
             valid = ", ".join(d.value for d in AnalysisDomainTypes)
-            raise RetryAgentRun(f"Domain cannot be empty. Valid values: {valid}.")
+            raise RetryAgentRun(
+                f"Domain cannot be empty. Valid values: {valid}."
+            )
         try:
             chosen = AnalysisDomainTypes(normalized)
         except ValueError as e:
@@ -172,7 +174,9 @@ class StrategyDiscoveryTools(Toolkit):
             )
 
         return [
-            i.model_dump(mode="json", include=_STRATEGY_CATEGORY_DISCOVERY_FIELDS)
+            i.model_dump(
+                mode="json", include=_STRATEGY_CATEGORY_DISCOVERY_FIELDS
+            )
             for i in self._registry.strategy_catalogs
             if i.domain == AnalysisDomainTypes(domain_value)
         ]
@@ -290,7 +294,10 @@ class StockDBTools(Toolkit):
             timeout=None,
         )
         async_tools = [
-            (self.get_company_exchange_and_ticker, "get_company_exchange_and_ticker"),
+            (
+                self.get_company_exchange_and_ticker,
+                "get_company_exchange_and_ticker",
+            ),
             (self.list_exchange, "list_exchanges"),
             (self.get_company_information, "get_company_information"),
         ]
@@ -397,7 +404,9 @@ class StockDBTools(Toolkit):
             result := df.filter(
                 pl.all_horizontal(
                     [
-                        pl.col("company_name").str.to_lowercase().str.contains(word)
+                        pl.col("company_name")
+                        .str.to_lowercase()
+                        .str.contains(word)
                         for word in words
                     ]
                 )
@@ -485,3 +494,29 @@ class StockDBTools(Toolkit):
             raise RetryAgentRun(
                 f"Failed to get company information due to: {err_detail}"
             ) from e
+
+
+def list_registered_datasets() -> list[dict[str, str]]:
+    """Get available datasets that the user can apply strategies to."""
+    return [
+        {
+            "dataset_id": "dataset-1",
+            "name": "Nifty50 Daily Prices",
+            "description": "Daily NSE Nifty50 OHLCV complete historic data ",
+        },
+        {
+            "dataset_id": "dataset-2",
+            "name": "Nifty50 Daily Prices 3M",
+            "description": "Daily NSE Nifty50 OHLCV last 3 months data from present day",
+        },
+        {
+            "dataset_id": "dataset-3",
+            "name": "Nifty50 Daily Prices 6M",
+            "description": "Daily NSE Nifty50 OHLCV last 6 months data from present day",
+        },
+        {
+            "dataset_id": "dataset-4",
+            "name": "Nifty Next 50 Daily Prices",
+            "description": "Daily NSE Nifty Next 50 OHLCV complete historic data",
+        },
+    ]

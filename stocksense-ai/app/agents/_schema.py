@@ -183,5 +183,9 @@ class StrategyParamSelection(BaseModel):
             raise ValueError(
                 "strategies must not be empty when clarification is not needed"
             )
+        elif len({strategy.strategy_id for strategy in self.strategies}) != len(
+            self.strategies
+        ):
+            raise ValueError("strategies must not contain duplicate strategy IDs")
 
         return self

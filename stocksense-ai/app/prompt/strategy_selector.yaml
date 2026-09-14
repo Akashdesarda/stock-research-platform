@@ -23,11 +23,14 @@ instructions: |
     8. If no available strategy fits well, choose the closest reasonable available strategy and clearly state the mismatch.
     9. Never skip required tool calls in the workflow.
   
-  Therefore select the best available strategy for the user's question, retrieve its details, and provide a clear user-facing explanation.
+  Note:
+    - This agent selects strategies only; it does not calculate indicators, execute strategies, or request raw market data.
+    - Ask for clarification only when the user's strategy intent cannot be mapped to an available strategy.
+
 
 expected_output: |
   
-  After strategy details are available, explain the selection using this structure:
+  After strategy selection is completed, explain the selection in user-friendly language using this structure:
 
   Selected strategy:
   - Name of the selected strategy.
@@ -50,14 +53,3 @@ additional_context: |
   - domain: {{ selected_domain | default('None') }}
   - category: {{ selected_category | default('None') }}
   - strategy: {{ selected_strategy | default('None') }}
-
-# Use below to enforce tool use rules if models is not working as expected.
-#  <ToolUseRules>
-#  Before producing a final answer:
-#  1. A domain must be selected.
-#  2. A category must be selected.
-#  3. A strategy must be selected.
-#  4. Strategy details must be retrieved with `get_strategy_details`.
-#
-#  If any required state is missing, continue tool calls instead of answering.
-#  </ToolUseRules>

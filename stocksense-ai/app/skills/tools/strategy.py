@@ -290,7 +290,10 @@ class StockDBTools(Toolkit):
             timeout=None,
         )
         async_tools = [
-            (self.get_company_exchange_and_ticker, "get_company_exchange_and_ticker"),
+            (
+                self.get_company_exchange_and_ticker,
+                "get_company_exchange_and_ticker",
+            ),
             (self.list_exchange, "list_exchanges"),
             (self.get_company_information, "get_company_information"),
         ]
@@ -394,13 +397,12 @@ class StockDBTools(Toolkit):
         df = pl.DataFrame(flattened)
         words = company_name.lower().split()
         if (
-            result := df.filter(
-                pl.all_horizontal(
-                    [
-                        pl.col("company_name").str.to_lowercase().str.contains(word)
-                        for word in words
-                    ]
-                )
+            result := df
+            .filter(
+                pl.all_horizontal([
+                    pl.col("company_name").str.to_lowercase().str.contains(word)
+                    for word in words
+                ])
             )
             .select(["exchange", "ticker", "company_name"])
             .to_dicts()
@@ -485,3 +487,22 @@ class StockDBTools(Toolkit):
             raise RetryAgentRun(
                 f"Failed to get company information due to: {err_detail}"
             ) from e
+
+    async def list_registered_datasets(self) -> list[dict[str, str]]:
+        """Use this tool to get available datasets that the user can apply strategies to.
+
+        Returns:
+            list[dict[str, str]]: A list of datasets with dataset_id, name, description.
+        """
+
+        response = await self._aclient.get("/api/operation/data")
+        # NOTE - Output is a list of dictionaries with dataset_id, name, description, logical_plan, tags, last_modified
+        data = response.json()
+        return [
+            {
+                "dataset_id": item["dataset_id"],
+                "name": item["name"],
+                "description": item["description"],
+            }
+            for item in data
+        ]

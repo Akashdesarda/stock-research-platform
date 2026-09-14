@@ -26,7 +26,13 @@ from ._helpers import (
     get_history_table_columns,
     get_strategy_selection_instruction,
 )
-from ._schema import DatasetDescriptionOutput, TextToSQLOutput
+from ._schema import (
+    DatasetDescriptionOutput,
+    DatasetSelection,
+    StrategyParamSelection,
+    StrategySelection,
+    TextToSQLOutput,
+)
 
 logger = logging.getLogger("stocksense")
 settings = get_settings()
@@ -139,13 +145,74 @@ session_title = Agent(
     name="Session title generator",
     description=pm.get_prompt("session_title", "description"),
     model=get_model(
-        settings.ai.dataset_description_model,
-        settings.get_model_api_keys(settings.ai.dataset_description_model),
-        settings.get_model_base_url(settings.ai.dataset_description_model),
+        settings.ai.session_title_model,
+        settings.get_model_api_keys(settings.ai.session_title_model),
+        settings.get_model_base_url(settings.ai.session_title_model),
     ),
     instructions=pm.get_prompt("session_title", "instructions"),
     use_instruction_tags=True,
     output_schema=SessionTitleOutput,
+    stream=False,
+    debug_mode=True,
+)
+
+dataset_resolver = Agent(
+    id="dataset-resolver",
+    name="Dataset Resolver agent",
+    description=pm.get_prompt("dataset_resolver", "description"),
+    db=async_sqlite_db,
+    model=get_model(
+        settings.ai.dataset_resolver_model,
+        settings.get_model_api_keys(settings.ai.dataset_resolver_model),
+        settings.get_model_base_url(settings.ai.dataset_resolver_model),
+    ),
+    instructions=pm.get_prompt("dataset_resolver", "instructions"),
+    use_instruction_tags=True,
+    tools=[StockDBTools(include_tools=["list_registered_datasets"])],
+    output_schema=DatasetSelection,
+    stream=False,
+    debug_mode=True,
+)
+
+strategy_resolver = Agent(
+    name="Strategy resolver agent",
+    id="strategy-resolver",
+    description=pm.get_prompt("strategy_selector", "description"),
+    db=async_sqlite_db,
+    model=get_model(
+        settings.ai.strategy_selector_model,
+        settings.get_model_api_keys(settings.ai.strategy_selector_model),
+        settings.get_model_base_url(settings.ai.strategy_selector_model),
+    ),
+    instructions=get_strategy_selection_instruction,
+    session_state={
+        SELECTED_DOMAIN_KEY: None,
+        SELECTED_CATEGORY_KEY: None,
+        SELECTED_STRATEGY_KEY: None,
+    },
+    use_instruction_tags=True,
+    tools=[StrategyDiscoveryTools()],
+    output_schema=StrategySelection,
+    stream=False,
+    debug_mode=True,
+)
+
+strategy_param_resolver = Agent(
+    name="Stock strategy param agent",
+    id="strategy-param-resolver",
+    db=async_sqlite_db,
+    model=get_model(
+        settings.ai.strategy_selector_model,
+        settings.get_model_api_keys(settings.ai.strategy_selector_model),
+        settings.get_model_base_url(settings.ai.strategy_selector_model),
+    ),
+    instructions=(
+        "For every strategy ID in strategy_ids, call get_strategy_details to get the "
+        "strategy details and return appropriate parameters."
+    ),
+    use_instruction_tags=True,
+    tools=[StrategyDiscoveryTools(include_tools=["get_strategy_details"])],
+    output_schema=StrategyParamSelection,
     stream=False,
     debug_mode=True,
 )

@@ -9,6 +9,7 @@ from stocksense.config import get_settings
 from stocksense.strategy.catalog import (
     AnalysisDomainTypes,
     StrategyCategoryTypes,
+    StrategyDescriptor,
 )
 from stocksense.strategy.catalog.registry import (
     filter_strategies,
@@ -32,36 +33,34 @@ def _ensure_session_state(run_context: RunContext) -> dict[str, Any]:
     return run_context.session_state
 
 
-# required keys for discovery
-_ANALYSIS_DOMAIN_DISCOVERY_FIELDS = {
-    "domains": {
-        "__all__": {  # to include all domains
-            # NOTE - below keys are wrt to unit domain
-            "id",
-            "summary",
-            "use_if",
-            "avoid_when",
-            "categories",
-        }
-    }
-}
-_STRATEGY_CATEGORY_DISCOVERY_FIELDS = {
-    "strategies": {
-        "__all__": {
-            "id",
-            "name",
-            "category",
-            "summary",
-            "purpose",
-        }
-    }
-}
+# Strategy descriptor field partitions
+
+# Fields the model needs to CHOOSE between candidates. Kept deliberately small:
+# a shortlist can span a whole category, and a category may hold 100+ strategies.
+# `llm_hint` is authored precisely as prefer/avoid selection guidance.
+_SHORTLIST_FIELDS = {"name", "llm_hint"}
+
+# Carried as dict keys in tool responses, never repeated inside the values.
+_KEY_FIELDS = {"id", "category"}
+
+# Everything else. Derived by subtraction so the two views can never overlap and
+# new descriptor fields are picked up automatically. To give the model more or
+# less to chew on while shortlisting, move a field into or out of
+# _SHORTLIST_FIELDS -- it lands in the other view with no further edits.
+_DETAIL_FIELDS = set(StrategyDescriptor.model_fields) - _SHORTLIST_FIELDS - _KEY_FIELDS
+
+_PARAMETER_FIELDS = {"name", "parameters", "required_columns"}
 
 
-# setting session_state keys globally
-SELECTED_DOMAIN_KEY = "selected_domain"
-SELECTED_CATEGORY_KEY = "selected_category"
-SELECTED_STRATEGY_KEY = "selected_strategy"
+def _normalize_enum_input(value: str) -> str:
+    """Normalize free-form model input to a catalog enum value.
+
+    Catalog enum values are space separated (e.g. "technical analysis"), so
+    underscores and hyphens are folded to spaces.
+    """
+    normalized = value.strip().lower().replace("_", " ").replace("-", " ")
+    return " ".join(normalized.split())
+
 
 # Session state keys for company context
 EXCHANGE_KEY = "exchange"
@@ -70,24 +69,25 @@ COMPANY_INFO_KEY = "company_info_cache"
 
 
 class StrategyDiscoveryTools(Toolkit):
-    """
-    Toolkit that lets an Agent progressively discover and select:
-        1. An Analysis Domain (e.g. --> technical analysis)
-        2. A Strategy Category (e.g. --> momentum)
-        3. A concrete Strategy (e.g. --> momentum.rsi)
+    """Toolkit for selecting strategies out of the strategy catalog.
+
+    Discovery is a two-hop lookup rather than a progressive funnel:
+        1. `list_strategies` shortlists candidates across one or more strategy
+           categories, returning only the fields needed to choose between them.
+        2. `get_strategy_details` (or `get_strategy_parameters`) returns the
+           remaining detail for the few ids actually chosen.
+
+    The two views are disjoint, so no field is ever sent twice. Every tool is
+    batched: pass all categories / ids under consideration in a single call.
     """
 
     def __init__(self, **kwargs):
         self._registry = get_registry()
 
         tools = [
-            self.list_analysis_domains,
-            self.select_analysis_domain,
-            self.list_strategy_categories,
-            self.select_strategy_category,
-            self.list_strategies_in_selection,
-            self.select_strategy,
+            self.list_strategies,
             self.get_strategy_details,
+            self.get_strategy_parameters,
         ]
 
         super().__init__(
@@ -96,189 +96,212 @@ class StrategyDiscoveryTools(Toolkit):
             **kwargs,
         )
 
-    def list_analysis_domains(self) -> dict[str, Any]:
-        """List all available analysis domains with their summaries and the
-        situations they are best suited for. Call this FIRST when you do
-        not yet know which analysis domain fits the user's question.
-
-        Returns:
-            A dictionary containing domain descriptors with id, summary, use_if, avoid_when, categories, etc
-        """
-        return self._registry.domains.model_dump(
-            mode="json", include=_ANALYSIS_DOMAIN_DISCOVERY_FIELDS
-        )
-
-    def select_analysis_domain(
+    def list_strategies(
         self,
-        domain: str,
-        run_context: RunContext,
-    ) -> str:
-        """Record which analysis domain you have chosen for this user query.
-        You MUST call this after deciding the domain, before exploring strategy categories.
+        categories: list[str],
+        domain: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Shortlist the candidate strategies for one or more strategy
+        categories, with just enough information to choose between them.
+
+        Pass EVERY category you are considering in a SINGLE call. Do not call
+        this tool once per category.
+
+        The response omits full strategy detail on purpose, so that a shortlist
+        spanning several categories stays small. Once you have narrowed it down,
+        call get_strategy_details with the chosen ids to get the rest.
 
         Args:
-            domain (str): The domain id, e.g. "technical analysis".
-            run_context (RunContext): The run context containing dependencies (automatically provided)
+            categories (list[str]): Strategy category ids to shortlist from,
+                e.g. ["trend", "momentum", "volatility", "volume", "overlap"].
+            domain (str | None): Optional analysis domain id, e.g.
+                "technical analysis". Pass it only to disambiguate categories
+                that exist in more than one domain.
+            tags (list[str] | None): Optional tags to narrow a broad category,
+                e.g. ["oscillator"], ["trend-following"], ["mean-reversion"],
+                ["volume-confirmation"]. A strategy must carry EVERY tag given
+                to be returned, so pass one or two at most. Prefer narrowing
+                here over making a second call. Omit this when unsure, since an
+                over-narrow tag set can filter out every candidate.
 
         Returns:
-            A message confirming the selected domain
+            A mapping of category -> strategy_id -> {name, llm_hint}.
+            Categories with no matching strategies are omitted.
         """
-        normalized = domain.strip().lower().replace("_", " ").replace("-", " ")
-        normalized = " ".join(normalized.split())  # collapse repeated spaces
+        valid_categories = ", ".join(c.value for c in StrategyCategoryTypes)
 
-        if not normalized:
-            valid = ", ".join(d.value for d in AnalysisDomainTypes)
-            raise RetryAgentRun(f"Domain cannot be empty. Valid values: {valid}.")
-        try:
-            chosen = AnalysisDomainTypes(normalized)
-        except ValueError as e:
-            valid = ", ".join(d.value for d in AnalysisDomainTypes)
-            # Letting the model know about its mistake
+        if not categories:
             raise RetryAgentRun(
-                f"Invalid domain '{domain}'. Valid values: {valid}."
-            ) from e
-
-        session_state = _ensure_session_state(run_context)
-
-        current = session_state.get(SELECTED_DOMAIN_KEY)
-        if current == chosen.value:
-            return f"Analysis domain already set to '{chosen.value}'."
-
-        # Clear downstream selections if the user pivots
-        session_state[SELECTED_DOMAIN_KEY] = chosen.value
-        session_state.pop(SELECTED_CATEGORY_KEY, None)
-        session_state.pop(SELECTED_STRATEGY_KEY, None)
-        return f"Analysis domain set to '{chosen.value}'."
-
-    def list_strategy_categories(
-        self,
-        run_context: RunContext,
-    ) -> list[dict[str, Any]] | str:
-        """List the strategy categories that belong to the previously selected
-        analysis domain. Call select_analysis_domain first.
-
-        Args:
-            run_context (RunContext): The run context containing dependencies (automatically provided)
-
-        Returns:
-            A list of category descriptors with summary, use_if, example_queries, etc.
-        """
-        session_state = _ensure_session_state(run_context)
-
-        domain_value = session_state.get(SELECTED_DOMAIN_KEY)
-        if domain_value is None:
-            raise RetryAgentRun(
-                "No analysis domain selected yet. Call select_analysis_domain first."
+                f"categories cannot be empty. Pass one or more of: {valid_categories}."
             )
 
-        return [
-            i.model_dump(mode="json", include=_STRATEGY_CATEGORY_DISCOVERY_FIELDS)
-            for i in self._registry.strategy_catalogs
-            if i.domain == AnalysisDomainTypes(domain_value)
-        ]
+        # Collect every invalid value so the model gets one retry, not N.
+        chosen: list[StrategyCategoryTypes] = []
+        invalid: list[str] = []
+        for raw in categories:
+            try:
+                category = StrategyCategoryTypes(_normalize_enum_input(raw))
+            except ValueError:
+                invalid.append(raw)
+                continue
+            if category not in chosen:
+                chosen.append(category)
 
-    def select_strategy_category(
-        self,
-        category: str,
-        run_context: RunContext,
-    ) -> str:
-        """Record which strategy category you have chosen. Must be called after select_analysis_domain.
-
-        Args:
-            category (str): The category id, e.g. "momentum", "trend".
-            run_context (RunContext): The run context containing dependencies (automatically provided)
-
-        Returns:
-            A message confirming the selected category
-        """
-        session_state = _ensure_session_state(run_context)
-
-        if SELECTED_DOMAIN_KEY not in session_state:
-            raise RetryAgentRun("Select an analysis domain first.")
-
-        try:
-            chosen = StrategyCategoryTypes(category.strip().lower())
-        except ValueError as e:
-            valid = ", ".join(c.value for c in StrategyCategoryTypes)
-            # Letting the model know about its mistake
+        if invalid:
             raise RetryAgentRun(
-                f"Invalid category '{category}'. Valid values: {valid}."
-            ) from e
-
-        session_state[SELECTED_CATEGORY_KEY] = chosen.value
-        session_state.pop(SELECTED_STRATEGY_KEY, None)
-        return f"Strategy category set to '{chosen.value}'."
-
-    def list_strategies_in_selection(
-        self,
-        run_context: RunContext,
-    ) -> list[dict[str, Any]] | str:
-        """List candidate strategies that match the previously selected analysis domain
-        and category. Use this to decide which strategy fits the user's question best.
-
-        Args:
-            run_context (RunContext): The run context containing dependencies (automatically provided)
-
-        Returns:
-            A list of serialized dictionary representations of filtered
-            strategies or a string error message if applicable.
-        """
-        session_state = _ensure_session_state(run_context)
-
-        domain_value = session_state.get(SELECTED_DOMAIN_KEY)
-        category_value = session_state.get(SELECTED_CATEGORY_KEY)
-
-        if domain_value is None or category_value is None:
-            # Letting the model know about its mistake
-            raise RetryAgentRun(
-                "Need both an analysis domain and a strategy category "
-                "selected before listing strategies."
+                f"Invalid categories: {', '.join(invalid)}. "
+                f"Valid values: {valid_categories}."
             )
 
-        candidates = filter_strategies(
-            domain=domain_value,
-            category=category_value,
-        )
+        domain_value: str | None = None
+        normalized_domain = _normalize_enum_input(domain) if domain else ""
+        if normalized_domain:
+            try:
+                domain_value = AnalysisDomainTypes(normalized_domain).value
+            except ValueError as e:
+                valid_domains = ", ".join(d.value for d in AnalysisDomainTypes)
+                raise RetryAgentRun(
+                    f"Invalid domain '{domain}'. Valid values: {valid_domains}."
+                ) from e
 
-        # Return only the fields the LLM needs to choose. Keep it compact.
-        return [i.model_dump(mode="json") for i in candidates]
+        # Tags are free-form in the catalog, so they are matched as given rather
+        # than validated against an enum. Unknown tags simply match nothing,
+        # which the empty-result branch below turns into an actionable retry.
+        selected_tags = [t.strip().lower() for t in tags if t.strip()] if tags else None
 
-    def select_strategy(
+        shortlist: dict[str, dict[str, dict[str, Any]]] = {}
+        for category in chosen:
+            if candidates := filter_strategies(
+                domain=domain_value,
+                category=category.value,
+                tags=selected_tags,
+            ):
+                shortlist[category.value] = {
+                    s.id: s.model_dump(mode="json", include=_SHORTLIST_FIELDS)
+                    for s in candidates
+                }
+
+        if not shortlist:
+            requested = ", ".join(c.value for c in chosen)
+            scope = f" within domain '{domain_value}'" if domain_value else ""
+            if selected_tags:
+                raise RetryAgentRun(
+                    f"No strategies matched categories {requested}{scope} with all "
+                    f"of the tags {', '.join(selected_tags)}. Retry with fewer "
+                    f"tags, or omit tags entirely to see every candidate."
+                )
+            raise RetryAgentRun(
+                f"No strategies matched categories {requested}{scope}. "
+                f"Try different categories. Valid values: {valid_categories}."
+            )
+
+        return shortlist
+
+    def get_strategy_details(
+        self, strategy_ids: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Return the remaining full detail for strategies you already
+        shortlisted with list_strategies.
+
+        Pass ALL the ids you chose in a SINGLE call. Do not call this tool once
+        per strategy.
+
+        The response deliberately EXCLUDES the fields list_strategies already
+        gave you (name, llm_hint), so nothing is repeated. Combine both
+        responses when reasoning about a strategy.
+
+        Args:
+            strategy_ids (list[str]): Full strategy ids, exactly as returned by
+                list_strategies, e.g. ["momentum.rsi", "trend.adx_dmi"].
+
+        Returns:
+            A mapping of strategy_id -> {summary, purpose, best_for,
+            avoid_when, tags, required_columns, parameters, output_columns,
+            interpretation, market_regimes, time_horizons, decision_guidance,
+            limitations}.
+        """
+        strategies = self._resolve_strategies(strategy_ids, "get_strategy_details")
+        return {
+            strategy_id: strategy.model_dump(mode="json", include=_DETAIL_FIELDS)
+            for strategy_id, strategy in strategies.items()
+        }
+
+    def get_strategy_parameters(
+        self, strategy_ids: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Return only the parameter specs and required input columns for the
+        given strategies. Use this when you need to resolve parameter values
+        and not the prose description of a strategy.
+
+        Pass ALL the ids you need in a SINGLE call. Do not call this tool once
+        per strategy.
+
+        Args:
+            strategy_ids (list[str]): Full strategy ids, e.g.
+                ["momentum.rsi", "trend.adx_dmi"].
+
+        Returns:
+            A mapping of strategy_id -> {name, parameters, required_columns}.
+        """
+        strategies = self._resolve_strategies(strategy_ids, "get_strategy_parameters")
+        return {
+            strategy_id: strategy.model_dump(mode="json", include=_PARAMETER_FIELDS)
+            for strategy_id, strategy in strategies.items()
+        }
+
+    def _resolve_strategies(
         self,
-        strategy_id: str,
-        run_context: RunContext,
-    ) -> str:
-        """Record the final strategy chosen for the user's question.
+        strategy_ids: list[str],
+        tool_name: str,
+    ) -> dict[str, StrategyDescriptor]:
+        """Resolve strategy ids to descriptors, de-duplicating and validating.
 
         Args:
-            strategy_id (str): Full strategy id, e.g. "momentum.rsi".
-            run_context (RunContext): The run context containing dependencies (automatically provided)
+            strategy_ids (list[str]): Raw ids supplied by the model.
+            tool_name (str): Calling tool name, used in the retry message.
 
         Returns:
-            A message confirming the selected strategy
+            A mapping of strategy_id -> descriptor, in first-seen order.
         """
-        if strategy_id not in self._registry.by_id:
-            raise RetryAgentRun(f"Unknown strategy_id '{strategy_id}'.")
+        if not strategy_ids:
+            raise RetryAgentRun(
+                "strategy_ids cannot be empty. Pass at least one strategy id, "
+                "exactly as returned by list_strategies."
+            )
 
-        session_state = _ensure_session_state(run_context)
+        resolved: dict[str, StrategyDescriptor] = {}
+        unknown: list[str] = []
+        seen: set[str] = set()
 
-        session_state[SELECTED_STRATEGY_KEY] = strategy_id
-        return f"Strategy '{strategy_id}' selected."
+        for raw in strategy_ids:
+            strategy_id = raw.strip()
+            if not strategy_id or strategy_id in seen:
+                continue
+            seen.add(strategy_id)
 
-    def get_strategy_details(self, strategy_id: str) -> dict[str, Any] | str:
-        """Return the full descriptor for a strategy id, including parameters,
-        interpretation, decision guidance, and limitations.
+            strategy = self._registry.by_id.get(strategy_id)
+            if strategy is None:
+                unknown.append(strategy_id)
+                continue
+            resolved[strategy_id] = strategy
 
-        Args:
-            strategy_id (str): Full strategy id, e.g. "momentum.rsi".
+        # Aggregate every bad id into ONE retry instead of one retry per id.
+        # The valid id list is deliberately not dumped here; it may be 100+ long.
+        if unknown:
+            raise RetryAgentRun(
+                f"Unknown strategy_ids: {', '.join(unknown)}. Use ids exactly as "
+                f"returned by list_strategies (for example 'momentum.rsi'), then "
+                f"call {tool_name} again with the corrected ids."
+            )
 
-        Returns:
-            A dictionary with strategy details or a string error message if applicable.
-        """
-        strategy = self._registry.by_id.get(strategy_id)
-        if strategy is None:
-            raise RetryAgentRun(f"Unknown strategy_id '{strategy_id}'")
-        return strategy.model_dump(mode="json")
+        if not resolved:
+            raise RetryAgentRun(
+                "strategy_ids contained no usable ids. Pass at least one "
+                "strategy id, exactly as returned by list_strategies."
+            )
+
+        return resolved
 
 
 class StockDBTools(Toolkit):
@@ -289,17 +312,18 @@ class StockDBTools(Toolkit):
             base_url=f"{settings.stockdb.stockdb_url}:{settings.stockdb.port}/api",
             timeout=None,
         )
-        async_tools = [
-            (
-                self.get_company_exchange_and_ticker,
-                "get_company_exchange_and_ticker",
-            ),
-            (self.list_exchange, "list_exchanges"),
-            (self.get_company_information, "get_company_information"),
-        ]
+        # Async callables whose method name matches the tool name belong in
+        # `tools` so include_tools / exclude_tools validation can see them.
+        # `async_tools` is only for aliasing (e.g. list_exchange -> list_exchanges).
         tools = [
             self.current_company_context,
             self.set_company_context,
+            self.get_company_exchange_and_ticker,
+            self.get_company_information,
+            self.list_registered_datasets,
+        ]
+        async_tools = [
+            (self.list_exchange, "list_exchanges"),
         ]
         super().__init__(
             name="stockdb_tools", tools=tools, async_tools=async_tools, **kwargs

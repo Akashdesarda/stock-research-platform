@@ -3448,7 +3448,7 @@ dev = [
 [[package]]
 name = "stocksense-core"
 version = "0.13.0"
-source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#6b14c0b4098c566ef6c9acde012c999edbdb47fd" }
+source = { git = "https://github.com/Akashdesarda/stock-research-platform.git?subdirectory=core#e0b08b594b3526fd092d79a899054c1bf6e7ee8f" }
 dependencies = [
     { name = "duckdb" },
     { name = "httpx" },

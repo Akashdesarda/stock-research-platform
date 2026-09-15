@@ -519,36 +519,14 @@ class StockDBTools(Toolkit):
             list[dict[str, str]]: A list of datasets with dataset_id, name, description.
         """
 
-        # response = await self._aclient.get("/api/operation/data")
-        # # NOTE - Output is a list of dictionaries with dataset_id, name, description, logical_plan, tags, last_modified
-        # data = response.json()
-        # return [
-        #     {
-        #         "dataset_id": item["dataset_id"],
-        #         "name": item["name"],
-        #         "description": item["description"],
-        #     }
-        #     for item in data
-        # ]
+        response = await self._aclient.get("/api/operation/data")
+        # NOTE - Output is a list of dictionaries with dataset_id, name, description, logical_plan, tags, last_modified
+        data = response.json()
         return [
             {
-                "dataset_id": "dataset-1",
-                "name": "Nifty50 Daily Prices",
-                "description": "Daily NSE Nifty50 OHLCV complete historic data ",
-            },
-            {
-                "dataset_id": "dataset-2",
-                "name": "Nifty50 Daily Prices 3M",
-                "description": "Daily NSE Nifty50 OHLCV last 3 months data from present day",
-            },
-            {
-                "dataset_id": "dataset-3",
-                "name": "Nifty50 Daily Prices 6M",
-                "description": "Daily NSE Nifty50 OHLCV last 6 months data from present day",
-            },
-            {
-                "dataset_id": "dataset-4",
-                "name": "Nifty Next 50 Daily Prices",
-                "description": "Daily NSE Nifty Next 50 OHLCV complete historic data",
-            },
+                "dataset_id": item["dataset_id"],
+                "name": item["name"],
+                "description": item["description"],
+            }
+            for item in data
         ]

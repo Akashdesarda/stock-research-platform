@@ -36,6 +36,21 @@ logger = logging.getLogger("stocksense")
 settings = get_settings()
 pm = PromptManager()
 
+session_title = Agent(
+    id="session-title",
+    name="Session title agent",
+    description=pm.get_prompt("session_title", "description"),
+    model=get_model(
+        settings.ai.session_title_model,
+        settings.get_model_api_keys(settings.ai.session_title_model),
+        settings.get_model_base_url(settings.ai.session_title_model),
+    ),
+    instructions=pm.get_prompt("session_title", "instructions"),
+    use_instruction_tags=True,
+    output_schema=SessionTitleOutput,
+    stream=False,
+    debug_mode=True,
+)
 
 text_to_sql = Agent(
     name="Natural language to SQL agent",
@@ -62,37 +77,9 @@ text_to_sql = Agent(
     debug_mode=True,
 )
 
-strategy_selector = Agent(
-    name="Stock strategy selector agent",
-    id="strategy-selector",
-    description=pm.get_prompt("strategy_selector", "description"),
-    db=async_sqlite_db,
-    model=get_model(
-        settings.ai.strategy_selector_model,
-        settings.get_model_api_keys(settings.ai.strategy_selector_model),
-        settings.get_model_base_url(settings.ai.strategy_selector_model),
-    ),
-    instructions=get_strategy_selection_instruction,
-    use_instruction_tags=True,
-    cache_session=True,
-    add_history_to_context=True,
-    # Cap history so older fully-formatted answers stop acting as few-shot
-    # examples that make the agent repeat the report structure every turn.
-    num_history_runs=3,
-    tools=[
-        StrategyDiscoveryTools(
-            include_tools=["list_strategies", "get_strategy_details"]
-        )
-    ],
-    tool_call_limit=4,
-    markdown=True,
-    stream=True,
-    debug_mode=True,
-)
-
 company_summary = Agent(
     id="company-summary",
-    name="Company summary agent",
+    name="Company summary chat agent",
     description=pm.get_prompt("company_summary", "description"),
     db=async_sqlite_db,
     model=get_model(
@@ -120,7 +107,7 @@ company_summary = Agent(
 
 dataset_description = Agent(
     id="dataset-description",
-    name="Dataset description generator",
+    name="Dataset description agent",
     description=pm.get_prompt("dataset_description", "description"),
     model=get_model(
         settings.ai.dataset_description_model,
@@ -132,22 +119,6 @@ dataset_description = Agent(
     output_schema=DatasetDescriptionOutput,
     use_json_mode=True,
     pre_hooks=[dataset_description_input_validation],
-    stream=False,
-    debug_mode=True,
-)
-
-session_title = Agent(
-    id="session-title",
-    name="Session title generator",
-    description=pm.get_prompt("session_title", "description"),
-    model=get_model(
-        settings.ai.session_title_model,
-        settings.get_model_api_keys(settings.ai.session_title_model),
-        settings.get_model_base_url(settings.ai.session_title_model),
-    ),
-    instructions=pm.get_prompt("session_title", "instructions"),
-    use_instruction_tags=True,
-    output_schema=SessionTitleOutput,
     stream=False,
     debug_mode=True,
 )
@@ -167,6 +138,34 @@ dataset_resolver = Agent(
     tools=[StockDBTools(include_tools=["list_registered_datasets"])],
     output_schema=DatasetSelection,
     stream=False,
+    debug_mode=True,
+)
+
+strategy_selector = Agent(
+    name="Strategy Chat agent",
+    id="strategy-selector",
+    description=pm.get_prompt("strategy_selector", "description"),
+    db=async_sqlite_db,
+    model=get_model(
+        settings.ai.strategy_selector_model,
+        settings.get_model_api_keys(settings.ai.strategy_selector_model),
+        settings.get_model_base_url(settings.ai.strategy_selector_model),
+    ),
+    instructions=get_strategy_selection_instruction,
+    use_instruction_tags=True,
+    cache_session=True,
+    add_history_to_context=True,
+    # Cap history so older fully-formatted answers stop acting as few-shot
+    # examples that make the agent repeat the report structure every turn.
+    num_history_runs=3,
+    tools=[
+        StrategyDiscoveryTools(
+            include_tools=["list_strategies", "get_strategy_details"]
+        )
+    ],
+    tool_call_limit=4,
+    markdown=True,
+    stream=True,
     debug_mode=True,
 )
 
@@ -194,7 +193,7 @@ strategy_resolver = Agent(
 )
 
 strategy_param_resolver = Agent(
-    name="Stock strategy param agent",
+    name="Strategy param agent",
     id="strategy-param-resolver",
     db=async_sqlite_db,
     model=get_model(

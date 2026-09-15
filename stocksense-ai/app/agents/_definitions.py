@@ -10,9 +10,6 @@ from app.skills.tools.sql import (
 )
 from app.skills.tools.strategy import (
     EXCHANGE_KEY,
-    SELECTED_CATEGORY_KEY,
-    SELECTED_DOMAIN_KEY,
-    SELECTED_STRATEGY_KEY,
     TICKER_KEY,
     StockDBTools,
     StrategyDiscoveryTools,
@@ -24,6 +21,7 @@ from ._helpers import (
     dataset_description_input_validation,
     get_dataset_description_instruction,
     get_history_table_columns,
+    get_strategy_resolution_instruction,
     get_strategy_selection_instruction,
 )
 from ._schema import (
@@ -75,20 +73,18 @@ strategy_selector = Agent(
         settings.get_model_base_url(settings.ai.strategy_selector_model),
     ),
     instructions=get_strategy_selection_instruction,
-    expected_output=pm.get_prompt("strategy_selector", "expected_output"),
-    additional_context=pm.get_prompt("strategy_selector", "additional_context"),
-    session_state={
-        SELECTED_DOMAIN_KEY: None,
-        SELECTED_CATEGORY_KEY: None,
-        SELECTED_STRATEGY_KEY: None,
-    },
     use_instruction_tags=True,
-    add_session_state_to_context=True,
-    enable_agentic_state=True,
     cache_session=True,
     add_history_to_context=True,
-    read_chat_history=True,
-    tools=[StrategyDiscoveryTools()],
+    # Cap history so older fully-formatted answers stop acting as few-shot
+    # examples that make the agent repeat the report structure every turn.
+    num_history_runs=3,
+    tools=[
+        StrategyDiscoveryTools(
+            include_tools=["list_strategies", "get_strategy_details"]
+        )
+    ],
+    tool_call_limit=4,
     markdown=True,
     stream=True,
     debug_mode=True,
@@ -184,14 +180,14 @@ strategy_resolver = Agent(
         settings.get_model_api_keys(settings.ai.strategy_selector_model),
         settings.get_model_base_url(settings.ai.strategy_selector_model),
     ),
-    instructions=get_strategy_selection_instruction,
-    session_state={
-        SELECTED_DOMAIN_KEY: None,
-        SELECTED_CATEGORY_KEY: None,
-        SELECTED_STRATEGY_KEY: None,
-    },
+    instructions=get_strategy_resolution_instruction,
     use_instruction_tags=True,
-    tools=[StrategyDiscoveryTools()],
+    tools=[
+        StrategyDiscoveryTools(
+            include_tools=["list_strategies", "get_strategy_details"]
+        )
+    ],
+    tool_call_limit=4,
     output_schema=StrategySelection,
     stream=False,
     debug_mode=True,
@@ -206,12 +202,10 @@ strategy_param_resolver = Agent(
         settings.get_model_api_keys(settings.ai.strategy_selector_model),
         settings.get_model_base_url(settings.ai.strategy_selector_model),
     ),
-    instructions=(
-        "For every strategy ID in strategy_ids, call get_strategy_details to get the "
-        "strategy details and return appropriate parameters."
-    ),
+    instructions=pm.get_prompt("strategy_selector", "parameter_resolution"),
     use_instruction_tags=True,
-    tools=[StrategyDiscoveryTools(include_tools=["get_strategy_details"])],
+    tools=[StrategyDiscoveryTools(include_tools=["get_strategy_parameters"])],
+    tool_call_limit=3,
     output_schema=StrategyParamSelection,
     stream=False,
     debug_mode=True,

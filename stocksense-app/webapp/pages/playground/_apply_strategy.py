@@ -7,6 +7,7 @@ from webapp.components.inputs import (
     multi_select_dropdown,
     reset_button,
     submit_button,
+    text_area,
     text_input,
 )
 from webapp.components.layout import (
@@ -187,9 +188,106 @@ def _results_view() -> rx.Component:
     )
 
 
-def apply_strategy_panel() -> rx.Component:
+def _or_separator() -> rx.Component:
+    return rx.hstack(
+        rx.separator(style={"flex": 1}),
+        rx.text("OR", size="4", weight="bold", color="gray"),
+        rx.separator(style={"flex": 1}),
+        width="100%",
+        align="center",
+        padding_y="2",
+    )
+
+
+def _ai_submit_workflow() -> rx.Component:
+    """Submit control for the AI strategy-application workflow."""
+    is_generating = ApplyStrategyState.run_state == RunState.generating.value
+
+    return rx.hstack(
+        submit_button(
+            on_click=ApplyStrategyState.submit_ai_prompt,
+            disabled=(ApplyStrategyState.ai_prompt == "") | is_generating,
+        ),
+        rx.cond(
+            is_generating,
+            rx.hstack(
+                rx.spinner(size="3"),
+                rx.text(
+                    "Applying Strategy...",
+                    size="3",
+                    color=rx.color("blue", 11),
+                ),
+                cancel_button(on_click=ApplyStrategyState.cancel_ai_workflow),
+                spacing="3",
+                align="center",
+            ),
+            rx.fragment(),
+        ),
+        spacing="4",
+        align="center",
+        width="100%",
+    )
+
+
+def _ai_explanations() -> rx.Component:
+    """Show LLM rationale for the dataset and strategies it selected."""
+    return rx.vstack(
+        rx.cond(
+            ApplyStrategyState.dataset_explanation != "",
+            callout_message(
+                ApplyStrategyState.dataset_explanation,
+                tone="info",
+                size="1",
+            ),
+        ),
+        rx.cond(
+            ApplyStrategyState.strategies_explanation != "",
+            callout_message(
+                ApplyStrategyState.strategies_explanation,
+                tone="info",
+                size="1",
+            ),
+        ),
+        spacing="3",
+        width="100%",
+    )
+
+
+def _ai_prompt_section() -> rx.Component:
+    return rx.vstack(
+        subsection_header("Describe your analysis requirement", size="3"),
+        form_field(
+            label="Enter your prompt",
+            control=text_area(
+                value=ApplyStrategyState.ai_prompt,
+                on_change=ApplyStrategyState.set_ai_prompt,
+                placeholder=(
+                    "Example: Apply RSI strategy on my NSE tech dataset "
+                    "and show stocks with RSI below 30"
+                ),
+                rows=4,
+            ),
+            help_text=(
+                "Describe the dataset, strategy, and parameters you want. "
+                "StockSense will fill the form below; review and click Submit to apply."
+            ),
+        ),
+        rx.cond(
+            ApplyStrategyState.workflow_error != "",
+            callout_message(
+                ApplyStrategyState.workflow_error, tone="error", size="1"
+            ),
+        ),
+        _ai_submit_workflow(),
+        spacing="4",
+        width="100%",
+    )
+
+
+def _manual_selection_section() -> rx.Component:
     return rx.vstack(
         subsection_header("Dataset & Strategy selection", size="3"),
+        _ai_explanations(),
         responsive_grid(
             form_field(
                 label="Select Dataset",
@@ -216,6 +314,16 @@ def apply_strategy_panel() -> rx.Component:
             spacing="5",
         ),
         _parameters_section(),
+        spacing="4",
+        width="100%",
+    )
+
+
+def apply_strategy_panel() -> rx.Component:
+    return rx.vstack(
+        _ai_prompt_section(),
+        _or_separator(),
+        _manual_selection_section(),
         rx.cond(
             ApplyStrategyState.apply_error != "",
             callout_message(ApplyStrategyState.apply_error, tone="error"),

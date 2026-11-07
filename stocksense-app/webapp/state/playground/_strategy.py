@@ -71,21 +71,17 @@ def _parameter_specs(parameters: dict[str, Any]) -> list[dict[str, str]]:
         param_type = str(meta.get("type", "") or "")
         min_v, max_v = meta.get("min"), meta.get("max")
         default = meta.get("default")
-        specs.append(
-            {
-                "name": name,
-                "type": param_type,
-                "default": "" if default is None else str(default),
-                "min": "" if min_v is None else str(min_v),
-                "max": "" if max_v is None else str(max_v),
-                "range": (
-                    f"{min_v}–{max_v}"
-                    if min_v is not None and max_v is not None
-                    else ""
-                ),
-                "description": str(meta.get("description", "") or ""),
-            }
-        )
+        specs.append({
+            "name": name,
+            "type": param_type,
+            "default": "" if default is None else str(default),
+            "min": "" if min_v is None else str(min_v),
+            "max": "" if max_v is None else str(max_v),
+            "range": (
+                f"{min_v}–{max_v}" if min_v is not None and max_v is not None else ""
+            ),
+            "description": str(meta.get("description", "") or ""),
+        })
     return specs
 
 
@@ -93,23 +89,25 @@ def _parameter_specs(parameters: dict[str, Any]) -> list[dict[str, str]]:
 # Returns a tuple of (converted_value, error_message) for flexible error handling
 def _cast_param(value: str, param_type: str) -> tuple[Any, str]:
     """Cast a raw input string to ``param_type``, returning ``(value, error)``."""
-    if param_type == "int":
-        try:
-            return int(value), ""
-        except ValueError:
-            return None, "Must be a whole number"
-    if param_type == "float":
+    if param_type == "bool":
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True, ""
+        return (
+            (False, "")
+            if normalized in {"false", "0", "no"}
+            else (None, "Must be true or false")
+        )
+    elif param_type == "float":
         try:
             return float(value), ""
         except ValueError:
             return None, "Must be a number"
-    if param_type == "bool":
-        normalized = value.strip().lower()
-        if normalized in ("true", "1", "yes"):
-            return True, ""
-        if normalized in ("false", "0", "no"):
-            return False, ""
-        return None, "Must be true or false"
+    elif param_type == "int":
+        try:
+            return int(value), ""
+        except ValueError:
+            return None, "Must be a whole number"
     return value, ""
 
 
@@ -148,26 +146,20 @@ def _rows_for_strategy(
     rows: list[dict[str, str]] = []
     for spec in specs:
         name, param_type, default = spec["name"], spec["type"], spec["default"]
-        rows.append(
-            {
-                **spec,
-                "strategy_id": strategy_id,
-                "value": inputs.get(name, ""),
-                "error": errors.get(name, ""),
-                "placeholder": default or "value",
-                # Smart input types: numeric fields get number inputs with steppers,
-                # everything else stays text for maximum flexibility (like column names)
-                "input_type": (
-                    "number" if param_type in _NUMERIC_PARAM_TYPES else "text"
-                ),
-                "step": "1" if param_type == "int" else "any",
-                "hint": (
-                    f"Default: {default}"
-                    if default
-                    else "Blank uses the strategy default"
-                ),
-            }
-        )
+        rows.append({
+            **spec,
+            "strategy_id": strategy_id,
+            "value": inputs.get(name, ""),
+            "error": errors.get(name, ""),
+            "placeholder": default or "value",
+            # Smart input types: numeric fields get number inputs with steppers,
+            # everything else stays text for maximum flexibility (like column names)
+            "input_type": ("number" if param_type in _NUMERIC_PARAM_TYPES else "text"),
+            "step": "1" if param_type == "int" else "any",
+            "hint": (
+                f"Default: {default}" if default else "Blank uses the strategy default"
+            ),
+        })
     return rows
 
 
@@ -190,6 +182,11 @@ def _resolved_params_for_strategy(
 def _lookup_id(df: pl.DataFrame, dropdown_value: str) -> str:
     """Resolve a "Name (ID)" dropdown label back to its raw ID."""
     return df.filter(pl.col("dropdown") == dropdown_value).select("id").item()
+
+
+def _dropdown_for_id(df: pl.DataFrame, id_value: str) -> str:
+    """Resolve a raw ID to its "Name (ID)" dropdown label."""
+    return df.filter(pl.col("id") == id_value).select("dropdown").item()
 
 
 class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
@@ -235,9 +232,7 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
         domain = _resolve_analysis_domain(self.selected_domain)
         if domain is None:
             return {}
-        category = self.available_strategy_category.get(
-            self.selected_strategy_category
-        )
+        category = self.available_strategy_category.get(self.selected_strategy_category)
         if category is None:
             return {}
         strategy = filter_strategies(domain=domain, category=category)
@@ -246,11 +241,7 @@ class StrategyDiscoveryState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
     @rx.var(cache=True)
     def strategy_json(self) -> str:
-        return (
-            ""
-            if self.strategy is None
-            else self.strategy.model_dump_json(indent=2)
-        )
+        return "" if self.strategy is None else self.strategy.model_dump_json(indent=2)
 
     @rx.var(cache=True)
     def strategy_category_label(self) -> str:
@@ -435,22 +426,23 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
     apply_error: str = ""
     _cancel_event: asyncio.Event = asyncio.Event()
 
-    # LLM Agent state
+    # AI workflow: natural-language strategy application (alternative to manual selection)
+    ai_prompt: str = ""
+    dataset_explanation: str = ""
+    strategies_explanation: str = ""
+
+    # LLM Agent / workflow state
     run_state: str = RunState.idle.value
     # Agno session for the conversation; minted on the first user message.
-    # (Also declared on ChatMixin — kept here for clarity of this page's contract.)
     current_session_id: str = ""
 
     @rx.var(cache=True)
     async def available_datasets(self) -> pl.DataFrame:
         async with self._stockdb_client() as client:
             response = await client.get("/operation/data")
-            datasets = pl.DataFrame(
-                [
-                    {"id": i["dataset_id"], "name": i["name"]}
-                    for i in response.json()
-                ]
-            )
+            datasets = pl.DataFrame([
+                {"id": i["dataset_id"], "name": i["name"]} for i in response.json()
+            ])
             # Format dropdown labels as "Name (ID)" for easy identification
             # while keeping the actual ID separate for API calls
             datasets = datasets.with_columns(
@@ -467,9 +459,9 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
     async def available_strategies(self) -> pl.DataFrame:
         async with self._stockdb_client() as client:
             response = await client.get("/strategy")
-            strategies = pl.DataFrame(
-                [{"id": i["id"], "name": i["name"]} for i in response.json()]
-            )
+            strategies = pl.DataFrame([
+                {"id": i["id"], "name": i["name"]} for i in response.json()
+            ])
             strategies = strategies.with_columns(
                 dropdown=pl.col("name") + " (" + pl.col("id") + ")"
             )
@@ -514,9 +506,7 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
     @rx.var(cache=True)
     def has_param_errors(self) -> bool:
-        return any(
-            any(errors.values()) for errors in self.param_errors.values()
-        )
+        return any(any(errors.values()) for errors in self.param_errors.values())
 
     @rx.var(cache=True)
     def resolved_params_by_strategy(self) -> dict[str, dict[str, Any]]:
@@ -540,10 +530,17 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         )
 
     @rx.event
+    def set_ai_prompt(self, value: str):
+        self.ai_prompt = value
+
+    @rx.event
     async def set_select_dataset_id(self, value: str):
         self.select_dataset_dropdown = value
         _ = await self.available_datasets
         self.select_dataset_id = _lookup_id(_, value)
+        # clearing LLM explanation if any for manual selection
+        self.dataset_explanation = ""
+
         self._clear_results()
 
     @rx.event
@@ -555,6 +552,8 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         keep = set(new_ids)
         added_ids = keep - set(self.select_strategy_ids)
         self.select_strategy_ids = new_ids
+        # clearing LLM explanation if any for manual selection
+        self.strategies_explanation = ""
 
         # Drop parameter state for strategies that got deselected
         self.strategy_params = {
@@ -563,15 +562,9 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
         self.strategy_param_specs = {
             k: v for k, v in self.strategy_param_specs.items() if k in keep
         }
-        self.param_inputs = {
-            k: v for k, v in self.param_inputs.items() if k in keep
-        }
-        self.param_errors = {
-            k: v for k, v in self.param_errors.items() if k in keep
-        }
-        self.params_errors = {
-            k: v for k, v in self.params_errors.items() if k in keep
-        }
+        self.param_inputs = {k: v for k, v in self.param_inputs.items() if k in keep}
+        self.param_errors = {k: v for k, v in self.param_errors.items() if k in keep}
+        self.params_errors = {k: v for k, v in self.params_errors.items() if k in keep}
 
         # Auto-load parameters for newly selected strategies
         # This keeps the form in sync with the selected strategies' requirements
@@ -650,9 +643,7 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
                 "strategies": [
                     {
                         "strategy_id": strategy_id,
-                        "parameters": resolved_params_by_strategy.get(
-                            strategy_id, {}
-                        ),
+                        "parameters": resolved_params_by_strategy.get(strategy_id, {}),
                     }
                     for strategy_id in self.select_strategy_ids
                 ],
@@ -660,9 +651,7 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
 
         try:
             async with self._stockdb_client() as client:
-                response = await client.post(
-                    url="/strategy/apply", json=payload
-                )
+                response = await client.post(url="/strategy/apply", json=payload)
             if response.is_error:
                 async with self:
                     self.apply_error = (
@@ -737,6 +726,93 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             for strategy_id, inputs in self.param_errors.items()
         }
 
+    @rx.event(background=True)
+    async def submit_ai_prompt(self):
+        """Run strategy-application workflow and hydrate the manual-selection UI."""
+        if self.run_state == RunState.generating.value:
+            return
+
+        prompt = self.ai_prompt.strip()
+        if not prompt:
+            return
+
+        async with self:
+            self.run_state = RunState.generating.value
+            self.workflow_error = ""
+            self.dataset_explanation = ""
+            self.strategies_explanation = ""
+            if not self.current_session_id:
+                self.current_session_id = str(uuid.uuid4())
+            session_id = self.current_session_id
+
+        try:
+            run_output = await self.workflow_run(
+                workflow_id="strategy-application",
+                message=prompt,
+                session_id=session_id,
+            )
+            draft = run_output.content
+
+            if isinstance(draft, dict) and draft.get("needs_clarification"):
+                async with self:
+                    self.workflow_error = str(
+                        draft.get("clarification_question")
+                        or draft.get("explanation")
+                        or "Clarification needed to continue."
+                    )
+                    self.run_state = RunState.idle.value
+                return
+
+            if not _is_strategy_apply_draft(draft):
+                async with self:
+                    self.workflow_error = self._workflow_failure_message(run_output)
+                    self.run_state = RunState.error.value
+                return
+
+            async with self:
+                await self._hydrate_from_ai_draft(draft)
+                self.run_state = RunState.idle.value
+        except Exception as e:
+            logger.exception("strategy-application workflow failed", exc_info=e)
+            async with self:
+                self.workflow_error = (
+                    self.workflow_error
+                    or f"Failed to resolve strategy apply draft: {e}"
+                )
+                self.run_state = RunState.error.value
+
+    @rx.event
+    async def cancel_ai_workflow(self):
+        """Cancel the in-flight strategy-application workflow."""
+        await self.cancel_workflow_run()
+        if self.run_state == RunState.generating.value:
+            self.run_state = RunState.cancelled.value
+
+    async def _hydrate_from_ai_draft(self, draft: dict[str, Any]) -> None:
+        """Apply StrategyApplyFinalDraft through the same setters as the manual UI."""
+        datasets = await self.available_datasets
+        strategies = await self.available_strategies
+
+        await self.set_select_dataset_id(
+            _dropdown_for_id(datasets, draft["dataset_id"])
+        )
+        await self.set_select_strategy_ids([
+            _dropdown_for_id(strategies, unit["strategy_id"])
+            for unit in draft["strategies"]
+        ])
+        for unit in draft["strategies"]:
+            for param in unit.get("parameters") or []:
+                if param.get("value") is not None:
+                    self.set_param_value(
+                        unit["strategy_id"],
+                        param["name"],
+                        str(param["value"]),
+                    )
+
+        # Set after setters — they clear explanations on manual change
+        self.dataset_explanation = draft.get("dataset_explanation") or ""
+        self.strategies_explanation = draft.get("strategies_explanation") or ""
+
     def _clear_results(self):
         self.data = []
         self.columns_def = []
@@ -753,3 +829,18 @@ class ApplyStrategyState(TickerSelectionMixin, AgentRunMixin, rx.State):
             strategy_id: dict.fromkeys(inputs, ""),
         }
 
+
+def _is_strategy_apply_draft(content: Any) -> bool:
+    """True when content looks like StrategyApplyFinalDraft."""
+    if not isinstance(content, dict):
+        return False
+    required = (
+        "dataset_id",
+        "dataset_name",
+        "dataset_explanation",
+        "strategies",
+        "strategies_explanation",
+    )
+    return all(key in content for key in required) and isinstance(
+        content.get("strategies"), list
+    )

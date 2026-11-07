@@ -1,55 +1,69 @@
 name: Stock-Research-Assistant
 services:
-    # 1. Snapshot Data Initialization Service
-    init_snapshot:
-        image: ghcr.io/akashdesarda/stock-research-platform/snapshot-data:latest
-        pull_policy: always
-        volumes:
-            - ./config.toml:/tmp/config.toml
-            - shared-data:/shared
-        environment:
-            FORCE_DECOMPRESSION: "false" # Force decompression only if required
-        command: ["uv", "run", "/snapshot_data_decompress.py"]
-        tty: true
-    # 2. Stock Database API Service
-    stockdb-api:
-        build:
-            context: ./stockdb
-            dockerfile: Dockerfile
-        image: ghcr.io/akashdesarda/stock-research-platform/stockdb-api:latest
-        pull_policy: always
-        ports:
-            - "8080:8080"
-        volumes:
-            - shared-data:/shared
-        environment:
-            CONFIG_FILE: /shared/assets/config.toml
-            DOCKER_CONTAINER: "true" # Explicit Docker environment flag
-            AI__AI_URL: "http://stocksense-ai"
-        depends_on:
-            init_snapshot:
-                condition: service_completed_successfully
-        tty: true
-    # 3. Stocksense AI
-    stocksense-ai:
-        image: ghcr.io/akashdesarda/stock-research-platform/stocksense-ai:latest
-        pull_policy: always
-        ports:
-            - "9000:9000"
-        volumes:
-            - shared-data:/shared
-        environment:
-            CONFIG_FILE: /shared/assets/config.toml
-            DOCKER_CONTAINER: "true" # Explicit Docker environment flag
-            COMMON__SQLITE_PATH: "/shared/sqlite/agno.db"
-            COMMON__POSTGRES_URL: "postgres"
-            STOCKDB__STOCKDB_URL: "http://stockdb-api"
-        tty: true
+  # 1. Snapshot Data Initialization Service
+  init_snapshot:
+    image: ghcr.io/akashdesarda/stock-research-platform/snapshot-data:latest
+    pull_policy: always
+    volumes:
+      - ./config.toml:/tmp/config.toml
+      - shared-data:/shared
+    environment:
+      FORCE_DECOMPRESSION: "false" # Force decompression only if required
+    command: ["uv", "run", "/snapshot_data_decompress.py"]
+    tty: true
+  # 2. Stock Database API Service
+  stockdb-api:
+    build:
+      context: ./stockdb
+      dockerfile: Dockerfile
+    image: ghcr.io/akashdesarda/stock-research-platform/stockdb-api:latest
+    pull_policy: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - shared-data:/shared
+    environment:
+      CONFIG_FILE: /shared/assets/config.toml
+      DOCKER_CONTAINER: "true" # Explicit Docker environment flag
+      AI__AI_URL: "http://stocksense-ai"
+    depends_on:
+      init_snapshot:
+        condition: service_completed_successfully
+    tty: true
+  # 3. Qdrant VectorDB
+  qdrant:
+    image: qdrant/qdrant:latest
+    pull_policy: IfNotPresent
+    ports:
+      - 6333:6333
+      - 6334:6334
+    expose:
+      - 6333
+      - 6334
+      - 6335
+    volumes:
+      - shared-data:/qdrant/storage
+    tty: true
+  # 4. Stocksense AI
+  stocksense-ai:
+    image: ghcr.io/akashdesarda/stock-research-platform/stocksense-ai:latest
+    pull_policy: always
+    ports:
+      - "9000:9000"
+    volumes:
+      - shared-data:/shared
+    environment:
+      CONFIG_FILE: /shared/assets/config.toml
+      DOCKER_CONTAINER: "true" # Explicit Docker environment flag
+      COMMON__SQLITE_PATH: "/shared/sqlite/agno.db"
+      COMMON__POSTGRES_URL: "postgres"
+      STOCKDB__STOCKDB_URL: "http://stockdb-api"
+    tty: true
 
 volumes:
-    shared-data:
-        driver: local
-        driver_opts:
-            type: none
-            o: bind
-            device: ~/.local/share/stock-research-platform
+  shared-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ~/.local/share/stock-research-platform

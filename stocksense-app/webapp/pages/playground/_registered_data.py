@@ -3,6 +3,7 @@ import reflex_enterprise as rxe
 from stocksense.types import DataInterval, DataPeriod
 
 from webapp.components.inputs import (
+    action_button,
     dropdown_select,
     refresh_button,
     tags_input,
@@ -137,59 +138,56 @@ def _edit_dataset_dialog() -> rx.Component:
 
 
 def registered_data_panel() -> rx.Component:
-    return bordered_container(
-        rx.vstack(
-            rxe.ag_grid(
-                id="registered-datasets-grid",
-                row_data=RegisteredDatasetState.datasets,
-                column_defs=DATASET_COLUMN_DEFS,
-                master_detail=True,
-                detail_cell_renderer_params=DATASET_DETAIL_PARAMS,
-                row_selection="single",
-                on_selection_changed=RegisteredDatasetState.set_selected_dataset_ids,
-                enable_cell_text_selection=True,
-                ensure_dom_order=True,
-                dom_layout="autoHeight",
-                width="100%",
-            ),
-            bordered_container(
-                rx.vstack(
-                    section_header(
-                        "Edit Dataset",
-                        "Select a dataset row from the grid, or enter a dataset ID manually, then open it in the edit dialog.",
-                        action_button=refresh_button(
-                            on_click=RegisteredDatasetState.force_refresh,
-                            size="2",
+    # return bordered_container(
+    return rx.vstack(
+        bordered_container(
+            rx.vstack(
+                section_header(
+                    "Edit Dataset",
+                    "Select a dataset row from the grid, or enter a dataset ID manually to edit it.",
+                ),
+                rx.hstack(
+                    form_field(
+                        label="Dataset ID",
+                        control=text_input(
+                            placeholder="Enter dataset id",
+                            value=RegisteredDatasetState.selected_dataset_id,
+                            on_change=RegisteredDatasetState.set_selected_dataset_id,
+                            width="100%",
                         ),
                     ),
-                    rx.hstack(
-                        form_field(
-                            label="Dataset ID",
-                            control=text_input(
-                                placeholder="Enter dataset id",
-                                value=RegisteredDatasetState.selected_dataset_id,
-                                on_change=RegisteredDatasetState.set_selected_dataset_id,
-                                width="100%",
-                            ),
-                        ),
-                        rx.button(
-                            rx.icon("pencil", size=16),
-                            "Edit Selected",
-                            on_click=RegisteredDatasetState.edit_selected_dataset,
-                            loading=RegisteredDatasetState.edit_is_loading,
-                            size="2",
-                        ),
-                        width="100%",
-                        align_items="end",
-                        spacing="4",
+                    action_button(
+                        "Edit Selected",
+                        left_icon="pencil",
+                        on_click=RegisteredDatasetState.edit_selected_dataset,
+                        loading=RegisteredDatasetState.edit_is_loading,
                     ),
+                    rx.spacer(),
+                    refresh_button(on_click=RegisteredDatasetState.force_refresh),
                     width="100%",
+                    align_items="end",
                     spacing="4",
                 ),
                 width="100%",
+                spacing="4",
             ),
-            _edit_dataset_dialog(),
             width="100%",
-            spacing="6",
-        )
+        ),
+        _edit_dataset_dialog(),
+        rx.spacer(),
+        rxe.ag_grid(
+            id="registered-datasets-grid",
+            row_data=RegisteredDatasetState.datasets,
+            column_defs=DATASET_COLUMN_DEFS,
+            master_detail=True,
+            detail_cell_renderer_params=DATASET_DETAIL_PARAMS,
+            row_selection="single",
+            on_selection_changed=RegisteredDatasetState.set_selected_dataset_ids,
+            enable_cell_text_selection=True,
+            ensure_dom_order=True,
+            dom_layout="autoHeight",
+            width="100%",
+        ),
+        width="100%",
+        spacing="6",
     )

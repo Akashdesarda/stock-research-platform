@@ -1,11 +1,12 @@
 import logging
-from collections.abc import Awaitable, Callable
-from typing import Literal
+from collections.abc import Awaitable, Callable, Iterator
+from typing import Any, Literal
 
 import polars as pl
 import reflex as rx
 from agno.client import AgentOSClient
 from agno.run import agent as agent_event
+from agno.run import workflow as workflow_event
 from httpx2 import AsyncClient, Timeout
 from stocksense.config import get_settings
 
@@ -266,6 +267,9 @@ class ChatMixin(rx.State, mixin=True):
         self.agent_status_message = ""
         self.agent_run_id = ""
         self._active_agent_id = ""
+        self.workflow_run_id = ""
+        self._active_workflow_id = ""
+        self.workflow_error = ""
 
     @rx.event
     async def append_message(self, role: Literal["user", "assistant"], content: str):
@@ -348,7 +352,11 @@ class AgentRunMixin(rx.State, mixin=True):
     agent_error: str = ""
     agent_status_message: str = ""
 
+    workflow_run_id: str = ""
+    workflow_error: str = ""
+
     _active_agent_id: str = ""
+    _active_workflow_id: str = ""
 
     @property
     def ai_client(self) -> AgentOSClient:
@@ -390,6 +398,97 @@ class AgentRunMixin(rx.State, mixin=True):
                 self.agent_error = f"Failed to generate due to error: {e}."
             # Re-raise to preserve return type contract
             raise
+
+    async def workflow_run(self, **kwargs) -> workflow_event.WorkflowRunOutput:
+        async with self:
+            self._active_workflow_id = kwargs["workflow_id"]
+            self._record_step(
+                TraceStep(
+                    name=f"Running workflow {kwargs['workflow_id']}", icon="workflow"
+                )
+            )
+        try:
+            run_output = await self.ai_client.run_workflow(**kwargs)
+            async with self:
+                self.workflow_run_id = run_output.run_id
+                self._record_step(
+                    TraceStep(
+                        name=f"Workflow {kwargs['workflow_id']} completed run",
+                        icon="workflow",
+                    )
+                )
+            return run_output
+
+        except Exception as e:
+            logger.exception("Workflow run failed", exc_info=e)
+            async with self:
+                self._record_step(
+                    TraceStep(
+                        name=f"Workflow {kwargs['workflow_id']} failed to generate",
+                        icon="workflow",
+                        detail=str(e),
+                        passed=False,
+                    )
+                )
+                self.workflow_error = f"Failed to generate due to error: {e}."
+            raise
+
+    @staticmethod
+    def _step_attr(step: Any, name: str, default: Any = None) -> Any:
+        if isinstance(step, dict):
+            return step.get(name, default)
+        return getattr(step, name, default)
+
+    @classmethod
+    def _iter_step_outputs(cls, step_results: Any) -> Iterator[Any]:
+        """Yield step outputs depth-first, including Parallel nested children."""
+        for step in step_results or []:
+            yield step
+            nested = cls._step_attr(step, "steps") or []
+            if nested:
+                yield from cls._iter_step_outputs(nested)
+
+    def _workflow_failure_message(
+        self,
+        run_output: workflow_event.WorkflowRunOutput,
+        *,
+        default_summary: str = "Workflow failed.",
+    ) -> str:
+        """Build a UI error string from a failed workflow run.
+
+        Agno returns a string ``content`` summary on logical failure, while
+        ``step_results`` (including nested Parallel children) hold the
+        actionable per-step ``error`` / content strings.
+        """
+        content = run_output.content
+        summary = (
+            content.strip()
+            if isinstance(content, str) and content.strip()
+            else default_summary
+        )
+
+        failures: list[str] = []
+        for step in self._iter_step_outputs(run_output.step_results):
+            if self._step_attr(step, "success", True):
+                continue
+            # Prefer leaf failures; Parallel wrappers usually have a markdown
+            # rollup that is noisier than the child step errors.
+            if self._step_attr(step, "steps"):
+                continue
+
+            step_name = self._step_attr(step, "step_name") or "Unknown step"
+            detail = self._step_attr(step, "error") or ""
+            if not detail:
+                step_content = self._step_attr(step, "content")
+                if isinstance(step_content, str) and step_content.strip():
+                    detail = step_content.strip()
+            if not detail or detail == summary:
+                continue
+            failures.append(f"{step_name}: {detail}")
+
+        if not failures:
+            return summary
+        return f"{summary}\n" + "\n".join(failures)
 
     async def stream_agent_run(
         self,
@@ -581,6 +680,26 @@ class AgentRunMixin(rx.State, mixin=True):
             logger.error("Cancel request failed", exc_info=e)
             async with self:
                 self.agent_error = f"Failed to cancel run: {e}"
+
+    @rx.event
+    async def cancel_workflow_run(self):
+        """Request server-side cancellation of the active workflow run."""
+        if self.run_state != RunState.generating.value or not self.workflow_run_id:
+            return
+        try:
+            self._record_step(
+                TraceStep(
+                    name="Canceling workflow run", icon="circle_minus", passed=False
+                )
+            )
+            await self.ai_client.cancel_workflow_run(
+                workflow_id=self._active_workflow_id,
+                run_id=self.workflow_run_id,
+            )
+        except Exception as e:
+            logger.error("Cancel workflow request failed", exc_info=e)
+            async with self:
+                self.workflow_error = f"Failed to cancel run: {e}"
 
     @rx.event(background=True)
     async def resume_agent_run(self, message_index: int):

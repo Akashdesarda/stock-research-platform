@@ -519,7 +519,7 @@ class StockDBTools(Toolkit):
             list[dict[str, str]]: A list of datasets with dataset_id, name, description.
         """
 
-        response = await self._aclient.get("/api/operation/data")
+        response = await self._aclient.get("/operation/data")
         # NOTE - Output is a list of dictionaries with dataset_id, name, description, logical_plan, tags, last_modified
         data = response.json()
         return [

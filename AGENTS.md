@@ -14,7 +14,7 @@ The platform consists of five main components:
 2. **StockDB API** (`stockdb/`): FastAPI-based REST API service for stock data operations and bulk processing
 3. **StockSense App** (`stocksense-app/`): Reflex-based interactive web application for user interfaces
 4. **StockSense AI** (`stocksense-ai/`): Agno based LLM application for all AI agentic capabilities
-5. **Snapshot Automation** (`snapshot/`): Data compression/decompression utilities for efficient storage
+5. **Snapshot Automation** (`snapshot/`): Data compression/decompression utilities for efficient storage based on Deltalake format
 
 ### Technology Stack
 
@@ -25,7 +25,7 @@ The platform consists of five main components:
 - **Web Framework**: Reflex (Python-based reactive web framework)
 - **API Framework**: FastAPI with Scalar documentation
 - **Observability**: Agno's native observability for AI/LLM tracing
-- **Database**: Delta Lake (primary), PostgreSQL 17 (only limited to Agno)
+- **Database**: Delta Lake (primary), SQLite (only limited to Agno backend)
 - **Containerization**: Docker with Docker Compose orchestration
 
 ## Building and Running
@@ -62,6 +62,7 @@ uv run python main.py
 ```bash
 cd stocksense-app/
 uv sync
+uv run reflex compile
 uv run reflex run
 # App will be available at http://localhost:3000
 ```
@@ -83,7 +84,7 @@ docker-compose up
 # Services:
 # - StockDB API: http://localhost:8080
 # - Agno AgentOS: http://localhost:9000
-# - PostgreSQL: localhost:5432
+# - StockSense App: http://localhost:3000
 ```
 
 ### Running Tests
@@ -137,7 +138,7 @@ pytest tests/tests_strategy/    # Strategy tests
 - **ETL Scripts**: Place in `stockdb/pipeline/` (e.g., `ticker_history_data_download.py`)
 - **Database Access**: Use `StockDataDB` class from `core/src/stocksense/data/_db.py` for consistent data access
 - **Data Sources**: NSE data via `core/src/stocksense/data/_nse.py`, Yahoo Finance via `_yahoo.py`
-- **Storage**: Data stored in Deltalake format via Polars for efficient columnar access
+- **Storage**: Data stored in Deltalake format & access via Polars for efficient columnar access
 
 ### Configuration Management
 
@@ -160,12 +161,12 @@ The platform uses a sophisticated configuration system (`core/src/stocksense/con
 ### Internal Communication
 
 - **App → API**: Web application calls StockDB API via HTTP (configured in `app.stockdb.stockdb_url`)
+- **AI API**: Web application calls StockSense AI via HTTP (configured in `app.stockense_ai.ai_url`) using Agno's AgentOS client library
 - **Shared Core**: All components import from `stocksense-core` package
-- **Database**: PostgreSQL shared between services (multiple databases: `stockdb`, `agno`)
 
 ### External Dependencies
 
-- **Data Sources**: NSE (via nsetools), Yahoo Finance (via yfinance)
+- **Data Sources**: NSE (via jugaad-data), Yahoo Finance (via yfinance)
 - **AI Providers**: OpenAI, Anthropic, Google, Groq, OpenRouter, Ollama (configured in `config.toml`)
 - **Observability**: Agno trace for LLM tracing (Agno built-in)
 
@@ -247,8 +248,6 @@ The platform uses a sophisticated configuration system (`core/src/stocksense/con
 ## Security Considerations
 
 - **API Keys**: Store in `config.toml` (gitignored), never hardcode
-- **Database Credentials**: Use environment variables in production
-- **CORS**: Configure appropriately for production deployments
 - **Input Validation**: All API inputs validated via Pydantic models
 
 ## Performance Optimization
@@ -264,10 +263,6 @@ The platform uses a sophisticated configuration system (`core/src/stocksense/con
 
 Ensure `CONFIG_FILE` environment variable points to valid `config.toml`, or run from repository root where config can be discovered.
 
-### Docker Volume Permissions
-
-If encountering permission issues, check that shared volume has appropriate ownership for container users.
-
 ### Port Conflicts
 
 Default ports: 8080 (API), 3000 (App), 5432 (PostgreSQL), 9000 (Agno AgentOS). Modify in `config.toml` or `docker-compose.yml` if conflicts occur.
@@ -282,8 +277,7 @@ Ensure virtual environment is activated and dependencies installed via `uv sync`
 - **Reflex Documentation**: <https://reflex.dev/docs/>
 - **FastAPI Documentation**: <https://fastapi.tiangolo.com/>
 - **Agno Documentation**: <https://docs.agno.com/>
-- **Pydantic-AI Documentation**: <https://ai.pydantic.dev/>
 
 ---
 
-**For AI Agents**: When working with this codebase, prioritize existing patterns and utilities over creating new abstractions. Reference the directory structure and key files above to understand the project layout. Use the documented workflows for common tasks. Always check `config.py` for configuration requirements and `.github/copilot-instructions.md` for additional context.
+**For AI Agents**: When working with this codebase, prioritize existing patterns and utilities over creating new abstractions. Reference the directory structure and key files above to understand the project layout. Use the documented workflows for common tasks. Always check `config.py` for configuration requirements.

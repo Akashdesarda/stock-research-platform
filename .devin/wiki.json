@@ -1,0 +1,302 @@
+{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "StockSense Platform Overview",
+      "purpose": "High-level introduction to the StockSense stock research platform: its purpose, monorepo architecture, five major components, technology stack, and how they interconnect. Links to child pages for each major subsystem.",
+      "page_notes": [
+        {
+          "content": "High level wiki to understand purpose of this open source project"
+        }
+      ]
+    },
+    {
+      "title": "Getting Started & Local Development",
+      "purpose": "Step-by-step guide for setting up the development environment: prerequisites (Python 3.13+, uv), per-component setup commands, running tests, and Docker Compose full-stack deployment. Covers port assignments and common troubleshooting.",
+      "parent": "StockSense Platform Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Configuration System",
+      "purpose": "Deep dive into the centralized config.toml-based configuration system: Settings schema, environment detection (Docker vs. local), path resolution pipeline, AI provider key management, and the save_as_toml persistence mechanism.",
+      "parent": "StockSense Platform Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Deployment & Infrastructure",
+      "purpose": "Covers Docker Compose orchestration, service startup order (init_snapshot → stockdb-api → stocksense-ai), shared volume strategy, Dockerfiles for each service, PostgreSQL setup, and CI/CD pipeline.",
+      "parent": "StockSense Platform Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Core Library (stocksense-core)",
+      "purpose": "Overview of the shared core Python library that all other components depend on. Introduces the major sub-packages: data acquisition, data persistence, technical analysis strategies, AI agents, and utilities. Links to child pages for each sub-package.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Data Acquisition Layer",
+      "purpose": "Explains how market data is fetched from external sources. Covers YFStockData (Yahoo Finance wrapper), NSEAccessor for Indian market data, Exchange gateway class, StockExchangeYahooIdentifier suffix mapping, DataPeriod/DataInterval enums, and the Polars-based data normalization pipeline.",
+      "parent": "Core Library (stocksense-core)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "StockDataDB — Delta Lake Persistence",
+      "purpose": "Documents the StockDataDB class: Delta Lake table management, sql_filter (DuckDB registration), polars_filter, merge/upsert operations, ZSTD compression, schema_mode merge, and the LogicalPlan hydration pipeline. Covers SQLQueryValidator and stable_hash utilities.",
+      "parent": "Core Library (stocksense-core)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Technical Analysis Strategy Engine",
+      "purpose": "Covers the Polars .ta namespace extension: register_ta(), TechnicalAnalysis accessor class, and all indicator sub-accessors (trend, volume, momentum, volatility, cycle, pattern, stats, overlap). Explains TA-Lib integration, OHLCV validation, and crossover signal patterns.",
+      "parent": "Core Library (stocksense-core)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Strategy Catalog & Registry",
+      "purpose": "Documents the YAML-driven strategy catalog: StrategyDescriptor, AnalysisDomainDescriptor, StrategyCategoryTypes, MarketRegime, TimeHorizon, and the StrategyRegistry with its inverted indexes. Covers filter_strategies(), get_registry() (lru_cache), parameter specs consumed by the strategy apply flow, and SQLQueryValidator column enforcement.",
+      "parent": "Core Library (stocksense-core)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Core AI Agents & Utilities",
+      "purpose": "Covers the pydantic-ai based agent layer in core: text_to_sql agent, company_summary and company_summary_qa agents, generate_dataset_description unit agent, dependency injection contexts, history processors, LLM provider abstraction (get_model), prompt helpers, and Phoenix/OpenTelemetry tracing.",
+      "parent": "Core Library (stocksense-core)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "StockDB API Service",
+      "purpose": "Overview of the FastAPI-based StockDB microservice: its role as the data middleware layer, key routers, health check logic, middleware, error handling, and dependency management. Links to child pages for routers, pipelines, and testing.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "API Routers & Data Models",
+      "purpose": "Documents all StockDB API routers: per_security, bulk, ops (optimization, ingestion, dataset registration/hydration, prompt caching), agents (text-to-sql, company-summary, QA streaming), and strategy (strategy listing, parameters, /strategy/apply). Covers key Pydantic models: LogicalPlan, DataRegistrationInput, PromptCache, AgentStructuredResponse.",
+      "parent": "StockDB API Service",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Data Ingestion Pipelines",
+      "purpose": "Covers the ETL pipeline scripts: ticker_history_data_download (full vs. incremental, batch processing), exchange_equity_tableinfo (metadata acquisition), create_table (Delta table initialization), and their CLI interfaces plus inter-pipeline dependencies.",
+      "parent": "StockDB API Service",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "StockDB Testing",
+      "purpose": "Documents the StockDB test suite: API router tests (per_security, bulk, ops, strategy), pipeline tests, model tests, and the root health check test. Covers test setup patterns and fixtures.",
+      "parent": "StockDB API Service",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "StockSense AI Service",
+      "purpose": "Overview of the Agno-based AI microservice (stocksense-ai): AgentOS orchestration, agent registry, workflows, SQLite session persistence, token optimization, and the FastAPI application structure. Links to child pages for agents, prompts/tools, and workflows.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Agent Definitions & Schemas",
+      "purpose": "Documents the Agno agents: text_to_sql, strategy_selector, strategy_resolver, strategy_param_resolver, dataset_resolver, company_summary, dataset_description, session_title. Covers output schemas (TextToSQLOutput, StrategySelection, DatasetSelection, StrategyParamSelection, SessionTitleOutput), agent helpers, and agentic state management.",
+      "parent": "StockSense AI Service",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Prompt Management & Agent Tools",
+      "purpose": "Covers the YAML-based PromptManager system, prompt templates per agent, and tool implementations: SQL verification tools (syntax, table name, returns-data), StrategyDiscoveryTools two-hop discovery, and StockDBTools company context/caching.",
+      "parent": "StockSense AI Service",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Agno Workflows (Strategy Application)",
+      "purpose": "New page documenting the multi-step Agno workflow layer in stocksense-ai/app/workflows: the strategy-application workflow (dataset_step, strategy_step, parallel verification, parameters_selection_step), HumanReview/OnError pause semantics, StrategyApplyLabel/StrategyApplyFinalDraft schemas, helper functions (step_content_check, fail_step_output), and how the web app consumes workflow_run streams.",
+      "parent": "StockSense AI Service",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "StockSense Web Application",
+      "purpose": "Overview of the Reflex-based web application (stocksense-app): application routing, page structure, state management pattern, navigation system, and the three main feature areas (AI Research, Playground, Management). Links to child pages for each area.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "UI Component Library",
+      "purpose": "Documents the reusable component library: page_layout, bordered_container, responsive_grid, section_header, stat_card, data_preview (Polars→AG Grid), dict_table, refined_markdown, action_button variants, dropdown_select, multi_select_dropdown, number_input, date_range_picker, form_field, dialog_form, and the navbar with NavGroup routing.",
+      "parent": "StockSense Web Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "State Management & Mixin Architecture",
+      "purpose": "Explains the mixin-based state pattern: CommonMixin, TickerSelectionMixin, ChatMixin, AgentRunMixin (Agno stream consumption, workflow_run, RunState lifecycle, cancel support). Covers CompanySummaryState MRO, inline_steps vs workflow_steps, TraceStep recording, and session management.",
+      "parent": "StockSense Web Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "AI Research Pages",
+      "purpose": "Documents the AI-facing pages: company_summary_component, company_summary_qa follow-up flow, AI chat page, and the shared_components library (ticker_selector, chat_window, chat_input, workflow_steps timeline, chat bubble dispatcher with inline steps toggle).",
+      "parent": "StockSense Web Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Playground Pages",
+      "purpose": "Documents the Playground feature area: strategy discovery panel (domain→category→strategy cascade), AI strategy discovery (StrategyAIState), the Apply Strategy panel (ApplyStrategyState, parameter specs, AI draft hydration via the strategy-application workflow), and the data workspace (manual SQL/ticker query, AI text-to-sql, registered datasets CRUD).",
+      "parent": "StockSense Web Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Management Pages",
+      "purpose": "Documents the Management feature area: ConfigurationState (LLM API key management, save_as_toml, apply_to_current_session), TaskState (background data download, table optimize/vacuum, prompt cache search), and the configuration and task UI pages.",
+      "parent": "StockSense Web Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Snapshot Automation",
+      "purpose": "Overview of the snapshot subsystem used to seed the shared data volume. Links to child pages for the compression/decompression scripts and the packaging/automation tooling.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Compression & Decompression Scripts",
+      "purpose": "Details snapshot_data_compress.py (zstd+tar archive creation) and snapshot_data_decompress.py (container initialization, shared volume setup, FORCE_DECOMPRESSION flag, config.toml injection).",
+      "parent": "Snapshot Automation",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Snapshot Packaging & Automation",
+      "purpose": "Covers the snapshot Dockerfile for the init_snapshot service, PowerShell/Bash automation scripts, and the snapshot project dependency setup (pyproject/uv.lock).",
+      "parent": "Snapshot Automation",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Testing Guide",
+      "purpose": "Overview of the testing strategy across all components, linking to child pages for core library tests and service-level tests. Covers pytest-asyncio usage, fixtures, and per-component test commands.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Core Library Tests",
+      "purpose": "Documents core tests: config/config resolution, data layer (yahoo, nse, db), SQL tools, the strategy TA indicator test matrix, and shared test helpers (grouped.py).",
+      "parent": "Testing Guide",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Service Tests (StockDB & AI)",
+      "purpose": "Documents service-level tests: StockDB router/pipeline/model tests and setup fixtures, plus stocksense-ai prompt and SQL validation tests with conftest fixtures.",
+      "parent": "Testing Guide",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    }
+  ]
+}
